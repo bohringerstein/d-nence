@@ -10,7 +10,7 @@ const gauss = () => Math.sqrt(-2 * Math.log(ER() + 1e-9)) * Math.cos(TAU * ER())
 const rnd4 = x => Math.round(x * 1e4) / 1e4;
 const needS = NEED + 2 * TAU / 720;
 
-function lockInto(ch, r, need) { // kilit sonrası açıklık; en geniş sonucu verir
+function lockInto(ch, r) { // kilit sonrası açıklık; en geniş sonucu verir
   const h = r.gap * DEG / 2;
   if (!ch) return { c: r.angle, w: h * 2 };
   let best = null;
@@ -54,9 +54,10 @@ function play(def, limit, { tol = 0.7, sigma = 0.06 } = {}) {
           for (const g of gapCenters(r)) { const d = norm(g - ch.c), lo = Math.max(-ch.w / 2, d - h), hi = Math.min(ch.w / 2, d + h); if (hi - lo >= needS && ch.w - (hi - lo) <= allow) want = true; } }
       }
       if (want) {
+        // Dokunus hatasi: erken de gec de olsa TUM halkalari birlikte sarar (gercek oyunda oyuncu zamani kaydirir, tek halkayi degil)
         const e = gauss() * sigma;
-        const saved = r.angle;
-        if (e > 0) { let k = e; while (k > 0) { t += dt; stepRings(rs, dt, t); k -= dt; } } else r.angle -= r.speed * r.dir * (-e);
+        const sdt = e >= 0 ? dt : -dt;
+        for (let k = Math.abs(e); k > 0; k -= dt) { t += sdt; stepRings(rs, sdt, t); }
         ch = lockInto(ch, r); if (ch.w < NEED) return { win: false, t };
         r.locked = true; last = t; done = true; break;
       }
@@ -78,7 +79,6 @@ function sizeGaps(rings, tolSec) {
     if (r.gaps === 2 && (gap > 80 || r.gapOffset < gap + 30 || 360 - r.gapOffset < gap + 30)) r.gaps = 1;
   }
 }
-const tolBase = n => 0.19 - 0.1 * ((n - 1) / 59);
 
 function candidate(n) {
   const count = Math.min(2 + Math.floor((n - 1) / 4), 6);
@@ -94,7 +94,8 @@ function candidate(n) {
     while (picks.length < pre) { const k = Math.floor(R() * count); if (!picks.includes(k)) picks.push(k); }
     picks.forEach((k, j) => { Object.assign(rings[k], { preLocked: true, gaps: 1, flip: 0, wobble: false, start: anchor + (j ? (R() - 0.5) * 0.15 : 0) }); });
   }
-  sizeGaps(rings, tolBase(n) * (0.8 + R() * 0.5));
+  // Bosluk genisligini tune() belirler; burada hesaplamak gereksizdi ve yan etkisi
+  // (gap > 80 ise gaps 2 -> 1) uretilen iki kapili halkalarin %80'ini yok ediyordu.
   return rings;
 }
 
@@ -103,7 +104,9 @@ const A = -Math.PI / 2;
 const mk = o => ({ gap: 0, gaps: 1, gapOffset: 150, flip: 0, wobble: false, preLocked: false, ...o });
 const BOSSES = {
   10: { name: 'Ayna', hint: 'Hepsi aynı anda hizalanıyor, o anı bekle ve hızlı dokun', tol: 0.2,
-    rings: () => [1.3, -1.3, 1.3, -1.3].map(s => mk({ speed: s, start: A - s * 2.5 })) },
+    // Hizlar birbirinden farkli olmali: esit hiz + esit start = birebir ayni halka, o kilit acikligi hic daraltmaz.
+    // start = A - s * 2.5 oldugu icin hepsi yine t = 2,5 sn'de A acisinda hizalanir.
+    rings: () => [1.3, -1.3, 1.9, -1.9].map(s => mk({ speed: s, start: A - s * 2.5 })) },
   20: { name: 'Merkez', hint: 'Ortadaki kilitli halka yolu gösteriyor', tol: 0.15,
     rings: () => [2.0, -1.4, 0, 1.4, -2.0].map((s, i) => mk(i === 2 ? { speed: 1, preLocked: true, start: A } : { speed: s, start: R() * TAU })) },
   30: { name: 'Metronom', hint: 'Halkalar sallanıyor, orta noktadan geçerken yakala', tol: 0.13,
@@ -124,7 +127,7 @@ function finalize(rings) {
   const limit = +Math.max(best * 1.6 + 2, 4 + 1.5 * moving).toFixed(1);
   return { def, best, limit };
 }
-function evaluate(L, trials = 40) {
+function evaluate(L, trials = 50) {
   es = 777; let w = 0, qs = []; for (let k = 0; k < trials; k++) { const r = play(L.def, L.limit); if (r.win) { w++; qs.push(r.q); } }
   return { win: w / trials, qs };
 }
