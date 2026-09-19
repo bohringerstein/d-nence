@@ -4,12 +4,25 @@
   "private": true,
   "description": "Kasa: tek dokunusla oynanan, level tabanli 2B mobil oyun",
   "scripts": {
-    "gen": "node tools/gen.js",
-    "verify": "node tools/gen.js --verify",
-    "verify:full": "node tools/gen.js --verify --deterministic",
-    "test": "node --test tools/*.test.js",
-    "sync": "node tools/sync-prototype.js",
-    "check": "npm run test && npm run verify && node tools/sync-prototype.js --check"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "gen": "node tools/gen.ts",
+    "verify": "node tools/gen.ts --verify",
+    "verify:full": "node tools/gen.ts --verify --deterministic",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "sync": "node tools/sync-prototype.ts",
+    "check": "npm run typecheck && npm test && npm run verify && node tools/sync-prototype.ts --check"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  },
+  "type": "module"
 }

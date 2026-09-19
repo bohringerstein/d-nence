@@ -1,13 +1,20 @@
-// node --test tools/
-const test = require("node:test");
-const assert = require("node:assert");
-const C = require("./core.js");
+import test from "node:test";
+import assert from "node:assert";
+import * as C from "./index.ts";
+import type { Ring, RingDef } from "./rings.ts";
+import type { Open } from "./opening.ts";
+
 const { TAU, DEG, BIN, BINS } = C;
 
-const ring = o => ({ speed: 1, gap: 40, gaps: 1, gapOffset: 150, flip: 0, wobble: false, preLocked: false, start: 0, ...o });
-const live = o => { const r = ring(o); return { ...r, angle: r.start, dir: 1, t: 0, locked: false }; };
-const deg = r => r / DEG;
-const yakin = (a, b, tol, mesaj) => assert.ok(Math.abs(a - b) <= tol, `${mesaj}: ${a} ile ${b} arasi fark ${Math.abs(a - b)} > ${tol}`);
+const ring = (o: Partial<RingDef> = {}): RingDef =>
+  ({ speed: 1, gap: 40, gaps: 1, gapOffset: 150, flip: 0, wobble: false, preLocked: false, start: 0, ...o });
+const live = (o: Partial<RingDef> = {}): Ring => {
+  const r = ring(o);
+  return { ...r, angle: r.start, dir: 1, t: 0, locked: false };
+};
+const deg = (r: number): number => r / DEG;
+const yakin = (a: number, b: number, tol: number, mesaj: string): void =>
+  assert.ok(Math.abs(a - b) <= tol, `${mesaj}: ${a} ile ${b} arasi fark ${Math.abs(a - b)} > ${tol}`);
 
 // ---- açı normalleştirme ----
 test("norm açıyı -pi..pi aralığına taşır", () => {
@@ -94,7 +101,7 @@ test("analitik aralık modeli ile dilim modeli en fazla 1 dilim ayrışır", () 
     const n = 2 + Math.floor(R() * 5);
     const rs = [];
     for (let i = 0; i < n; i++) rs.push(live({ gap: 25 + R() * 60, gaps: R() < 0.35 ? 2 : 1, gapOffset: 120 + R() * 70, start: R() * TAU }));
-    let open = C.OPEN_ALL; const m = C.newMask();
+    let open: Open = C.OPEN_ALL; const m = C.newMask();
     for (const r of rs) {
       open = C.lockOpen(open, r); C.applyMask(m, r);
       const a = C.largestOpen(open).w, b = C.maskLargest(m).w;

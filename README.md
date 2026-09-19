@@ -19,10 +19,11 @@ Claude Code, `CLAUDE.md` dosyasını her oturumda kendiliğinden okur. Bu yüzde
 | `CLAUDE.md` | Claude Code'un proje yönergesi: kurallar, çalışma planı, seninle nasıl iletişim kuracağı. |
 | `docs/SPEC.md` | Oyunun tam teknik şartnamesi. |
 | `reference/kasa.html` | Çalışan prototip. Çift tıklayıp tarayıcıda oynayabilirsin. |
-| `tools/core.js` | Oyun ile level üreticinin paylaştığı çekirdek kurallar. Tek kaynak budur. |
-| `tools/gen.js` | Level üretici ve doğrulayıcı. |
-| `tools/*.test.js` | Çekirdek ve level tablosu testleri. |
-| `tools/sync-prototype.js` | Çekirdeği ve level tablosunu prototipe gömer. |
+| `src/core/` | Oyunun kuralları: geometri, halka hareketi, açıklık, yıldız (TypeScript). Tek kaynak budur. |
+| `src/main.ts` | Uygulamanın giriş noktası. |
+| `src/core/*.test.ts` | Çekirdek ve level tablosu testleri. |
+| `tools/gen.ts` | Level üretici ve doğrulayıcı. |
+| `tools/sync-prototype.ts` | Çekirdeği ve level tablosunu prototipe gömer. |
 | `data/levels.json` | Hazır 60 level. |
 
 ## İşine yarayacak komutlar

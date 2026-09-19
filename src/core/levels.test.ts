@@ -1,20 +1,30 @@
 // Tablo testi: her levelin, OYUNUN kullandığı maske modeliyle de bitirilebildiğini gösterir.
 // Üretici analitik aralık modeliyle çalışır; bu test ikisinin 60 levelin hiçbirinde ayrışmadığını
 // kanıtlar. Ayrışırsa, üreticinin "çözülebilir" dediği bir level oyunda kaybedilir.
-const test = require("node:test");
-const assert = require("node:assert");
-const fs = require("fs"), path = require("path");
-const C = require("./core.js");
+import test from "node:test";
+import assert from "node:assert";
+import fs from "node:fs";
+import path from "node:path";
+import * as C from "./index.ts";
+import type { Open } from "./opening.ts";
+import type { LevelTable } from "./levels.ts";
+import type { RingDef } from "./rings.ts";
+
 const { DEG, TAU, REACT, canPass, stepRings, liveRings, OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen } = C;
 
-const data = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "levels.json"), "utf8"));
+const data: LevelTable = JSON.parse(
+  fs.readFileSync(path.join(import.meta.dirname, "..", "..", "data", "levels.json"), "utf8"));
 const needS = C.NEED_PASS + C.SOLVER_MARGIN;
 
+interface Kilit { i: number; t: number }
+interface Trace { t: number; kilitler: Kilit[]; w: number }
+
 // Referans çözücü, ama kilit anlarını da kaydeder
-function solveTrace(def) {
+function solveTrace(def: RingDef[]): Trace | null {
   const rs = liveRings(def), dt = 1 / 120;
-  let open = initialOpen(rs), t = 0, last = 0;
-  const kilitler = [];
+  let open: Open = initialOpen(rs);
+  let t = 0, last = 0;
+  const kilitler: Kilit[] = [];
   for (let i = 0; i < rs.length; i++) {
     const r = rs[i]; if (r.locked) continue;
     const rem = rs.filter((x, k) => k > i && !x.locked).length;
@@ -36,8 +46,10 @@ function solveTrace(def) {
   return { t, kilitler, w: largestOpen(open).w };
 }
 
+interface Replay { win: boolean; t: number; w: number; kacinci?: number }
+
 // Aynı kilit anlarını oyunun maske modelinden geçir
-function replayWithMask(def, kilitler) {
+function replayWithMask(def: RingDef[], kilitler: Kilit[]): Replay {
   const rs = liveRings(def), dt = 1 / 120;
   const mask = C.newMask();
   rs.forEach(r => { if (r.locked) C.applyMask(mask, r); });
@@ -62,7 +74,7 @@ test("tablo dosyası okunabilir ve 60 level içeriyor", () => {
 });
 
 test("her level referans çözücüyle bitirilebiliyor ve süre sınırına sığıyor", () => {
-  const sorun = [];
+  const sorun: string[] = [];
   for (const l of data.levels) {
     const s = solveTrace(l.rings);
     if (!s) { sorun.push(`level ${l.n}: çözücü bitiremedi`); continue; }
@@ -72,11 +84,12 @@ test("her level referans çözücüyle bitirilebiliyor ve süre sınırına sı�
 });
 
 test("çözücünün yolu oyunun maske modelinde de kazanıyor", () => {
-  const sorun = []; let enBuyukFark = 0;
+  const sorun: string[] = []; let enBuyukFark = 0;
   for (const l of data.levels) {
     const s = solveTrace(l.rings);
+    assert.ok(s, `level ${l.n}: çözücü bitiremedi`);
     const g = replayWithMask(l.rings, s.kilitler);
-    if (!g.win) sorun.push(`level ${l.n}: ${g.kacinci + 1}. kilitte maske kapandı (${(g.w / DEG).toFixed(2)}°)`);
+    if (!g.win) sorun.push(`level ${l.n}: ${(g.kacinci ?? 0) + 1}. kilitte maske kapandı (${(g.w / DEG).toFixed(2)}°)`);
     else enBuyukFark = Math.max(enBuyukFark, Math.abs(g.w - s.w));
   }
   assert.deepEqual(sorun, [], sorun.join("; "));

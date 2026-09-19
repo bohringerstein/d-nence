@@ -1,19 +1,36 @@
 // Kasa level üretici. Kullanım:
-//   node tools/gen.js           -> data/levels.json dosyasını yeniden üretir (sabit tohum, her seferinde aynı sonuç)
-//   node tools/gen.js --verify  -> mevcut data/levels.json dosyasını sanal oyuncularla test eder
-const fs = require("fs"); const path = require("path");
-const { TAU, DEG, NEED, NEED_PASS, SOLVER_MARGIN, REACT, canPass, stepRings, liveRings,
-        OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio } = require("./core.js");
-const OUT = path.join(__dirname, "..", "data", "levels.json");
+//   npm run gen           -> data/levels.json dosyasını yeniden üretir (sabit tohum, her seferinde aynı sonuç)
+//   npm run verify        -> mevcut tabloyu denetler
+//   npm run verify:full   -> üstüne determinizmi de sınar
+import fs from "node:fs";
+import path from "node:path";
+import {
+  TAU, DEG, NEED, NEED_PASS, SOLVER_MARGIN, REACT, GAP_MAX_DEG,
+  canPass, stepRings, liveRings, validateTable,
+  OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio
+} from "../src/core/index.ts";
+import type { RingDef, Level, LevelTable } from "../src/core/index.ts";
+
+/** Üretim sırasındaki ham halka: tanıma gapScale eklenir, gap'i sizeGaps hesaplar. */
+interface RawRing extends RingDef { gapScale?: number }
+
+interface PlayResult { win: boolean; t: number; q?: number }
+interface Finalized { def: RingDef[]; best: number; limit: number; want: number; roomy: boolean }
+interface Evaluated { win: number; qs: number[] }
+type Candidate = Finalized & Evaluated & { tol: number; boss?: string; hint?: string };
+interface Boss { name: string; hint: string; tol: number; rings: () => RawRing[] }
+type Log = (...args: unknown[]) => void;
+
+const OUT = path.join(import.meta.dirname, "..", "data", "levels.json");
 let seed = 12345; const R = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 let es = 1; const ER = () => { es = (es * 16807) % 2147483647; return es / 2147483647; };
 const gauss = () => Math.sqrt(-2 * Math.log(ER() + 1e-9)) * Math.cos(TAU * ER());
-const rnd4 = x => Math.round(x * 1e4) / 1e4;
+const rnd4 = (x: number): number => Math.round(x * 1e4) / 1e4;
 // Çözücünün kendine bıraktığı pay: geçiş eşiğinin biraz üstünü hedefler ki insan oyuncuya yer kalsın.
 const needS = NEED_PASS + SOLVER_MARGIN;
 
 // Referans çözücü: hemen ilk kilit, hata payını eşit böl, kusursuz zamanlama
-function solve(def) {
+function solve(def: RingDef[]): number | null {
   const rs = liveRings(def), dt = 1 / 120; let open = initialOpen(rs), t = 0, last = 0;
   for (let i = 0; i < rs.length; i++) { const r = rs[i]; if (r.locked) continue;
     const rem = rs.filter((x, k) => k > i && !x.locked).length; const until = t + 30; let done = false;
@@ -34,7 +51,7 @@ function solve(def) {
   return t;
 }
 // İnsan benzeri oyuncu: dokunuşu ±sigma sn sapar
-function play(def, limit, { tol = 0.7, sigma = 0.06 } = {}) {
+function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): PlayResult {
   const rs = liveRings(def), dt = 1 / 120; let open = initialOpen(rs), t = 0, last = 0;
   for (let i = 0; i < rs.length; i++) { const r = rs[i]; if (r.locked) continue;
     const rem = rs.filter((x, k) => k > i && !x.locked).length; let done = false;
@@ -69,8 +86,8 @@ function play(def, limit, { tol = 0.7, sigma = 0.06 } = {}) {
 // Hata payı milisaniye cinsinden: boşluk = gereken açıklık + tolerans süresi × tüm hareketli halkaların hızı toplamı.
 // Halkalar bu ortak genişliği kendi gapScale çarpanıyla ölçekler: dar halka "dikkat et", geniş halka
 // "burada nefes alabilirsin" der. Ortalama tolerans korunur, zorluğu tune() yine hedefe oturtur.
-function sizeGaps(rings, tolSec) {
-  const vsum = rings.filter(r => !r.preLocked).reduce((s, r) => s + Math.abs(r.speed) * (r.wobble ? 1.7 : 1), 0);
+function sizeGaps(rings: RawRing[], tolSec: number): void {
+  const vsum = rings.filter(r => !r.preLocked).reduce((s: number, r) => s + Math.abs(r.speed) * (r.wobble ? 1.7 : 1), 0);
   const base = NEED / DEG + tolSec * vsum / DEG;
   for (const r of rings) {
     const gap = Math.min(base * (r.gapScale || 1), GAP_MAX);
@@ -79,26 +96,26 @@ function sizeGaps(rings, tolSec) {
   }
 }
 
-const GAP_MAX = 85;
+const GAP_MAX = GAP_MAX_DEG;
 // 17. levelden sonra halka sayısı 6'da sabitleniyordu; 60 levelin 41'i aynı yapıdaydı.
 // Bu ritim araya daha az halkalı ama daha dar boşluklu (hassasiyet isteyen) leveller serpiştirir.
 const RHYTHM = [6, 6, 5, 6, 4, 6, 5, 6];
-const ringCount = n => { const grow = Math.min(2 + Math.floor((n - 1) / 4), 6); return grow < 6 ? grow : RHYTHM[(n - 1) % RHYTHM.length]; };
+const ringCount = (n: number): number => { const grow = Math.min(2 + Math.floor((n - 1) / 4), 6); return grow < 6 ? grow : RHYTHM[(n - 1) % RHYTHM.length]; };
 // Süre limiti artık tasarım girdisi: hareketli halka sayısından gelir ve geç levellerde kademeli sıkılaşır.
 // Çözücü süresi limiti belirlemez, yalnızca "bu limit yeterli mi" diye denetlenir.
-const limitFor = (n, moving) => +((4 + 2 * moving) * (1 - 0.22 * ((n - 1) / 59))).toFixed(1);
+const limitFor = (n: number, moving: number): number => +((4 + 2 * moving) * (1 - 0.22 * ((n - 1) / 59))).toFixed(1);
 
-function candidate(n) {
+function candidate(n: number): RawRing[] {
   const count = ringCount(n);
   const base = Math.min(0.8 + n * 0.03, 2.2);
-  const rings = [];
+  const rings: RawRing[] = [];
   for (let i = 0; i < count; i++) {
     const dir = n < 3 ? 1 : (R() < 0.5 ? -1 : 1);
     rings.push({ speed: dir * base * (0.7 + R() * 0.6), gap: 0, gapScale: 0.82 + R() * 0.36, gaps: n >= 11 && R() < 0.3 ? 2 : 1, gapOffset: 130 + R() * 50,
       flip: n >= 12 && R() < Math.min(0.2 + n * 0.008, 0.45) ? 1.4 + R() * 1.8 : 0, wobble: n >= 18 && R() < 0.3, preLocked: false, start: R() * TAU });
   }
   if (n >= 6 && R() < 0.5) {
-    const pre = n >= 15 && count >= 4 && R() < 0.5 ? 2 : 1, anchor = R() * TAU, picks = [];
+    const pre = n >= 15 && count >= 4 && R() < 0.5 ? 2 : 1, anchor = R() * TAU, picks: number[] = [];
     while (picks.length < pre) { const k = Math.floor(R() * count); if (!picks.includes(k)) picks.push(k); }
     picks.forEach((k, j) => { Object.assign(rings[k], { preLocked: true, gaps: 1, flip: 0, wobble: false, start: anchor + (j ? (R() - 0.5) * 0.15 : 0) }); });
   }
@@ -109,8 +126,10 @@ function candidate(n) {
 
 // ===== Patron levelleri (elle tasarlandı) =====
 const A = -Math.PI / 2;
-const mk = o => ({ gap: 0, gaps: 1, gapOffset: 150, flip: 0, wobble: false, preLocked: false, ...o });
-const BOSSES = {
+// speed ve start varsayilanlari hicbir cagrida kullanilmaz; yalnizca tip tamligi icin.
+const mk = (o: Partial<RawRing>): RawRing =>
+  ({ speed: 0, start: 0, gap: 0, gaps: 1, gapOffset: 150, flip: 0, wobble: false, preLocked: false, ...o });
+const BOSSES: Record<number, Boss | undefined> = {
   10: { name: 'Ayna', hint: 'Hepsi aynı anda hizalanıyor, o anı bekle ve hızlı dokun', tol: 0.2,
     // Hizlar birbirinden farkli olmali: esit hiz + esit start = birebir ayni halka, o kilit acikligi hic daraltmaz.
     // start = A - s * 2.5 oldugu icin hepsi yine t = 2,5 sn'de A acisinda hizalanir.
@@ -128,7 +147,7 @@ const BOSSES = {
       mk({ speed: -1.4, wobble: true, start: R() * TAU }), mk({ speed: 2.1, flip: 1.7, start: R() * TAU }), mk({ speed: -1.7, start: R() * TAU })] }
 };
 
-function finalize(rings, n) {
+function finalize(rings: RawRing[], n: number): Finalized | null {
   const def = rings.map(r => ({ speed: rnd4(r.speed), gap: rnd4(r.gap), gaps: r.gaps, gapOffset: rnd4(r.gapOffset), flip: rnd4(r.flip), wobble: r.wobble, preLocked: r.preLocked, start: rnd4(((r.start % TAU) + TAU) % TAU) }));
   const best = solve(def); if (best == null) return null;
   const moving = def.filter(r => !r.preLocked).length;
@@ -138,15 +157,16 @@ function finalize(rings, n) {
   const limit = +Math.max(want, best * 1.5 + 1.5).toFixed(1);
   return { def, best, limit, want, roomy: best <= want * 0.65 };
 }
-function evaluate(L, trials = 50) {
-  es = 777; let w = 0, qs = []; for (let k = 0; k < trials; k++) { const r = play(L.def, L.limit); if (r.win) { w++; qs.push(r.q); } }
+function evaluate(L: { def: RingDef[]; limit: number }, trials = 50): Evaluated {
+  es = 777; let w = 0; const qs: number[] = [];
+  for (let k = 0; k < trials; k++) { const r = play(L.def, L.limit); if (r.win) { w++; qs.push(r.q as number); } }
   return { win: w / trials, qs };
 }
 
-const target = n => 0.97 - 0.57 * Math.pow((n - 1) / 59, 1.1);
+const target = (n: number): number => 0.97 - 0.57 * Math.pow((n - 1) / 59, 1.1);
 // Yapıyı sabit tutup tolerans süresini ayarlayarak kazanma oranını hedefe oturt
-function tune(rawRings, want, n, lo = 0.03, hi = 0.45) {
-  let best = null;
+function tune(rawRings: RawRing[], want: number, n: number, lo = 0.03, hi = 0.45): Candidate | null {
+  let best: Candidate | null = null;
   for (let it = 0; it < 8; it++) {
     const tol = (lo + hi) / 2;
     const rings = rawRings.map(r => ({ ...r })); sizeGaps(rings, tol);
@@ -161,20 +181,24 @@ function tune(rawRings, want, n, lo = 0.03, hi = 0.45) {
 }
 // ===== Üretim =====
 // Sabit tohumla çalışır: aynı kod her çalıştırmada birebir aynı tabloyu verir.
-function generate(log = () => {}) {
+function generate(log: Log = () => {}): LevelTable {
   seed = 12345; es = 1;
-  const levels = []; const allQ = []; let prev = 1;
+  const levels: Candidate[] = []; const allQ: number[] = []; let prev = 1;
   for (let n = 1; n <= 60; n++) {
     const boss = BOSSES[n];
     const want = boss ? target(n) - 0.12 : Math.min(target(n), prev);
-    let pick = null;
+    let pick: Candidate | null = null;
     for (let k = 0; k < (boss ? 6 : 8); k++) {
       const raw = boss ? boss.rings() : candidate(n);
       const c = tune(raw, want, n);
       if (c) {
-        const dc = Math.abs(c.win - want), dp = pick ? Math.abs(pick.win - want) : Infinity;
-        const daha_iyi = dc < dp - 0.04 || (dc < dp + 0.04 && c.roomy && !pick.roomy) || (dc < dp && !(pick && pick.roomy && !c.roomy));
-        if (!pick || daha_iyi) pick = c;
+        // pick yokken eski kod dp = Infinity ile ilk kosuldan kisa devre yapiyordu; ayni davranis.
+        if (!pick) pick = c;
+        else {
+          const dc = Math.abs(c.win - want), dp = Math.abs(pick.win - want);
+          const dahaIyi = dc < dp - 0.04 || (dc < dp + 0.04 && c.roomy && !pick.roomy) || (dc < dp && !(pick.roomy && !c.roomy));
+          if (dahaIyi) pick = c;
+        }
       }
       if (pick && pick.roomy && Math.abs(pick.win - want) < 0.03) break;
     }
@@ -184,7 +208,7 @@ function generate(log = () => {}) {
     levels.push(pick);
   }
   allQ.sort((a, b) => a - b);
-  const pct = p => allQ[Math.floor(allQ.length * p)];
+  const pct = (p: number): number => allQ[Math.floor(allQ.length * p)];
   const out = { q3: +pct(0.75).toFixed(2), q2: +pct(0.4).toFixed(2), levels: levels.map((l, i) => ({ n: i + 1, boss: l.boss || null, hint: l.hint || null, limit: l.limit, rings: l.def })) };
   log('yıldız eşikleri q3/q2:', out.q3, out.q2);
   log(levels.map((l, i) => `${i + 1}${l.boss ? '*' : ''}:${Math.round(l.win * 100)}%/${l.limit}s/${l.def.length}h/${Math.round(l.def[0].gap)}°`).join('  '));
@@ -192,7 +216,7 @@ function generate(log = () => {}) {
 }
 
 // data/levels.json biçimi: her level tek satır, okunabilir kalsın diye elle diziliyor.
-const serialize = o => '{"q3":' + o.q3 + ',"q2":' + o.q2 + ',"levels":[\n' + o.levels.map(l => JSON.stringify(l)).join(',\n') + '\n]}\n';
+const serialize = (o: LevelTable): string => '{"q3":' + o.q3 + ',"q2":' + o.q2 + ',"levels":[\n' + o.levels.map(l => JSON.stringify(l)).join(',\n') + '\n]}\n';
 
 // ===== Doğrulama =====
 // Eski --verify yalnızca "kazanma oranı %20'nin üstünde mi" diye bakıyordu; oysa üretim
@@ -200,36 +224,17 @@ const serialize = o => '{"q3":' + o.q3 + ',"q2":' + o.q2 + ',"levels":[\n' + o.l
 const BAND = 0.15;          // hedef eğriden izin verilen sapma
 const SOLVER_HEADROOM = 0.9; // çözücü, süre sınırının en fazla %90'ını kullanabilir
 
-const RING_FIELDS = { speed: "number", gap: "number", gaps: "number", gapOffset: "number", flip: "number", wobble: "boolean", preLocked: "boolean", start: "number" };
-
-function checkSchema(data) {
-  const err = [];
-  if (typeof data.q3 !== "number" || typeof data.q2 !== "number") err.push("q3/q2 sayı değil");
-  if (!(data.q3 > data.q2)) err.push("q3, q2'den büyük olmalı");
-  if (!Array.isArray(data.levels) || data.levels.length !== 60) err.push("60 level olmalı");
-  data.levels.forEach((l, i) => {
-    const ad = `level ${i + 1}`;
-    if (l.n !== i + 1) err.push(`${ad}: n alanı sırayla gitmiyor`);
-    if (typeof l.limit !== "number" || l.limit <= 0) err.push(`${ad}: limit geçersiz`);
-    if (!Array.isArray(l.rings) || l.rings.length < 2 || l.rings.length > 6) err.push(`${ad}: halka sayısı 2-6 dışında`);
-    (l.rings || []).forEach((r, k) => {
-      for (const [alan, tur] of Object.entries(RING_FIELDS)) {
-        if (typeof r[alan] !== tur) { err.push(`${ad} halka ${k}: ${alan} ${tur} olmalı`); continue; }
-      }
-      if (r.gaps !== 1 && r.gaps !== 2) err.push(`${ad} halka ${k}: gaps 1 veya 2 olmalı`);
-      if (r.gap < NEED / DEG || r.gap > 85) err.push(`${ad} halka ${k}: gap ${r.gap.toFixed(1)}° sınırların dışında`);
-      if (r.start < 0 || r.start >= TAU) err.push(`${ad} halka ${k}: start 0..2π dışında`);
-      if (r.flip < 0) err.push(`${ad} halka ${k}: flip negatif`);
-    });
-  });
-  return err;
-}
-
-function verify() {
-  const data = JSON.parse(fs.readFileSync(OUT, "utf8"));
-  const semaHatalari = checkSchema(data);
-  const rows = []; const sorunlar = [...semaHatalari];
-  let oncekiNormal = null;
+function verify(): number {
+  const data: LevelTable = JSON.parse(fs.readFileSync(OUT, "utf8"));
+  // Şema doğrulaması çekirdekte (src/core/levels.ts): oyun da aynı kontrolü kullanabilsin diye.
+  const semaHatalari = validateTable(data);
+  if (semaHatalari.length) {
+    console.error(semaHatalari.length + " şema sorunu:");
+    semaHatalari.forEach(h => console.error("  - " + h));
+    return 1;
+  }
+  const rows: string[] = []; const sorunlar: string[] = [];
+  let oncekiNormal: number | null = null;
 
   for (const l of data.levels) {
     const ad = `${l.n}${l.boss ? "*" : ""}`;
@@ -251,7 +256,7 @@ function verify() {
   }
 
   // Yıldız dağılımı: eşikler yüzdelikten geldiği için ~%25/%35/%40 çıkmalı
-  const tumQ = data.levels.flatMap(l => evaluate({ def: l.rings, limit: l.limit }, 30).qs);
+  const tumQ: number[] = data.levels.flatMap((l: Level) => evaluate({ def: l.rings, limit: l.limit }, 30).qs);
   const pay = [tumQ.filter(q => q >= data.q3).length, tumQ.filter(q => q < data.q3 && q >= data.q2).length, tumQ.filter(q => q < data.q2).length].map(v => v / tumQ.length);
   if (pay[0] < 0.15 || pay[0] > 0.35) sorunlar.push(`3 yıldız oranı %${Math.round(pay[0] * 100)} — %15-35 dışında`);
 
@@ -260,7 +265,7 @@ function verify() {
 
   if (process.argv.includes("--deterministic")) {
     const tekrar = serialize(generate());
-    if (tekrar !== fs.readFileSync(OUT, "utf8")) sorunlar.push("üretim deterministik değil ya da dosya elle değiştirilmiş: gen.js yeniden üretince farklı tablo çıkıyor");
+    if (tekrar !== fs.readFileSync(OUT, "utf8")) sorunlar.push("üretim deterministik değil ya da dosya elle değiştirilmiş: gen.ts yeniden üretince farklı tablo çıkıyor");
     else console.log("determinizm: yeniden üretim birebir aynı dosyayı veriyor");
   }
 

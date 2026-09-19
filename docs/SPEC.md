@@ -55,7 +55,7 @@ Her halka şu alanlarla tanımlanır (level tablosundaki biçim):
 
 Oyun sırasında her halkaya şu durum alanları eklenir: `angle` (başlangıçta `start`), `dir` (başlangıçta 1), `t` (yön değişimi sayacı, başlangıçta 0), `locked` (başlangıçta `preLocked`).
 
-**Hareket fonksiyonu.** Oyun ve level üretici birebir aynı fonksiyonu kullanmalıdır (`tools/core.js` içindeki `stepRings`). `lt`, levelin başından beri geçen süredir:
+**Hareket fonksiyonu.** Oyun ve level üretici birebir aynı fonksiyonu kullanmalıdır (`src/core/rings.ts` içindeki `stepRings`). `lt`, levelin başından beri geçen süredir:
 
 ```
 kilitli değilse:
@@ -76,10 +76,10 @@ Halka yalnızca oyun "bekleme" (idle) durumundayken hareket eder. Kilitlendikten
 - Level başında tüm dilimler 1'dir. Baştan kilitli halkalar hemen uygulanır.
 - Bir halka kilitlenince: her açık dilim için, dilimin orta açısı halkanın herhangi bir boşluk merkezine `gap / 2`'den yakın değilse dilim 0 olur.
 - **En büyük açıklık:** çembersel olarak en uzun ardışık açık dilim dizisidir (başa sarmayı hesaba katarak).
-- **Kayıp koşulu:** kilitten sonra en büyük açıklık `ceil(NEED / 0,5°)` dilimden kısaysa oyuncu kaybeder. Bu eşik `core.js` içinde tek bir yerde, `NEED_PASS = ceil(NEED / 0,5°) × 0,5°` (= 18,0°) olarak tanımlıdır ve oyun da level üretici de onu kullanır. Eskiden üç ayrı yerde üç farklı değer vardı (17,871° / 18,0° / 18,871°).
+- **Kayıp koşulu:** kilitten sonra en büyük açıklık `ceil(NEED / 0,5°)` dilimden kısaysa oyuncu kaybeder. Bu eşik `src/core/geometry.ts` içinde tek bir yerde, `NEED_PASS = ceil(NEED / 0,5°) × 0,5°` (= 18,0°) olarak tanımlıdır ve oyun da level üretici de onu kullanır. Eskiden üç ayrı yerde üç farklı değer vardı (17,871° / 18,0° / 18,871°).
 - **Kazanma:** son hareketli halka geçerli şekilde kilitlenince top, en büyük açıklığın ortasındaki açı boyunca fırlatılır.
 
-Level üretici, hız gerektirdiği için dilim yerine **analitik aralık kesişimi** kullanır: açık bölge `{merkez, genişlik}` aralıklarının listesidir ve her kilit bu listeyi kesiştirir. İki yöntemin en fazla 1 dilim farklı olması zorunludur; `tools/core.test.js` bunu rastgele senaryolarda, `tools/levels.test.js` ise 60 levelin tamamında referans çözücünün yolunu oyunun maske modelinden geçirerek sınar.
+Level üretici, hız gerektirdiği için dilim yerine **analitik aralık kesişimi** kullanır: açık bölge `{merkez, genişlik}` aralıklarının listesidir ve her kilit bu listeyi kesiştirir. İki yöntemin en fazla 1 dilim farklı olması zorunludur; `src/core/core.test.ts` bunu rastgele senaryolarda, `src/core/levels.test.ts` ise 60 levelin tamamında referans çözücünün yolunu oyunun maske modelinden geçirerek sınar.
 
 ## 5. Süre ve yıldızlar
 
@@ -165,7 +165,7 @@ Yazı tipi: Fredoka (400 ve 600), yedek olarak sistem sans-serif. Tüm metinler 
 ]}
 ```
 
-Tablo `tools/gen.js` ile üretilir. Üretim adımları:
+Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
 
 1. **Aday üretimi.** Her level numarası için o numaraya uygun özelliklerle aday yapılar üretilir: halka sayısı `min(2 + ⌊(n−1)/4⌋, 6)`; iki kapılı halkalar 11'den, yön değiştirenler 12'den, hızlananlar 18'den, baştan kilitliler 6'dan itibaren.
    **Halka sayısı ritmi.** Yukarıdaki formül 17. levelde 6'ya ulaşıp orada kalırdı; 60 levelin 41'i aynı yapıdaydı. 6'ya ulaşıldıktan sonra halka sayısı `[6, 6, 5, 6, 4, 6, 5, 6]` dizisinden `(n−1) mod 8` ile seçilir. Daha az halkalı leveller zorluğu kaybetmez: ayarlama adımı boşlukları daraltarak aynı kazanma oranını tutturur, böylece o leveller dayanıklılık yerine hassasiyet ister.
@@ -201,7 +201,9 @@ npm run check        # hepsi bir arada
 oranının hedef eğriden en fazla 15 puan sapması, normal levellerin bir öncekinden belirgin kolay
 olmaması, ve yıldız dağılımının %15–35 aralığında 3 yıldız vermesi.
 
-**Kural:** oyunun hareket, geometri veya açıklık kurallarında yapılan her değişiklikten sonra `tools/core.js` güncellenmeli, tablo yeniden üretilmeli ve `npm run check` geçmelidir. Oyun kodu çekirdek mantığı kendi içinde kopyalamamalıdır: açıklık maskesi, en büyük açıklık, geçiş eşiği (`NEED_PASS`) ve yıldız kuralı yalnızca `core.js` içinde yaşar. `reference/kasa.html` tek dosya olmak zorunda olduğu için çekirdeği ve tabloyu içine gömer, ama gömme işini `tools/sync-prototype.js` yapar; o blok elle düzenlenmez.
+**Kural:** oyunun hareket, geometri veya açıklık kurallarında yapılan her değişiklikten sonra `src/core/` güncellenmeli, tablo yeniden üretilmeli ve `npm run check` geçmelidir. Oyun kodu çekirdek mantığı kendi içinde kopyalamamalıdır: açıklık maskesi, en büyük açıklık, geçiş eşiği (`NEED_PASS`) ve yıldız kuralı yalnızca `src/core/` içinde yaşar. `src/core/` DOM'a, dosya sistemine ya da herhangi bir ortama bağımlı değildir; bu yüzden hem tarayıcıda hem Node'da aynı kodu çalıştırır.
+
+`reference/kasa.html` tek dosya olmak zorunda olduğu için çekirdeği ve tabloyu içine gömer, ama gömme işini `tools/sync-prototype.ts` yapar (esbuild ile paketler); o blok elle düzenlenmez ve `npm run check` güncelliğini denetler.
 
 ## 9. Kayıt
 
@@ -215,7 +217,7 @@ Kayıt okunamazsa oyun hata vermeden Level 1'den başlar. "Baştan başla" düğ
 
 Bir sürüm ancak aşağıdakilerin hepsi sağlanınca tamam sayılır:
 
-- [ ] `node tools/gen.js --verify` başarılı.
+- [ ] `npm run check` başarılı (tip denetimi, birim testleri, tablo denetimi, prototip güncelliği).
 - [ ] Otomatik test: her level için referans çözücü, oyunun kendi güncelleme döngüsü üzerinden (sabit adımla) leveli süre sınırından önce bitiriyor.
 - [ ] Birim testleri: açı normalleştirme, maske uygulama, çembersel en büyük açıklık (başa sarma dahil), yıldız hesabı.
 - [ ] Kayıp sonrası kazanma, süre dolması ve art arda hızlı dokunuş senaryolarında oyun takılmıyor.

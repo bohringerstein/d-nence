@@ -6,9 +6,9 @@ Bu projede tek dokunuşla oynanan, level tabanlı, 2 boyutlu bir mobil oyun olan
 
 1. `docs/SPEC.md`: oyunun tüm kuralları, formülleri ve kabul ölçütleri. Tek doğru kaynak budur.
 2. `reference/kasa.html`: çalışan prototip. Tarayıcıda açılabilir. Şartnamede açıkça yazmayan davranışlarda bunu örnek al.
-3. `tools/core.js`: halka hareketi, geometri, açıklık hesabı ve yıldız kuralı. **Tek kaynak budur.** Oyun da level üretici de buradan beslenir.
-4. `tools/gen.js`: level üretici ve doğrulayıcı.
-5. `tools/core.test.js`, `tools/levels.test.js`: çekirdek ve tablo testleri.
+3. `src/core/`: halka hareketi, geometri, açıklık hesabı ve yıldız kuralı (TypeScript). **Tek kaynak budur.** Oyun da level üretici de buradan beslenir.
+4. `tools/gen.ts`: level üretici ve doğrulayıcı.
+5. `src/core/*.test.ts`: çekirdek ve tablo testleri.
 6. `data/levels.json`: 60 levellik hazır tablo.
 
 ## Kullanıcı hakkında
@@ -29,8 +29,8 @@ Hedef platformu Kader'e sor. Cevap yoksa varsayılan: **web + PWA** (telefona "a
 - Halka hareketi, geometri ve açıklık hesabı tek bir çekirdek modülde yaşar; oyun da level üretici de onu kullanır. Mantığı kopyalama.
 - Fizik güncellemesi sabit 1/120 sn adımla yapılır.
 - Oyun içinde rastgele level üretme; `data/levels.json`'u oku.
-- Çekirdek kurallarda her değişiklikten sonra tabloyu yeniden üret (`npm run gen`) ve **`npm run check`** çalıştır (testler + tablo denetimi + prototip güncelliği). Geçmezse işi bitmiş sayma.
-- `reference/kasa.html` içindeki çekirdek ve level blokları elle düzenlenmez; `npm run sync` onları kaynaklarından gömer.
+- Çekirdek kurallarda her değişiklikten sonra tabloyu yeniden üret (`npm run gen`) ve **`npm run check`** çalıştır (tip denetimi + testler + tablo denetimi + prototip güncelliği). Geçmezse işi bitmiş sayma.
+- `reference/kasa.html` içindeki çekirdek ve level blokları elle düzenlenmez; `npm run sync` çekirdeği `src/core/` dizininden esbuild ile paketleyip gömer.
 - Açıklık maskesi, en büyük açıklık, geçiş eşiği (`NEED_PASS`) ve yıldız kuralının ikinci bir kopyası hiçbir yerde olmayacak.
 - Bir level yüklenirken tüm zamanlayıcıları ve durum değerlerini sıfırla (prototipteki donma hatası buradan çıkmıştı).
 

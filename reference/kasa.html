@@ -58,141 +58,286 @@
 </div>
 
 <script>
-// >>> core.js (tools/sync-prototype.js ile gömülür, elle düzenleme)
-// ===== ORTAK ÇEKİRDEK =====
-// Oyun ve level üretici bu dosyayı paylaşır. Halka hareketi, geometri, açıklık hesabı
-// ve yıldız kuralı yalnızca burada yaşar; iki taraf da kendi kopyasını tutmaz.
-// Tarayıcıda bu dosya reference/kasa.html içine `tools/sync-prototype.js` ile gömülür.
+// >>> core.js (tools/sync-prototype.ts ile gömülür, elle düzenleme)
+"use strict";
+var KasaCore = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-const TAU = Math.PI * 2;
-const DEG = Math.PI / 180;
+  // src/core/index.ts
+  var index_exports = {};
+  __export(index_exports, {
+    BIN: () => BIN,
+    BINS: () => BINS,
+    BOSS_LEVELS: () => BOSS_LEVELS,
+    DEG: () => DEG,
+    GAP_MAX_DEG: () => GAP_MAX_DEG,
+    LEVEL_COUNT: () => LEVEL_COUNT,
+    LINE_WIDTH_MAX: () => LINE_WIDTH_MAX,
+    LINE_WIDTH_MIN: () => LINE_WIDTH_MIN,
+    NEED: () => NEED,
+    NEED_BINS: () => NEED_BINS,
+    NEED_PASS: () => NEED_PASS,
+    OPEN_ALL: () => OPEN_ALL,
+    RATIO: () => RATIO,
+    REACT: () => REACT,
+    SOLVER_MARGIN: () => SOLVER_MARGIN,
+    STAR_LABEL: () => STAR_LABEL,
+    TAU: () => TAU,
+    applyMask: () => applyMask,
+    canPass: () => canPass,
+    firstSeen: () => firstSeen,
+    gapCenters: () => gapCenters,
+    initialOpen: () => initialOpen,
+    isBetter: () => isBetter,
+    largestOpen: () => largestOpen,
+    layout: () => layout,
+    liveRings: () => liveRings,
+    lockOpen: () => lockOpen,
+    maskLargest: () => maskLargest,
+    maskRuns: () => maskRuns,
+    newMask: () => newMask,
+    norm: () => norm,
+    peekOpen: () => peekOpen,
+    starCount: () => starCount,
+    starRatio: () => starRatio,
+    stepRings: () => stepRings,
+    validateTable: () => validateTable,
+    wrap: () => wrap
+  });
 
-// Topun geçmesi için gereken en küçük açıklık (top yarıçapı / iç halka yarıçapı oranından;
-// ekran boyutundan bağımsız). Geometri oranları değişirse tüm level tablosu yeniden üretilmelidir.
-const NEED = 2 * Math.asin(0.022 / 0.17) + 3 * DEG;
-
-// Çember 720 dilime bölünür (dilim başına 0,5°).
-const BINS = 720;
-const BIN = TAU / BINS;
-const NEED_BINS = Math.ceil(NEED / BIN);
-
-// Geçiş eşiği. Oyun dilim sayar, üretici analitik ölçer; ikisi de AYNI eşiği kullansın diye
-// eşik dilime yuvarlanmış halidir. Eskiden üç yerde üç farklı değer vardı.
-const NEED_PASS = NEED_BINS * BIN;
-const canPass = w => w >= NEED_PASS;
-
-// Referans çözücünün kendine bıraktığı pay: insan oyuncunun sapması için yer açar.
-const SOLVER_MARGIN = 2 * BIN;
-
-const REACT = 0.3;
-
-const norm = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
-const wrap = a => ((a % TAU) + TAU) % TAU;
-
-// ---- Halka hareketi ----------------------------------------------------------
-// lt: levelin başından beri geçen süre. dt negatif olabilir (simülasyonda geri sarma).
-function stepRings(rs, dt, lt) {
-  for (const r of rs) {
-    if (r.locked) continue;
-    r.t += dt;
-    if (r.flip && r.t >= r.flip) { r.t = 0; r.dir *= -1; }
-    const w = r.wobble ? 1 + 0.7 * Math.sin(lt * 2.3 + r.start) : 1;
-    r.angle += r.speed * r.dir * w * dt;
+  // src/core/geometry.ts
+  var TAU = Math.PI * 2;
+  var DEG = Math.PI / 180;
+  var RATIO = {
+    outer: 0.44,
+    // en dış halka yarıçapı
+    inner: 0.17,
+    // en iç halka yarıçapı
+    ball: 0.022,
+    // top yarıçapı
+    lineWidth: 0.018
+    // halka çizgi kalınlığı (5–9 piksel arasına sıkıştırılır)
+  };
+  var LINE_WIDTH_MIN = 5;
+  var LINE_WIDTH_MAX = 9;
+  var NEED = 2 * Math.asin(RATIO.ball / RATIO.inner) + 3 * DEG;
+  var BINS = 720;
+  var BIN = TAU / BINS;
+  var NEED_BINS = Math.ceil(NEED / BIN);
+  var NEED_PASS = NEED_BINS * BIN;
+  var canPass = (w) => w >= NEED_PASS;
+  var SOLVER_MARGIN = 2 * BIN;
+  var REACT = 0.3;
+  var norm = (a) => {
+    a = (a + Math.PI) % TAU;
+    if (a < 0) a += TAU;
+    return a - Math.PI;
+  };
+  var wrap = (a) => (a % TAU + TAU) % TAU;
+  function layout(width, height, ringCount) {
+    const S = Math.min(width, height);
+    const outer = S * RATIO.outer, inner = S * RATIO.inner;
+    const step = ringCount > 1 ? (outer - inner) / (ringCount - 1) : 0;
+    return {
+      S,
+      outer,
+      inner,
+      step,
+      ballR: S * RATIO.ball,
+      lineWidth: Math.max(LINE_WIDTH_MIN, Math.min(LINE_WIDTH_MAX, S * RATIO.lineWidth)),
+      radius: (i) => outer - i * step
+    };
   }
-}
 
-function gapCenters(r) {
-  const c = [r.angle];
-  if (r.gaps === 2) c.push(r.angle + r.gapOffset * DEG);
-  return c;
-}
-
-const liveRings = def => def.map(r => ({ ...r, angle: r.start, dir: 1, t: 0, locked: !!r.preLocked }));
-
-// ---- Açıklık: analitik aralık modeli ----------------------------------------
-// Açık bölge {merkez, genişlik} aralıklarının listesidir. null = henüz hiçbir halka
-// kilitlenmedi, tüm çember açık. Her kilit bu listeyi ancak daraltabilir.
-const OPEN_ALL = null;
-
-// Geçemeyecek kadar dar aralıklar atılır: kesişim yalnızca daraltacağı için bir daha açılamazlar.
-// Bu budama olmadan iki kapılı halkalarda aralık sayısı 2^n büyür.
-function lockOpen(open, r) {
-  const half = r.gap * DEG / 2;
-  const centers = gapCenters(r);
-  if (open === OPEN_ALL) return centers.map(c => ({ c, w: half * 2 })).filter(o => canPass(o.w));
-  const out = [];
-  for (const o of open) {
-    for (const c of centers) {
-      const d = norm(c - o.c);
-      const lo = Math.max(-o.w / 2, d - half), hi = Math.min(o.w / 2, d + half);
-      if (hi - lo > 0 && canPass(hi - lo)) out.push({ c: wrap(o.c + (lo + hi) / 2), w: hi - lo });
+  // src/core/rings.ts
+  function stepRings(rs, dt, lt) {
+    for (const r of rs) {
+      if (r.locked) continue;
+      r.t += dt;
+      if (r.flip && r.t >= r.flip) {
+        r.t = 0;
+        r.dir = r.dir === 1 ? -1 : 1;
+      }
+      const w = r.wobble ? 1 + 0.7 * Math.sin(lt * 2.3 + r.start) : 1;
+      r.angle += r.speed * r.dir * w * dt;
     }
   }
-  return out;
-}
+  function gapCenters(r) {
+    const c = [r.angle];
+    if (r.gaps === 2) c.push(r.angle + r.gapOffset * DEG);
+    return c;
+  }
+  var liveRings = (def) => def.map((r) => ({ ...r, angle: r.start, dir: 1, t: 0, locked: !!r.preLocked }));
 
-// Kilitlenseydi kalan en geniş açıklık ne olurdu? (Halkayı gerçekten kilitlemeden ölçer.)
-function peekOpen(open, r) {
-  const half = r.gap * DEG / 2;
-  const centers = gapCenters(r);
-  if (open === OPEN_ALL) return { c: r.angle, w: half * 2 };
-  let best = { c: 0, w: 0 };
-  for (const o of open) {
-    for (const c of centers) {
-      const d = norm(c - o.c);
-      const lo = Math.max(-o.w / 2, d - half), hi = Math.min(o.w / 2, d + half);
-      if (hi - lo > best.w) best = { c: wrap(o.c + (lo + hi) / 2), w: hi - lo };
+  // src/core/opening.ts
+  var OPEN_ALL = null;
+  function lockOpen(open, r) {
+    const half = r.gap * DEG / 2;
+    const centers = gapCenters(r);
+    if (open === OPEN_ALL) return centers.map((c) => ({ c: wrap(c), w: half * 2 })).filter((o) => canPass(o.w));
+    const out = [];
+    for (const o of open) {
+      for (const c of centers) {
+        const d = norm(c - o.c);
+        const lo = Math.max(-o.w / 2, d - half), hi = Math.min(o.w / 2, d + half);
+        if (hi - lo > 0 && canPass(hi - lo)) out.push({ c: wrap(o.c + (lo + hi) / 2), w: hi - lo });
+      }
+    }
+    return out;
+  }
+  function peekOpen(open, r) {
+    const half = r.gap * DEG / 2;
+    const centers = gapCenters(r);
+    if (open === OPEN_ALL) return { c: wrap(r.angle), w: half * 2 };
+    let best = { c: 0, w: 0 };
+    for (const o of open) {
+      for (const c of centers) {
+        const d = norm(c - o.c);
+        const lo = Math.max(-o.w / 2, d - half), hi = Math.min(o.w / 2, d + half);
+        if (hi - lo > best.w) best = { c: wrap(o.c + (lo + hi) / 2), w: hi - lo };
+      }
+    }
+    return best;
+  }
+  var largestOpen = (open) => open === OPEN_ALL ? { c: 0, w: TAU } : open.reduce((a, o) => o.w > a.w ? o : a, { c: 0, w: 0 });
+  function initialOpen(rs) {
+    let open = OPEN_ALL;
+    for (const r of rs) if (r.locked) open = lockOpen(open, r);
+    return open;
+  }
+  var newMask = () => new Uint8Array(BINS).fill(1);
+  function applyMask(mask, r) {
+    const half = r.gap * DEG / 2, cs = gapCenters(r);
+    for (let b = 0; b < BINS; b++) {
+      if (!mask[b]) continue;
+      const a = (b + 0.5) * BIN;
+      mask[b] = cs.some((c) => Math.abs(norm(a - c)) <= half) ? 1 : 0;
     }
   }
-  return best;
-}
-
-const largestOpen = open => open === OPEN_ALL
-  ? { c: 0, w: TAU }
-  : open.reduce((a, o) => o.w > a.w ? o : a, { c: 0, w: 0 });
-
-// Baştan kilitli halkaları uygula
-function initialOpen(rs) { let open = OPEN_ALL; for (const r of rs) if (r.locked) open = lockOpen(open, r); return open; }
-
-// ---- Açıklık: dilim (maske) modeli -------------------------------------------
-// Oyun kamaları çizmek için bunu kullanır. Analitik modelle en fazla 1 dilim
-// farklı olmalıdır (bkz. tools/core.test.js).
-const newMask = () => new Uint8Array(BINS).fill(1);
-
-function applyMask(mask, r) {
-  const half = r.gap * DEG / 2, cs = gapCenters(r);
-  for (let b = 0; b < BINS; b++) {
-    if (!mask[b]) continue;
-    const a = (b + 0.5) * BIN;
-    mask[b] = cs.some(c => Math.abs(norm(a - c)) <= half) ? 1 : 0;
+  function maskRuns(mask) {
+    const out = [];
+    let start = -1;
+    for (let b = 0; b < BINS; b++) if (!mask[b]) {
+      start = b;
+      break;
+    }
+    if (start < 0) return [{ from: 0, to: TAU, len: BINS, w: TAU }];
+    let cur = 0, curStart = 0;
+    for (let k = 1; k <= BINS; k++) {
+      const b = (start + k) % BINS;
+      if (mask[b]) {
+        if (!cur) curStart = b;
+        cur++;
+      } else if (cur) {
+        out.push({ from: curStart * BIN, to: (curStart + cur) * BIN, len: cur, w: cur * BIN });
+        cur = 0;
+      }
+    }
+    return out;
   }
-}
-
-// Çembersel açık dilim dizileri (başa sarmayı hesaba katarak)
-function maskRuns(mask) {
-  const out = []; let start = -1;
-  for (let b = 0; b < BINS; b++) if (!mask[b]) { start = b; break; }
-  if (start < 0) return [{ from: 0, to: TAU, len: BINS, w: TAU }];
-  let cur = 0, curStart = 0;
-  for (let k = 1; k <= BINS; k++) {
-    const b = (start + k) % BINS;
-    if (mask[b]) { if (!cur) curStart = b; cur++; }
-    else if (cur) { out.push({ from: curStart * BIN, to: (curStart + cur) * BIN, len: cur, w: cur * BIN }); cur = 0; }
+  function maskLargest(mask) {
+    let best = { from: 0, to: 0, len: 0, w: 0 };
+    for (const r of maskRuns(mask)) if (r.len > best.len) best = r;
+    return { len: best.len, w: best.w, center: (best.from + best.to) / 2 };
   }
-  return out;
-}
 
-function maskLargest(mask) {
-  let best = { len: 0, from: 0, to: 0 };
-  for (const r of maskRuns(mask)) if (r.len > best.len) best = r;
-  return { len: best.len, w: best.len * BIN, center: (best.from + best.to) / 2 };
-}
+  // src/core/stars.ts
+  var starRatio = (widthRad, minGapRad) => (widthRad - NEED) / (minGapRad - NEED);
+  var starCount = (q, q3, q2) => q >= q3 ? 3 : q >= q2 ? 2 : 1;
+  var STAR_LABEL = {
+    3: "Temiz açılış",
+    2: "İyi açılış",
+    1: "Kıl payı"
+  };
+  var isBetter = (yeni, eski) => !eski || yeni.s > eski.s || yeni.s === eski.s && yeni.t < eski.t;
 
-// ---- Yıldız ------------------------------------------------------------------
-// Hassasiyeti ölçer, hızı değil: kasa açıldığında kalan açıklığın, levelin en dar
-// boşluğuna göre ne kadarını koruyabildin.
-function starRatio(widthRad, minGapRad) { return (widthRad - NEED) / (minGapRad - NEED); }
-function starCount(q, q3, q2) { return q >= q3 ? 3 : q >= q2 ? 2 : 1; }
+  // src/core/levels.ts
+  var GAP_MAX_DEG = 85;
+  var LEVEL_COUNT = 60;
+  var BOSS_LEVELS = [10, 20, 30, 40, 50, 60];
+  var RING_FIELDS = [
+    ["speed", "number"],
+    ["gap", "number"],
+    ["gaps", "number"],
+    ["gapOffset", "number"],
+    ["flip", "number"],
+    ["wobble", "boolean"],
+    ["preLocked", "boolean"],
+    ["start", "number"]
+  ];
+  function validateTable(data) {
+    const err = [];
+    if (typeof data.q3 !== "number" || typeof data.q2 !== "number") err.push("q3/q2 sayı değil");
+    else if (!(data.q3 > data.q2)) err.push("q3, q2 değerinden büyük olmalı");
+    if (!Array.isArray(data.levels) || data.levels.length !== LEVEL_COUNT) {
+      err.push(LEVEL_COUNT + " level olmalı");
+      return err;
+    }
+    data.levels.forEach((l, i) => {
+      const ad = "level " + (i + 1);
+      if (l.n !== i + 1) err.push(ad + ": n alanı sırayla gitmiyor");
+      if (typeof l.limit !== "number" || l.limit <= 0) err.push(ad + ": limit geçersiz");
+      if (!Array.isArray(l.rings) || l.rings.length < 2 || l.rings.length > 6) {
+        err.push(ad + ": halka sayısı 2-6 dışında");
+        return;
+      }
+      if (!l.rings.some((r) => !r.preLocked)) err.push(ad + ": tüm halkalar baştan kilitli");
+      const gorulen = /* @__PURE__ */ new Set();
+      l.rings.forEach((r, k) => {
+        const nerede = ad + " halka " + k + ": ";
+        const kayit = r;
+        let tipTamam = true;
+        for (const [alan, tur] of RING_FIELDS) {
+          if (typeof kayit[alan] !== tur) {
+            err.push(nerede + alan + " " + tur + " olmalı");
+            tipTamam = false;
+          }
+        }
+        if (!tipTamam) return;
+        if (r.gaps !== 1 && r.gaps !== 2) err.push(nerede + "gaps 1 veya 2 olmalı");
+        if (r.gap < NEED / DEG || r.gap > GAP_MAX_DEG) err.push(nerede + "gap " + r.gap.toFixed(1) + " derece, sınırların dışında");
+        if (r.start < 0 || r.start >= TAU) err.push(nerede + "start 0..2pi dışında");
+        if (r.flip < 0) err.push(nerede + "flip negatif");
+        const anahtar = JSON.stringify(r);
+        if (gorulen.has(anahtar)) err.push(nerede + "bir öncekiyle birebir aynı");
+        gorulen.add(anahtar);
+      });
+    });
+    return err;
+  }
+  function firstSeen(levels) {
+    const out = {};
+    for (const l of levels) {
+      if (l.boss) continue;
+      const var_ = {
+        preLocked: l.rings.some((r) => r.preLocked),
+        gaps2: l.rings.some((r) => r.gaps === 2),
+        flip: l.rings.some((r) => r.flip > 0),
+        wobble: l.rings.some((r) => r.wobble)
+      };
+      for (const k in var_) if (var_[k] && !(k in out)) out[k] = l.n;
+    }
+    return out;
+  }
+  return __toCommonJS(index_exports);
+})();
+const { BIN, BINS, BOSS_LEVELS, DEG, GAP_MAX_DEG, LEVEL_COUNT, LINE_WIDTH_MAX, LINE_WIDTH_MIN, NEED, NEED_BINS, NEED_PASS, OPEN_ALL, RATIO, REACT, SOLVER_MARGIN, STAR_LABEL, TAU, applyMask, canPass, firstSeen, gapCenters, initialOpen, isBetter, largestOpen, layout, liveRings, lockOpen, maskLargest, maskRuns, newMask, norm, peekOpen, starCount, starRatio, stepRings, validateTable, wrap } = KasaCore;
 // <<< core.js
 </script>
 <script>
