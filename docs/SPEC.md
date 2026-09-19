@@ -95,7 +95,7 @@ q = (en büyük açıklık − NEED) / (minGap − NEED)
 1 yıldız: aksi      "Kıl payı"
 ```
 
-`q3` ve `q2` level tablosunun en üstünde gelir (şu an 0,36 ve 0,19). Bu eşikler sanal oyuncuların kazandığı oyunların sırasıyla %75'lik ve %40'lık dilimlerinden hesaplanmıştır.
+`q3` ve `q2` level tablosunun en üstünde gelir (şu an 0,46 ve 0,25). Bu eşikler sanal oyuncuların kazandığı oyunların sırasıyla %75'lik ve %40'lık dilimlerinden hesaplanmıştır. Değerler tablo her üretildiğinde yeniden hesaplanır; oyun bunları `levels.json`'dan okur, koda gömmez.
 
 **Rekor:** her level için en iyi `{ yıldız, süre }` saklanır. Daha çok yıldız her zaman daha iyidir; eşit yıldızda kısa süre kazanır.
 
@@ -159,8 +159,8 @@ Yazı tipi: Fredoka (400 ve 600), yedek olarak sistem sans-serif. Tüm metinler 
 60 level `data/levels.json` içinde hazırdır. Oyun bu dosyayı olduğu gibi okur; **oyun içinde rastgele level üretilmez.**
 
 ```json
-{ "q3": 0.36, "q2": 0.19, "levels": [
-  { "n": 1, "boss": null, "hint": null, "limit": 17.2, "rings": [ { "speed": 0.6291, "gap": 27.3696, "gaps": 1, "gapOffset": 171.6997, "flip": 0, "wobble": false, "preLocked": false, "start": 5.9546 }, ... ] },
+{ "q3": 0.46, "q2": 0.25, "levels": [
+  { "n": 1, "boss": null, "hint": null, "limit": 8.9, "rings": [ {"speed": 0.6291, "gap": 30.5554, "gaps": 1, "gapOffset": 177.3851, "flip": 0, "wobble": false, "preLocked": false, "start": 0.2254}, ... ] },
   ...
 ]}
 ```
@@ -168,10 +168,19 @@ Yazı tipi: Fredoka (400 ve 600), yedek olarak sistem sans-serif. Tüm metinler 
 Tablo `tools/gen.js` ile üretilir. Üretim adımları:
 
 1. **Aday üretimi.** Her level numarası için o numaraya uygun özelliklerle aday yapılar üretilir: halka sayısı `min(2 + ⌊(n−1)/4⌋, 6)`; iki kapılı halkalar 11'den, yön değiştirenler 12'den, hızlananlar 18'den, baştan kilitliler 6'dan itibaren.
-2. **Hata payı milisaniye cinsinden.** Boşluk genişliği sabit derece değil, tolerans süresinden hesaplanır: `gap = NEED + tolSn × (hareketli halkaların hız toplamı)`, en fazla 110°. Hızlanan halkaların hızı 1,7 katı sayılır. Böylece hız artsa da insan için hissedilen zorluk kontrol altında kalır.
+   **Halka sayısı ritmi.** Yukarıdaki formül 17. levelde 6'ya ulaşıp orada kalırdı; 60 levelin 41'i aynı yapıdaydı. 6'ya ulaşıldıktan sonra halka sayısı `[6, 6, 5, 6, 4, 6, 5, 6]` dizisinden `(n−1) mod 8` ile seçilir. Daha az halkalı leveller zorluğu kaybetmez: ayarlama adımı boşlukları daraltarak aynı kazanma oranını tutturur, böylece o leveller dayanıklılık yerine hassasiyet ister.
+2. **Hata payı milisaniye cinsinden.** Boşluk genişliği sabit derece değil, tolerans süresinden hesaplanır: `gap = NEED + tolSn × (hareketli halkaların hız toplamı)`. Hızlanan halkaların hızı 1,7 katı sayılır. Böylece hız artsa da insan için hissedilen zorluk kontrol altında kalır.
+   **Halka başına genişlik.** Her halkanın kendi `gapScale` çarpanı vardır (0,82 – 1,18): `halkanın gap değeri = min(gap × gapScale, 85°)`. Böylece bir leveldeki halkalar farklı genişlikte olur; dar halka oyuncuya "asıl iş burada" der. Patron levelleri elle tasarlandığı için çarpanları 1'dir. Tavan 85°: daha geniş bir boşlukta halkanın üçte biri çizilmez ve halka gibi durmaz.
 3. **Referans çözücü.** Kusursuz zamanlamalı bir oyuncu: ilk kilidi hemen vurur, kalan hata payını kalan halkalara eşit böler, dokunuşlar arasında en az 0,3 sn bekler. Levelin çözülemediği ya da 16 sn'den uzun sürdüğü adaylar elenir.
-4. **Süre sınırı:** `limit = max(çözücü süresi × 1,6 + 2, 4 + 1,5 × hareketli halka sayısı)`.
+4. **Süre sınırı.** Limit bir tasarım girdisidir, çözücünün çıktısı değil:
+   ```
+   tasarımLimiti(n) = (4 + 2 × hareketli halka sayısı) × (1 − 0,22 × (n−1)/59)
+   limit = max(tasarımLimiti(n), çözücü süresi × 1,5 + 1,5)
+   ```
+   İlk terim kuraldır: süre halka sayısından gelir ve geç levellerde kademeli sıkılaşır (hareketli halka başına ilk on levelde ~3,7 sn, son on levelde ~2,7 sn). İkinci terim yalnızca güvenlik ağıdır — levelin bitirilebilir kalmasını garanti eder. Aday seçiminde, kazanma oranı denk (≤4 puan fark) adaylar arasında çözücünün tasarım limitine rahat sığdığı aday tercih edilir, böylece güvenlik ağı nadiren devreye girer.
+   *Neden:* limit eskiden doğrudan çözücü süresinden geliyordu; çözücü "uygun hizalanma ne zaman gelirse" beklediği için bu süre gürültüydü. Sonuçta komşu leveller arasında 15 sn'ye varan sıçramalar oluyor ve ekrandaki en büyük sayı zorluk hakkında ters sinyal veriyordu.
 5. **İnsan benzeri oyuncu.** Dokunuşları ortalama 0 ve standart sapma 60 ms olan normal dağılımla sapar; kalan payın %70'ini kullanmaya razıdır. Her aday 50 kez oynatılır.
+   **Sapma simetrik uygulanır (zorunlu).** Erken ya da geç dokunuş, tüm halkaları birlikte ileri veya geri sarar — tek halkanın açısını kaydırmak değildir. Aksi halde `wobble` çarpanı ve `flip` sayacı hesaba katılmaz; bu hata bir önceki sürümde kazanma oranını level başına 19 puana kadar şişiriyordu.
 6. **Ayarlama ve sıralama.** Her level için tolerans süresi ikili aramayla ayarlanır, böylece kazanma oranı hedef eğriye oturur: `hedef(n) = 0,97 − 0,57 × ((n−1)/59)^1,1`. Bu eğri %97'den %40'a iner. Normal leveller bir öncekinden kolay olamaz (en fazla 3 puan tolerans).
 7. **Patron levelleri** (10, 20, 30, 40, 50, 60) elle tasarlanmıştır ve hedef eğrinin 12 puan altına ayarlanır: Ayna, Merkez, Metronom, Çatal, Tavşan ile kaplumbağa, Büyük kasa. Tasarımları `gen.js` içindeki `BOSSES` nesnesindedir.
 

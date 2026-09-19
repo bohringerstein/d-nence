@@ -69,24 +69,35 @@ function play(def, limit, { tol = 0.7, sigma = 0.06 } = {}) {
   return { win: true, t, q: (ch.w - NEED) / (minGap - NEED) };
 }
 
-// Hata payı milisaniye cinsinden: boşluk = gereken açıklık + tolerans süresi × tüm hareketli halkaların hızı toplamı
+// Hata payı milisaniye cinsinden: boşluk = gereken açıklık + tolerans süresi × tüm hareketli halkaların hızı toplamı.
+// Halkalar bu ortak genişliği kendi gapScale çarpanıyla ölçekler: dar halka "dikkat et", geniş halka
+// "burada nefes alabilirsin" der. Ortalama tolerans korunur, zorluğu tune() yine hedefe oturtur.
 function sizeGaps(rings, tolSec) {
   const vsum = rings.filter(r => !r.preLocked).reduce((s, r) => s + Math.abs(r.speed) * (r.wobble ? 1.7 : 1), 0);
-  let gap = NEED / DEG + tolSec * vsum / DEG;
-  gap = Math.min(gap, 110);
+  const base = NEED / DEG + tolSec * vsum / DEG;
   for (const r of rings) {
+    const gap = Math.min(base * (r.gapScale || 1), GAP_MAX);
     r.gap = gap;
     if (r.gaps === 2 && (gap > 80 || r.gapOffset < gap + 30 || 360 - r.gapOffset < gap + 30)) r.gaps = 1;
   }
 }
 
+const GAP_MAX = 85;
+// 17. levelden sonra halka sayısı 6'da sabitleniyordu; 60 levelin 41'i aynı yapıdaydı.
+// Bu ritim araya daha az halkalı ama daha dar boşluklu (hassasiyet isteyen) leveller serpiştirir.
+const RHYTHM = [6, 6, 5, 6, 4, 6, 5, 6];
+const ringCount = n => { const grow = Math.min(2 + Math.floor((n - 1) / 4), 6); return grow < 6 ? grow : RHYTHM[(n - 1) % RHYTHM.length]; };
+// Süre limiti artık tasarım girdisi: hareketli halka sayısından gelir ve geç levellerde kademeli sıkılaşır.
+// Çözücü süresi limiti belirlemez, yalnızca "bu limit yeterli mi" diye denetlenir.
+const limitFor = (n, moving) => +((4 + 2 * moving) * (1 - 0.22 * ((n - 1) / 59))).toFixed(1);
+
 function candidate(n) {
-  const count = Math.min(2 + Math.floor((n - 1) / 4), 6);
+  const count = ringCount(n);
   const base = Math.min(0.8 + n * 0.03, 2.2);
   const rings = [];
   for (let i = 0; i < count; i++) {
     const dir = n < 3 ? 1 : (R() < 0.5 ? -1 : 1);
-    rings.push({ speed: dir * base * (0.7 + R() * 0.6), gap: 0, gaps: n >= 11 && R() < 0.3 ? 2 : 1, gapOffset: 130 + R() * 50,
+    rings.push({ speed: dir * base * (0.7 + R() * 0.6), gap: 0, gapScale: 0.82 + R() * 0.36, gaps: n >= 11 && R() < 0.3 ? 2 : 1, gapOffset: 130 + R() * 50,
       flip: n >= 12 && R() < Math.min(0.2 + n * 0.008, 0.45) ? 1.4 + R() * 1.8 : 0, wobble: n >= 18 && R() < 0.3, preLocked: false, start: R() * TAU });
   }
   if (n >= 6 && R() < 0.5) {
@@ -120,12 +131,15 @@ const BOSSES = {
       mk({ speed: -1.4, wobble: true, start: R() * TAU }), mk({ speed: 2.1, flip: 1.7, start: R() * TAU }), mk({ speed: -1.7, start: R() * TAU })] }
 };
 
-function finalize(rings) {
+function finalize(rings, n) {
   const def = rings.map(r => ({ speed: rnd4(r.speed), gap: rnd4(r.gap), gaps: r.gaps, gapOffset: rnd4(r.gapOffset), flip: rnd4(r.flip), wobble: r.wobble, preLocked: r.preLocked, start: rnd4(((r.start % TAU) + TAU) % TAU) }));
   const best = solve(def); if (best == null) return null;
   const moving = def.filter(r => !r.preLocked).length;
-  const limit = +Math.max(best * 1.6 + 2, 4 + 1.5 * moving).toFixed(1);
-  return { def, best, limit };
+  const want = limitFor(n, moving);
+  // Tasarım limiti kural; çözücü sığmıyorsa aday zaten elenir (bkz. tune), ama son çare olarak
+  // limit yine de çözücünün üstünde kalır ki level bitirilebilir olsun.
+  const limit = +Math.max(want, best * 1.5 + 1.5).toFixed(1);
+  return { def, best, limit, want, roomy: best <= want * 0.65 };
 }
 function evaluate(L, trials = 50) {
   es = 777; let w = 0, qs = []; for (let k = 0; k < trials; k++) { const r = play(L.def, L.limit); if (r.win) { w++; qs.push(r.q); } }
@@ -144,12 +158,12 @@ if (process.argv.includes("--verify")) {
 }
 const target = n => 0.97 - 0.57 * Math.pow((n - 1) / 59, 1.1);
 // Yapıyı sabit tutup tolerans süresini ayarlayarak kazanma oranını hedefe oturt
-function tune(rawRings, want, lo = 0.03, hi = 0.45) {
+function tune(rawRings, want, n, lo = 0.03, hi = 0.45) {
   let best = null;
   for (let it = 0; it < 8; it++) {
     const tol = (lo + hi) / 2;
     const rings = rawRings.map(r => ({ ...r })); sizeGaps(rings, tol);
-    const L = finalize(rings);
+    const L = finalize(rings, n);
     if (!L) { lo = tol; continue; }
     const ev = evaluate(L, 50);
     const c = { ...L, ...ev, tol };
@@ -165,9 +179,13 @@ for (let n = 1; n <= 60; n++) {
   let pick = null;
   for (let k = 0; k < (boss ? 6 : 8); k++) {
     const raw = boss ? boss.rings() : candidate(n);
-    const c = tune(raw, want);
-    if (c && (!pick || Math.abs(c.win - want) < Math.abs(pick.win - want))) pick = c;
-    if (pick && Math.abs(pick.win - want) < 0.03) break;
+    const c = tune(raw, want, n);
+    if (c) {
+      const dc = Math.abs(c.win - want), dp = pick ? Math.abs(pick.win - want) : Infinity;
+      const daha_iyi = dc < dp - 0.04 || (dc < dp + 0.04 && c.roomy && !pick.roomy) || (dc < dp && !(pick && pick.roomy && !c.roomy));
+      if (!pick || daha_iyi) pick = c;
+    }
+    if (pick && pick.roomy && Math.abs(pick.win - want) < 0.03) break;
   }
   if (!pick) { console.error('level', n, 'bulunamadı'); process.exit(1); }
   if (boss) Object.assign(pick, { boss: boss.name, hint: boss.hint }); else prev = Math.min(prev, pick.win + 0.03);
