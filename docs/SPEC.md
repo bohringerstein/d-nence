@@ -76,10 +76,10 @@ Halka yalnızca oyun "bekleme" (idle) durumundayken hareket eder. Kilitlendikten
 - Level başında tüm dilimler 1'dir. Baştan kilitli halkalar hemen uygulanır.
 - Bir halka kilitlenince: her açık dilim için, dilimin orta açısı halkanın herhangi bir boşluk merkezine `gap / 2`'den yakın değilse dilim 0 olur.
 - **En büyük açıklık:** çembersel olarak en uzun ardışık açık dilim dizisidir (başa sarmayı hesaba katarak).
-- **Kayıp koşulu:** kilitten sonra en büyük açıklık `ceil(NEED / 0,5°)` dilimden kısaysa oyuncu kaybeder.
+- **Kayıp koşulu:** kilitten sonra en büyük açıklık `ceil(NEED / 0,5°)` dilimden kısaysa oyuncu kaybeder. Bu eşik `core.js` içinde tek bir yerde, `NEED_PASS = ceil(NEED / 0,5°) × 0,5°` (= 18,0°) olarak tanımlıdır ve oyun da level üretici de onu kullanır. Eskiden üç ayrı yerde üç farklı değer vardı (17,871° / 18,0° / 18,871°).
 - **Kazanma:** son hareketli halka geçerli şekilde kilitlenince top, en büyük açıklığın ortasındaki açı boyunca fırlatılır.
 
-İstenirse dilim yerine analitik aralık kesişimi kullanılabilir, ancak sonuçlar dilim yöntemiyle en fazla 1 dilim farklı olmalıdır.
+Level üretici, hız gerektirdiği için dilim yerine **analitik aralık kesişimi** kullanır: açık bölge `{merkez, genişlik}` aralıklarının listesidir ve her kilit bu listeyi kesiştirir. İki yöntemin en fazla 1 dilim farklı olması zorunludur; `tools/core.test.js` bunu rastgele senaryolarda, `tools/levels.test.js` ise 60 levelin tamamında referans çözücünün yolunu oyunun maske modelinden geçirerek sınar.
 
 ## 5. Süre ve yıldızlar
 
@@ -188,11 +188,20 @@ Tablo `tools/gen.js` ile üretilir. Üretim adımları:
 
 Komutlar:
 ```
-node tools/gen.js            # data/levels.json'u yeniden üretir
-node tools/gen.js --verify   # mevcut tabloyu test eder; sorun varsa 1 koduyla çıkar
+npm run gen          # data/levels.json'u yeniden üretir
+npm run verify       # mevcut tabloyu denetler; sorun varsa 1 koduyla çıkar
+npm run verify:full  # üstüne determinizmi de sınar (yeniden üretim birebir aynı dosyayı vermeli)
+npm test             # çekirdek birim testleri + level tablosu testleri
+npm run sync         # çekirdeği ve tabloyu reference/kasa.html içine gömer
+npm run check        # hepsi bir arada
 ```
 
-**Kural:** oyunun hareket, geometri veya açıklık kurallarında yapılan her değişiklikten sonra `tools/core.js` güncellenmeli, tablo yeniden üretilmeli ve `--verify` geçmelidir. Oyun kodu çekirdek mantığı kendi içinde kopyalamamalı, `core.js` ile aynı kaynaktan beslenmelidir.
+`npm run verify` şunları denetler: şema (alan türleri, boşluk ve açı sınırları), her levelin referans
+çözücüyle bitirilebilirliği, çözücünün süre sınırının en fazla %90'ını kullanması, kazanma
+oranının hedef eğriden en fazla 15 puan sapması, normal levellerin bir öncekinden belirgin kolay
+olmaması, ve yıldız dağılımının %15–35 aralığında 3 yıldız vermesi.
+
+**Kural:** oyunun hareket, geometri veya açıklık kurallarında yapılan her değişiklikten sonra `tools/core.js` güncellenmeli, tablo yeniden üretilmeli ve `npm run check` geçmelidir. Oyun kodu çekirdek mantığı kendi içinde kopyalamamalıdır: açıklık maskesi, en büyük açıklık, geçiş eşiği (`NEED_PASS`) ve yıldız kuralı yalnızca `core.js` içinde yaşar. `reference/kasa.html` tek dosya olmak zorunda olduğu için çekirdeği ve tabloyu içine gömer, ama gömme işini `tools/sync-prototype.js` yapar; o blok elle düzenlenmez.
 
 ## 9. Kayıt
 

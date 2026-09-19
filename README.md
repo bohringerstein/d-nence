@@ -19,20 +19,36 @@ Claude Code, `CLAUDE.md` dosyasını her oturumda kendiliğinden okur. Bu yüzde
 | `CLAUDE.md` | Claude Code'un proje yönergesi: kurallar, çalışma planı, seninle nasıl iletişim kuracağı. |
 | `docs/SPEC.md` | Oyunun tam teknik şartnamesi. |
 | `reference/kasa.html` | Çalışan prototip. Çift tıklayıp tarayıcıda oynayabilirsin. |
-| `tools/core.js` | Oyun ile level üreticinin paylaştığı çekirdek kurallar. |
+| `tools/core.js` | Oyun ile level üreticinin paylaştığı çekirdek kurallar. Tek kaynak budur. |
 | `tools/gen.js` | Level üretici ve doğrulayıcı. |
+| `tools/*.test.js` | Çekirdek ve level tablosu testleri. |
+| `tools/sync-prototype.js` | Çekirdeği ve level tablosunu prototipe gömer. |
 | `data/levels.json` | Hazır 60 level. |
 
-## İşine yarayacak iki komut
+## İşine yarayacak komutlar
 
-Bilgisayarında Node.js kuruluysa:
-
-```
-node tools/gen.js --verify
-```
-Tüm levellerin hâlâ bitirilebilir olduğunu kontrol eder. Claude Code oyunun kurallarını değiştirdiyse bunu çalıştırmasını iste.
+Bilgisayarında Node.js kuruluysa, bu klasörde PowerShell açıp:
 
 ```
-node tools/gen.js
+npm run check
 ```
-Level tablosunu yeniden üretir.
+**En çok işine yarayacak komut bu.** Testleri çalıştırır, tüm levellerin hâlâ bitirilebilir ve
+zorluk eğrisine uygun olduğunu doğrular, prototipin güncel olup olmadığına bakar. Claude Code
+oyunun kurallarında bir şey değiştirdiyse bunu çalıştırmasını iste; geçmezse iş bitmemiştir.
+
+```
+npm run verify
+```
+Yalnızca level tablosunu denetler: her level bitirilebiliyor mu, kazanma oranı hedefin ±15 puanı
+içinde mi, yıldız dağılımı makul mü. Sorun varsa hangi levelde ne olduğunu tek tek yazar.
+
+```
+npm test
+```
+Çekirdek kuralların birim testleri (açı hesabı, açıklık, yıldız) ve 60 levelin tablo testi.
+
+```
+npm run gen
+```
+Level tablosunu yeniden üretir. Sabit tohumla çalışır: aynı kod her zaman aynı tabloyu verir.
+Bunu çalıştırdıktan sonra `npm run sync` ile prototipi de güncelle.

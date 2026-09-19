@@ -1,0 +1,15 @@
+{
+  "name": "kasa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kasa: tek dokunusla oynanan, level tabanli 2B mobil oyun",
+  "scripts": {
+    "gen": "node tools/gen.js",
+    "verify": "node tools/gen.js --verify",
+    "verify:full": "node tools/gen.js --verify --deterministic",
+    "test": "node --test tools/*.test.js",
+    "sync": "node tools/sync-prototype.js",
+    "check": "npm run test && npm run verify && node tools/sync-prototype.js --check"
+  },
+  "engines": { "node": ">=20" }
+}

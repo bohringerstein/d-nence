@@ -2,38 +2,30 @@
 //   node tools/gen.js           -> data/levels.json dosyasını yeniden üretir (sabit tohum, her seferinde aynı sonuç)
 //   node tools/gen.js --verify  -> mevcut data/levels.json dosyasını sanal oyuncularla test eder
 const fs = require("fs"); const path = require("path");
-const { TAU, DEG, NEED, REACT, norm, stepRings, gapCenters, liveRings } = require("./core.js");
+const { TAU, DEG, NEED, NEED_PASS, SOLVER_MARGIN, REACT, canPass, stepRings, liveRings,
+        OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio } = require("./core.js");
 const OUT = path.join(__dirname, "..", "data", "levels.json");
 let seed = 12345; const R = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 let es = 1; const ER = () => { es = (es * 16807) % 2147483647; return es / 2147483647; };
 const gauss = () => Math.sqrt(-2 * Math.log(ER() + 1e-9)) * Math.cos(TAU * ER());
 const rnd4 = x => Math.round(x * 1e4) / 1e4;
-const needS = NEED + 2 * TAU / 720;
-
-function lockInto(ch, r) { // kilit sonrası açıklık; en geniş sonucu verir
-  const h = r.gap * DEG / 2;
-  if (!ch) return { c: r.angle, w: h * 2 };
-  let best = null;
-  for (const g of gapCenters(r)) {
-    const d = norm(g - ch.c), lo = Math.max(-ch.w / 2, d - h), hi = Math.min(ch.w / 2, d + h);
-    if (!best || hi - lo > best.w) best = { c: ch.c + (lo + hi) / 2, w: hi - lo };
-  }
-  return best;
-}
-function initialChannel(rs) { let ch = null; for (const r of rs) if (r.locked) ch = lockInto(ch, r); return ch; }
+// Çözücünün kendine bıraktığı pay: geçiş eşiğinin biraz üstünü hedefler ki insan oyuncuya yer kalsın.
+const needS = NEED_PASS + SOLVER_MARGIN;
 
 // Referans çözücü: hemen ilk kilit, hata payını eşit böl, kusursuz zamanlama
 function solve(def) {
-  const rs = liveRings(def), dt = 1 / 120; let ch = initialChannel(rs), t = 0, last = 0;
+  const rs = liveRings(def), dt = 1 / 120; let open = initialOpen(rs), t = 0, last = 0;
   for (let i = 0; i < rs.length; i++) { const r = rs[i]; if (r.locked) continue;
     const rem = rs.filter((x, k) => k > i && !x.locked).length; const until = t + 30; let done = false;
     while (t < until) {
       if (t >= last + REACT) {
-        if (!ch) { ch = lockInto(null, r); done = true; }
-        else { const allow = (ch.w - needS) / (rem + 1), h = r.gap * DEG / 2;
-          for (const g of gapCenters(r)) { const d = norm(g - ch.c), lo = Math.max(-ch.w / 2, d - h), hi = Math.min(ch.w / 2, d + h);
-            if (hi - lo >= needS && ch.w - (hi - lo) <= allow) { ch = { c: ch.c + (lo + hi) / 2, w: hi - lo }; done = true; break; } } }
-        if (done) { r.locked = true; last = t; break; }
+        if (open === OPEN_ALL) done = true;
+        else {
+          const cur = largestOpen(open).w, allow = (cur - needS) / (rem + 1);
+          const p = peekOpen(open, r);
+          if (p.w >= needS && cur - p.w <= allow) done = true;
+        }
+        if (done) { open = lockOpen(open, r); r.locked = true; last = t; break; }
       }
       t += dt; stepRings(rs, dt, t);
     }
@@ -43,22 +35,27 @@ function solve(def) {
 }
 // İnsan benzeri oyuncu: dokunuşu ±sigma sn sapar
 function play(def, limit, { tol = 0.7, sigma = 0.06 } = {}) {
-  const rs = liveRings(def), dt = 1 / 120; let ch = initialChannel(rs), t = 0, last = 0;
+  const rs = liveRings(def), dt = 1 / 120; let open = initialOpen(rs), t = 0, last = 0;
   for (let i = 0; i < rs.length; i++) { const r = rs[i]; if (r.locked) continue;
     const rem = rs.filter((x, k) => k > i && !x.locked).length; let done = false;
     while (t < limit) {
       let want = false;
       if (t >= last + REACT) {
-        if (!ch) want = true;
-        else { const allow = (ch.w - needS) / (rem + 1) * tol, h = r.gap * DEG / 2;
-          for (const g of gapCenters(r)) { const d = norm(g - ch.c), lo = Math.max(-ch.w / 2, d - h), hi = Math.min(ch.w / 2, d + h); if (hi - lo >= needS && ch.w - (hi - lo) <= allow) want = true; } }
+        if (open === OPEN_ALL) want = true;
+        else {
+          const cur = largestOpen(open).w, allow = (cur - needS) / (rem + 1) * tol;
+          const p = peekOpen(open, r);
+          if (p.w >= needS && cur - p.w <= allow) want = true;
+        }
       }
       if (want) {
         // Dokunus hatasi: erken de gec de olsa TUM halkalari birlikte sarar (gercek oyunda oyuncu zamani kaydirir, tek halkayi degil)
         const e = gauss() * sigma;
         const sdt = e >= 0 ? dt : -dt;
-        for (let k = Math.abs(e); k > 0; k -= dt) { t += sdt; stepRings(rs, sdt, t); }
-        ch = lockInto(ch, r); if (ch.w < NEED) return { win: false, t };
+        // İleri adım lt'yi adımdan SONRA, geri adım ÖNCE alır: ancak böyle tam tersine çevrilebilir.
+        for (let k = Math.abs(e); k > 0; k -= dt) { const lt = sdt > 0 ? t + sdt : t; stepRings(rs, sdt, lt); t += sdt; }
+        open = lockOpen(open, r);
+        if (!canPass(largestOpen(open).w)) return { win: false, t };
         r.locked = true; last = t; done = true; break;
       }
       t += dt; stepRings(rs, dt, t);
@@ -66,7 +63,7 @@ function play(def, limit, { tol = 0.7, sigma = 0.06 } = {}) {
     if (!done) return { win: false, t };
   }
   const minGap = Math.min(...def.map(r => r.gap)) * DEG;
-  return { win: true, t, q: (ch.w - NEED) / (minGap - NEED) };
+  return { win: true, t, q: starRatio(largestOpen(open).w, minGap) };
 }
 
 // Hata payı milisaniye cinsinden: boşluk = gereken açıklık + tolerans süresi × tüm hareketli halkaların hızı toplamı.
@@ -146,16 +143,6 @@ function evaluate(L, trials = 50) {
   return { win: w / trials, qs };
 }
 
-if (process.argv.includes("--verify")) {
-  const data = JSON.parse(fs.readFileSync(OUT, "utf8")); let bad = 0; const rows = [];
-  for (const l of data.levels) {
-    const best = solve(l.rings); const ev = evaluate({ def: l.rings, limit: l.limit }, 50);
-    const ok = best != null && best < l.limit && ev.win >= 0.2; if (!ok) bad++;
-    rows.push(`${l.n}${l.boss ? "*" : ""}:${ok ? "" : "HATA "}${Math.round(ev.win * 100)}%`);
-  }
-  console.log(rows.join("  ")); console.log(bad ? `${bad} level sorunlu` : "Tüm leveller çözülebilir");
-  process.exit(bad ? 1 : 0);
-}
 const target = n => 0.97 - 0.57 * Math.pow((n - 1) / 59, 1.1);
 // Yapıyı sabit tutup tolerans süresini ayarlayarak kazanma oranını hedefe oturt
 function tune(rawRings, want, n, lo = 0.03, hi = 0.45) {
@@ -172,29 +159,115 @@ function tune(rawRings, want, n, lo = 0.03, hi = 0.45) {
   }
   return best;
 }
-const levels = []; const allQ = []; let prev = 1;
-for (let n = 1; n <= 60; n++) {
-  const boss = BOSSES[n];
-  const want = boss ? target(n) - 0.12 : Math.min(target(n), prev);
-  let pick = null;
-  for (let k = 0; k < (boss ? 6 : 8); k++) {
-    const raw = boss ? boss.rings() : candidate(n);
-    const c = tune(raw, want, n);
-    if (c) {
-      const dc = Math.abs(c.win - want), dp = pick ? Math.abs(pick.win - want) : Infinity;
-      const daha_iyi = dc < dp - 0.04 || (dc < dp + 0.04 && c.roomy && !pick.roomy) || (dc < dp && !(pick && pick.roomy && !c.roomy));
-      if (!pick || daha_iyi) pick = c;
+// ===== Üretim =====
+// Sabit tohumla çalışır: aynı kod her çalıştırmada birebir aynı tabloyu verir.
+function generate(log = () => {}) {
+  seed = 12345; es = 1;
+  const levels = []; const allQ = []; let prev = 1;
+  for (let n = 1; n <= 60; n++) {
+    const boss = BOSSES[n];
+    const want = boss ? target(n) - 0.12 : Math.min(target(n), prev);
+    let pick = null;
+    for (let k = 0; k < (boss ? 6 : 8); k++) {
+      const raw = boss ? boss.rings() : candidate(n);
+      const c = tune(raw, want, n);
+      if (c) {
+        const dc = Math.abs(c.win - want), dp = pick ? Math.abs(pick.win - want) : Infinity;
+        const daha_iyi = dc < dp - 0.04 || (dc < dp + 0.04 && c.roomy && !pick.roomy) || (dc < dp && !(pick && pick.roomy && !c.roomy));
+        if (!pick || daha_iyi) pick = c;
+      }
+      if (pick && pick.roomy && Math.abs(pick.win - want) < 0.03) break;
     }
-    if (pick && pick.roomy && Math.abs(pick.win - want) < 0.03) break;
+    if (!pick) { console.error('level', n, 'bulunamadı'); process.exit(1); }
+    if (boss) Object.assign(pick, { boss: boss.name, hint: boss.hint }); else prev = Math.min(prev, pick.win + 0.03);
+    pick.qs.forEach(q => allQ.push(q));
+    levels.push(pick);
   }
-  if (!pick) { console.error('level', n, 'bulunamadı'); process.exit(1); }
-  if (boss) Object.assign(pick, { boss: boss.name, hint: boss.hint }); else prev = Math.min(prev, pick.win + 0.03);
-  pick.qs.forEach(q => allQ.push(q));
-  levels.push(pick);
+  allQ.sort((a, b) => a - b);
+  const pct = p => allQ[Math.floor(allQ.length * p)];
+  const out = { q3: +pct(0.75).toFixed(2), q2: +pct(0.4).toFixed(2), levels: levels.map((l, i) => ({ n: i + 1, boss: l.boss || null, hint: l.hint || null, limit: l.limit, rings: l.def })) };
+  log('yıldız eşikleri q3/q2:', out.q3, out.q2);
+  log(levels.map((l, i) => `${i + 1}${l.boss ? '*' : ''}:${Math.round(l.win * 100)}%/${l.limit}s/${l.def.length}h/${Math.round(l.def[0].gap)}°`).join('  '));
+  return out;
 }
-allQ.sort((a, b) => a - b);
-const pct = p => allQ[Math.floor(allQ.length * p)];
-const out = { q3: +pct(0.75).toFixed(2), q2: +pct(0.4).toFixed(2), levels: levels.map((l, i) => ({ n: i + 1, boss: l.boss || null, hint: l.hint || null, limit: l.limit, rings: l.def })) };
-fs.writeFileSync(OUT, '{"q3":' + out.q3 + ',"q2":' + out.q2 + ',"levels":[\n' + out.levels.map(l => JSON.stringify(l)).join(',\n') + '\n]}\n');
-console.log('yıldız eşikleri q3/q2:', out.q3, out.q2);
-console.log(levels.map((l, i) => `${i + 1}${l.boss ? '*' : ''}:${Math.round(l.win * 100)}%/${l.limit}s/${l.def.length}h/${Math.round(l.def[0].gap)}°`).join('  '));
+
+// data/levels.json biçimi: her level tek satır, okunabilir kalsın diye elle diziliyor.
+const serialize = o => '{"q3":' + o.q3 + ',"q2":' + o.q2 + ',"levels":[\n' + o.levels.map(l => JSON.stringify(l)).join(',\n') + '\n]}\n';
+
+// ===== Doğrulama =====
+// Eski --verify yalnızca "kazanma oranı %20'nin üstünde mi" diye bakıyordu; oysa üretim
+// hedefi %97'den %28'e inen bir eğri. Bir level hedefinin 25 puan altına düşse bile geçiyordu.
+const BAND = 0.15;          // hedef eğriden izin verilen sapma
+const SOLVER_HEADROOM = 0.9; // çözücü, süre sınırının en fazla %90'ını kullanabilir
+
+const RING_FIELDS = { speed: "number", gap: "number", gaps: "number", gapOffset: "number", flip: "number", wobble: "boolean", preLocked: "boolean", start: "number" };
+
+function checkSchema(data) {
+  const err = [];
+  if (typeof data.q3 !== "number" || typeof data.q2 !== "number") err.push("q3/q2 sayı değil");
+  if (!(data.q3 > data.q2)) err.push("q3, q2'den büyük olmalı");
+  if (!Array.isArray(data.levels) || data.levels.length !== 60) err.push("60 level olmalı");
+  data.levels.forEach((l, i) => {
+    const ad = `level ${i + 1}`;
+    if (l.n !== i + 1) err.push(`${ad}: n alanı sırayla gitmiyor`);
+    if (typeof l.limit !== "number" || l.limit <= 0) err.push(`${ad}: limit geçersiz`);
+    if (!Array.isArray(l.rings) || l.rings.length < 2 || l.rings.length > 6) err.push(`${ad}: halka sayısı 2-6 dışında`);
+    (l.rings || []).forEach((r, k) => {
+      for (const [alan, tur] of Object.entries(RING_FIELDS)) {
+        if (typeof r[alan] !== tur) { err.push(`${ad} halka ${k}: ${alan} ${tur} olmalı`); continue; }
+      }
+      if (r.gaps !== 1 && r.gaps !== 2) err.push(`${ad} halka ${k}: gaps 1 veya 2 olmalı`);
+      if (r.gap < NEED / DEG || r.gap > 85) err.push(`${ad} halka ${k}: gap ${r.gap.toFixed(1)}° sınırların dışında`);
+      if (r.start < 0 || r.start >= TAU) err.push(`${ad} halka ${k}: start 0..2π dışında`);
+      if (r.flip < 0) err.push(`${ad} halka ${k}: flip negatif`);
+    });
+  });
+  return err;
+}
+
+function verify() {
+  const data = JSON.parse(fs.readFileSync(OUT, "utf8"));
+  const semaHatalari = checkSchema(data);
+  const rows = []; const sorunlar = [...semaHatalari];
+  let oncekiNormal = null;
+
+  for (const l of data.levels) {
+    const ad = `${l.n}${l.boss ? "*" : ""}`;
+    const best = solve(l.rings);
+    const ev = evaluate({ def: l.rings, limit: l.limit }, 50);
+    const hedef = l.boss ? target(l.n) - 0.12 : target(l.n);
+    const sapma = ev.win - hedef;
+    const moving = l.rings.filter(r => !r.preLocked).length;
+
+    if (best == null) sorunlar.push(`${ad}: referans çözücü bitiremiyor`);
+    else if (best > l.limit * SOLVER_HEADROOM) sorunlar.push(`${ad}: çözücü ${best.toFixed(1)} sn, limit ${l.limit} sn — pay yok`);
+    if (Math.abs(sapma) > BAND) sorunlar.push(`${ad}: kazanma %${Math.round(ev.win * 100)}, hedef %${Math.round(hedef * 100)} (${sapma > 0 ? "+" : ""}${Math.round(sapma * 100)} puan)`);
+    if (l.limit < limitFor(l.n, moving) - 0.05) sorunlar.push(`${ad}: limit tasarım değerinin altında`);
+    if (!l.boss) {
+      if (oncekiNormal != null && ev.win > oncekiNormal + 0.06) sorunlar.push(`${ad}: bir önceki normal levelden belirgin kolay`);
+      oncekiNormal = ev.win;
+    }
+    rows.push(`${ad}:${Math.round(ev.win * 100)}%`);
+  }
+
+  // Yıldız dağılımı: eşikler yüzdelikten geldiği için ~%25/%35/%40 çıkmalı
+  const tumQ = data.levels.flatMap(l => evaluate({ def: l.rings, limit: l.limit }, 30).qs);
+  const pay = [tumQ.filter(q => q >= data.q3).length, tumQ.filter(q => q < data.q3 && q >= data.q2).length, tumQ.filter(q => q < data.q2).length].map(v => v / tumQ.length);
+  if (pay[0] < 0.15 || pay[0] > 0.35) sorunlar.push(`3 yıldız oranı %${Math.round(pay[0] * 100)} — %15-35 dışında`);
+
+  console.log(rows.join("  "));
+  console.log(`yıldız dağılımı: 3★ %${Math.round(pay[0] * 100)}  2★ %${Math.round(pay[1] * 100)}  1★ %${Math.round(pay[2] * 100)}`);
+
+  if (process.argv.includes("--deterministic")) {
+    const tekrar = serialize(generate());
+    if (tekrar !== fs.readFileSync(OUT, "utf8")) sorunlar.push("üretim deterministik değil ya da dosya elle değiştirilmiş: gen.js yeniden üretince farklı tablo çıkıyor");
+    else console.log("determinizm: yeniden üretim birebir aynı dosyayı veriyor");
+  }
+
+  if (sorunlar.length) { console.error("\n" + sorunlar.length + " sorun:"); sorunlar.forEach(s => console.error("  - " + s)); return 1; }
+  console.log("Tüm leveller çözülebilir, zorluk eğrisi hedefin ±15 puanı içinde");
+  return 0;
+}
+
+if (process.argv.includes("--verify")) process.exit(verify());
+fs.writeFileSync(OUT, serialize(generate(console.log)));

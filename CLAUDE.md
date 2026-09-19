@@ -6,9 +6,10 @@ Bu projede tek dokunuşla oynanan, level tabanlı, 2 boyutlu bir mobil oyun olan
 
 1. `docs/SPEC.md`: oyunun tüm kuralları, formülleri ve kabul ölçütleri. Tek doğru kaynak budur.
 2. `reference/kasa.html`: çalışan prototip. Tarayıcıda açılabilir. Şartnamede açıkça yazmayan davranışlarda bunu örnek al.
-3. `tools/core.js`: halka hareketi ve temel sabitler. Oyun ve level üretici bu dosyayı paylaşır.
+3. `tools/core.js`: halka hareketi, geometri, açıklık hesabı ve yıldız kuralı. **Tek kaynak budur.** Oyun da level üretici de buradan beslenir.
 4. `tools/gen.js`: level üretici ve doğrulayıcı.
-5. `data/levels.json`: 60 levellik hazır tablo.
+5. `tools/core.test.js`, `tools/levels.test.js`: çekirdek ve tablo testleri.
+6. `data/levels.json`: 60 levellik hazır tablo.
 
 ## Kullanıcı hakkında
 
@@ -28,14 +29,17 @@ Hedef platformu Kader'e sor. Cevap yoksa varsayılan: **web + PWA** (telefona "a
 - Halka hareketi, geometri ve açıklık hesabı tek bir çekirdek modülde yaşar; oyun da level üretici de onu kullanır. Mantığı kopyalama.
 - Fizik güncellemesi sabit 1/120 sn adımla yapılır.
 - Oyun içinde rastgele level üretme; `data/levels.json`'u oku.
-- Çekirdek kurallarda her değişiklikten sonra tabloyu yeniden üret ve `node tools/gen.js --verify` çalıştır. Geçmezse işi bitmiş sayma.
+- Çekirdek kurallarda her değişiklikten sonra tabloyu yeniden üret (`npm run gen`) ve **`npm run check`** çalıştır (testler + tablo denetimi + prototip güncelliği). Geçmezse işi bitmiş sayma.
+- `reference/kasa.html` içindeki çekirdek ve level blokları elle düzenlenmez; `npm run sync` onları kaynaklarından gömer.
+- Açıklık maskesi, en büyük açıklık, geçiş eşiği (`NEED_PASS`) ve yıldız kuralının ikinci bir kopyası hiçbir yerde olmayacak.
 - Bir level yüklenirken tüm zamanlayıcıları ve durum değerlerini sıfırla (prototipteki donma hatası buradan çıkmıştı).
 
 ## Çalışma planı
 
 Her aşamanın sonunda dur, Kader'e ne yaptığını ve nasıl deneyeceğini anlat, onayını al.
 
-1. **İskelet ve çekirdek:** proje kurulumu, çekirdek modül (TypeScript), birim testleri, `tools/` araçlarının bu modülü kullanması, `--verify` geçmesi.
+1. **İskelet ve çekirdek:** proje kurulumu, çekirdek modül (TypeScript), birim testleri, `tools/` araçlarının bu modülü kullanması, `npm run check` geçmesi.
+   *Durum:* çekirdek birleştirildi, testler yazıldı, doğrulama sıkılaştırıldı, üretici ve prototip tek kaynağa bağlandı — hepsi düz JavaScript ile. Kalan: TypeScript + Vite kurulumu (platform kararı sonrası).
 2. **Oyun ekranı:** oyun döngüsü, çizim, dokunma, durumlar, süre, yıldızlar, ipuçları, kayıt. Prototiple yan yana karşılaştırıldığında aynı hissettirmeli.
 3. **Otomatik oynanış testi:** her levelin referans çözücüyle oyunun kendi döngüsü üzerinden bitirilebildiğini gösteren test.
 4. **Cila:** tema, güvenli alanlar, hareket azaltma, performans, şartnamedeki kabul ölçütlerinin hepsi.
