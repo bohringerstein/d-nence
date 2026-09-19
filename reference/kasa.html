@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Kasa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #E9EEF0; --ink: #1D3440; --ball: #E89B00; --fail: #E5484D; --win: #2E9E6A; --muted: #6B8390; --track: #D3DDE1;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #13232B; --ink: #DCE6EA; --ball: #FFC93C; --fail: #FF6369; --win: #4CC38A; --muted: #7F98A4; --track: #22363F; }
+  }
+  :root[data-theme="dark"] { --bg: #13232B; --ink: #DCE6EA; --ball: #FFC93C; --fail: #FF6369; --win: #4CC38A; --muted: #7F98A4; --track: #22363F; }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .app { height: 100%; display: flex; flex-direction: column; }
+  header, footer { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; flex: 0 0 auto; gap: 12px; }
+  header h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
+  .clock { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .clock.low { color: var(--fail); }
+  .lvl { font-size: 1.1rem; color: var(--muted); }
+  .lvl b { color: var(--ink); font-weight: 600; font-size: 1.4rem; }
+  .bar { height: 6px; margin: 0 20px; background: var(--track); border-radius: 3px; overflow: hidden; flex: 0 0 auto; }
+  .bar i { display: block; height: 100%; width: 100%; background: var(--ink); transform-origin: left; }
+  .bar.low i { background: var(--fail); }
+  canvas { flex: 1 1 auto; width: 100%; min-height: 0; display: block; cursor: pointer; }
+  footer { font-size: 0.95rem; color: var(--muted); }
+  #hint { min-width: 0; }
+  button { font: inherit; color: var(--muted); background: none; border: 1.5px solid currentColor; border-radius: 999px; padding: 4px 12px; cursor: pointer; flex: 0 0 auto; }
+  button:focus-visible { outline: 2px solid var(--ball); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Kasa</h1>
+    <span class="clock" id="clock">0,0</span>
+    <div class="lvl">Level <b id="lvl">1</b></div>
+  </header>
+  <div class="bar" id="bar"><i id="barFill"></i></div>
+  <canvas id="c" aria-label="Oyun alanı. Dokunarak sıradaki halkayı kilitle."></canvas>
+  <footer>
+    <span id="hint">Dokun, dış halkayı kilitle</span>
+    <button id="reset" type="button">Baştan başla</button>
+  </footer>
+</div>
+
+<script>
+// ===== ORTAK ÇEKİRDEK: oyun ve level üretici aynı kodu kullanır =====
+const TAU = Math.PI * 2;
+const DEG = Math.PI / 180;
+// Topun geçmesi için gereken en küçük açıklık (top yarıçapı / iç halka yarıçapı oranından; ekran boyutundan bağımsız)
+const NEED = 2 * Math.asin(0.022 / 0.17) + 3 * DEG;
+const REACT = 0.3;
+const norm = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
+function stepRings(rs, dt, lt) {
+  for (const r of rs) {
+    if (r.locked) continue;
+    r.t += dt;
+    if (r.flip && r.t >= r.flip) { r.t = 0; r.dir *= -1; }
+    const w = r.wobble ? 1 + 0.7 * Math.sin(lt * 2.3 + r.start) : 1;
+    r.angle += r.speed * r.dir * w * dt;
+  }
+}
+function gapCenters(r) {
+  const c = [r.angle];
+  if (r.gaps === 2) c.push(r.angle + r.gapOffset * DEG);
+  return c;
+}
+const liveRings = def => def.map(r => ({ ...r, angle: r.start, dir: 1, t: 0, locked: !!r.preLocked }));
+</script>
+<script>
+// ===== LEVEL TABLOSU =====
+// Simülasyonla üretildi ve zorluk sırasına dizildi. Her level: limit (sn), rings (dıştan içe).
+// Halka: speed rad/sn (işaret = yön), gap derece, gaps 1-2, gapOffset derece, flip sn (0 = yok), wobble, preLocked, start rad.
+// q3/q2: 3 ve 2 yıldız için gereken hassasiyet oranı.
+window.KASA_LEVELS = {"q3":0.36,"q2":0.19,"levels":[
+{"n": 1, "boss": null, "hint": null, "limit": 17.2, "rings": [{"speed": 0.6291, "gap": 27.3696, "gaps": 1, "gapOffset": 171.6997, "flip": 0, "wobble": false, "preLocked": false, "start": 5.9546}, {"speed": 0.5989, "gap": 27.3696, "gaps": 1, "gapOffset": 130.5773, "flip": 0, "wobble": false, "preLocked": false, "start": 0.3214}]},
+{"n": 2, "boss": null, "hint": null, "limit": 8.9, "rings": [{"speed": 0.9038, "gap": 28.325, "gaps": 1, "gapOffset": 175.7065, "flip": 0, "wobble": false, "preLocked": false, "start": 4.9248}, {"speed": 0.7739, "gap": 28.325, "gaps": 1, "gapOffset": 139.7557, "flip": 0, "wobble": false, "preLocked": false, "start": 1.6789}]},
+{"n": 3, "boss": null, "hint": null, "limit": 7, "rings": [{"speed": 0.7025, "gap": 28.8154, "gaps": 1, "gapOffset": 146.9573, "flip": 0, "wobble": false, "preLocked": false, "start": 0.2143}, {"speed": -0.7124, "gap": 28.8154, "gaps": 1, "gapOffset": 173.2177, "flip": 0, "wobble": false, "preLocked": false, "start": 1.314}]},
+{"n": 4, "boss": null, "hint": null, "limit": 7, "rings": [{"speed": -1.1575, "gap": 30.4656, "gaps": 1, "gapOffset": 176.788, "flip": 0, "wobble": false, "preLocked": false, "start": 1.9263}, {"speed": 0.9267, "gap": 30.4656, "gaps": 1, "gapOffset": 139.8944, "flip": 0, "wobble": false, "preLocked": false, "start": 5.7218}]},
+{"n": 5, "boss": null, "hint": null, "limit": 10.9, "rings": [{"speed": 1.2062, "gap": 38.8974, "gaps": 1, "gapOffset": 176.5433, "flip": 0, "wobble": false, "preLocked": false, "start": 0.3237}, {"speed": 1.1708, "gap": 38.8974, "gaps": 1, "gapOffset": 147.8262, "flip": 0, "wobble": false, "preLocked": false, "start": 0.6653}, {"speed": 0.9975, "gap": 38.8974, "gaps": 1, "gapOffset": 142.1324, "flip": 0, "wobble": false, "preLocked": false, "start": 1.117}]},
+{"n": 6, "boss": null, "hint": null, "limit": 21.5, "rings": [{"speed": -0.998, "gap": 34.4857, "gaps": 1, "gapOffset": 165.4751, "flip": 0, "wobble": false, "preLocked": false, "start": 3.7984}, {"speed": -0.9083, "gap": 34.4857, "gaps": 1, "gapOffset": 159.9319, "flip": 0, "wobble": false, "preLocked": false, "start": 2.0444}, {"speed": 0.7602, "gap": 34.4857, "gaps": 1, "gapOffset": 156.5695, "flip": 0, "wobble": false, "preLocked": false, "start": 0.3587}]},
+{"n": 7, "boss": null, "hint": null, "limit": 22.4, "rings": [{"speed": 1.2781, "gap": 32.3154, "gaps": 1, "gapOffset": 146.7568, "flip": 0, "wobble": false, "preLocked": true, "start": 3.6117}, {"speed": -0.7657, "gap": 32.3154, "gaps": 1, "gapOffset": 137.1088, "flip": 0, "wobble": false, "preLocked": false, "start": 3.4805}, {"speed": -0.7977, "gap": 32.3154, "gaps": 1, "gapOffset": 151.6167, "flip": 0, "wobble": false, "preLocked": false, "start": 1.4394}]},
+{"n": 8, "boss": null, "hint": null, "limit": 7.4, "rings": [{"speed": 0.9761, "gap": 38.8417, "gaps": 1, "gapOffset": 144.3389, "flip": 0, "wobble": false, "preLocked": false, "start": 5.6144}, {"speed": -0.9805, "gap": 38.8417, "gaps": 1, "gapOffset": 161.7781, "flip": 0, "wobble": false, "preLocked": true, "start": 1.9322}, {"speed": 1.0468, "gap": 38.8417, "gaps": 1, "gapOffset": 165.6747, "flip": 0, "wobble": false, "preLocked": false, "start": 4.3456}]},
+{"n": 9, "boss": null, "hint": null, "limit": 18.1, "rings": [{"speed": 0.9308, "gap": 40.6816, "gaps": 1, "gapOffset": 148.1927, "flip": 0, "wobble": false, "preLocked": false, "start": 1.8672}, {"speed": 0.837, "gap": 40.6816, "gaps": 1, "gapOffset": 152.4422, "flip": 0, "wobble": false, "preLocked": false, "start": 4.5347}, {"speed": -0.7603, "gap": 40.6816, "gaps": 1, "gapOffset": 151.9957, "flip": 0, "wobble": false, "preLocked": true, "start": 4.9215}, {"speed": -1.1811, "gap": 40.6816, "gaps": 1, "gapOffset": 133.932, "flip": 0, "wobble": false, "preLocked": false, "start": 4.3901}]},
+{"n": 10, "boss": "Ayna", "hint": "Hepsi aynı anda hizalanıyor, o anı bekle ve hızlı dokun", "limit": 16.9, "rings": [{"speed": 1.3, "gap": 42.4511, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 1.4624}, {"speed": -1.3, "gap": 42.4511, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 1.6792}, {"speed": 1.3, "gap": 42.4511, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 1.4624}, {"speed": -1.3, "gap": 42.4511, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 1.6792}]},
+{"n": 11, "boss": null, "hint": null, "limit": 10, "rings": [{"speed": 1.0199, "gap": 53.2631, "gaps": 2, "gapOffset": 168.2251, "flip": 0, "wobble": false, "preLocked": false, "start": 6.1513}, {"speed": -1.074, "gap": 53.2631, "gaps": 2, "gapOffset": 136.2274, "flip": 0, "wobble": false, "preLocked": false, "start": 1.7323}, {"speed": 0.8114, "gap": 53.2631, "gaps": 1, "gapOffset": 169.3905, "flip": 0, "wobble": false, "preLocked": false, "start": 4.542}, {"speed": -1.2648, "gap": 53.2631, "gaps": 2, "gapOffset": 131.2789, "flip": 0, "wobble": false, "preLocked": false, "start": 5.6531}]},
+{"n": 12, "boss": null, "hint": null, "limit": 14.5, "rings": [{"speed": -1.4262, "gap": 85.9859, "gaps": 1, "gapOffset": 145.1523, "flip": 2.874, "wobble": false, "preLocked": false, "start": 3.9679}, {"speed": 1.1753, "gap": 85.9859, "gaps": 1, "gapOffset": 176.5517, "flip": 0, "wobble": false, "preLocked": false, "start": 1.4127}, {"speed": 1.2813, "gap": 85.9859, "gaps": 1, "gapOffset": 165.6056, "flip": 0, "wobble": false, "preLocked": false, "start": 4.5208}, {"speed": 0.8138, "gap": 85.9859, "gaps": 1, "gapOffset": 146.3868, "flip": 2.7094, "wobble": false, "preLocked": false, "start": 0.4527}]},
+{"n": 13, "boss": null, "hint": null, "limit": 10, "rings": [{"speed": -1.3296, "gap": 63.3025, "gaps": 1, "gapOffset": 150.5553, "flip": 0, "wobble": false, "preLocked": true, "start": 0.7384}, {"speed": -1.4228, "gap": 63.3025, "gaps": 1, "gapOffset": 150.4284, "flip": 0, "wobble": false, "preLocked": false, "start": 1.6742}, {"speed": -1.2103, "gap": 63.3025, "gaps": 1, "gapOffset": 133.2637, "flip": 2.9294, "wobble": false, "preLocked": false, "start": 3.2586}, {"speed": 0.8929, "gap": 63.3025, "gaps": 1, "gapOffset": 159.4075, "flip": 1.7445, "wobble": false, "preLocked": false, "start": 0.5169}, {"speed": 1.3914, "gap": 63.3025, "gaps": 1, "gapOffset": 161.2209, "flip": 0, "wobble": false, "preLocked": false, "start": 1.3206}]},
+{"n": 14, "boss": null, "hint": null, "limit": 17.9, "rings": [{"speed": 1.4103, "gap": 52.7407, "gaps": 1, "gapOffset": 150.5162, "flip": 0, "wobble": false, "preLocked": false, "start": 2.8662}, {"speed": 1.5388, "gap": 52.7407, "gaps": 1, "gapOffset": 131.7782, "flip": 0, "wobble": false, "preLocked": false, "start": 4.5966}, {"speed": -1.5082, "gap": 52.7407, "gaps": 1, "gapOffset": 146.9646, "flip": 0, "wobble": false, "preLocked": false, "start": 4.8081}, {"speed": -1.5224, "gap": 52.7407, "gaps": 1, "gapOffset": 163.8101, "flip": 0, "wobble": false, "preLocked": false, "start": 0.448}, {"speed": -1.3971, "gap": 52.7407, "gaps": 1, "gapOffset": 150.6921, "flip": 0, "wobble": false, "preLocked": false, "start": 5.0411}]},
+{"n": 15, "boss": null, "hint": null, "limit": 19.3, "rings": [{"speed": 1.5295, "gap": 50.6186, "gaps": 1, "gapOffset": 153.2542, "flip": 0, "wobble": false, "preLocked": false, "start": 1.1018}, {"speed": -1.2834, "gap": 50.6186, "gaps": 1, "gapOffset": 173.937, "flip": 0, "wobble": false, "preLocked": false, "start": 1.9392}, {"speed": -1.3695, "gap": 50.6186, "gaps": 1, "gapOffset": 137.9474, "flip": 0, "wobble": false, "preLocked": false, "start": 3.9409}, {"speed": 1.1566, "gap": 50.6186, "gaps": 1, "gapOffset": 148.2377, "flip": 0, "wobble": false, "preLocked": false, "start": 2.5889}, {"speed": -1.5889, "gap": 50.6186, "gaps": 1, "gapOffset": 135.9576, "flip": 0, "wobble": false, "preLocked": false, "start": 0.354}]},
+{"n": 16, "boss": null, "hint": null, "limit": 8.5, "rings": [{"speed": 1.6031, "gap": 36.8952, "gaps": 1, "gapOffset": 166.1077, "flip": 0, "wobble": false, "preLocked": true, "start": 3.7926}, {"speed": -1.1242, "gap": 36.8952, "gaps": 2, "gapOffset": 145.083, "flip": 0, "wobble": false, "preLocked": false, "start": 5.4104}, {"speed": -1.0182, "gap": 36.8952, "gaps": 1, "gapOffset": 151.7802, "flip": 0, "wobble": false, "preLocked": true, "start": 3.8337}, {"speed": 1.077, "gap": 36.8952, "gaps": 2, "gapOffset": 131.817, "flip": 0, "wobble": false, "preLocked": false, "start": 4.241}, {"speed": -1.0481, "gap": 36.8952, "gaps": 1, "gapOffset": 143.0183, "flip": 0, "wobble": false, "preLocked": false, "start": 1.472}]},
+{"n": 17, "boss": null, "hint": null, "limit": 10, "rings": [{"speed": 1.0939, "gap": 47.5733, "gaps": 1, "gapOffset": 131.7772, "flip": 0, "wobble": false, "preLocked": true, "start": 2.0393}, {"speed": -1.1077, "gap": 47.5733, "gaps": 1, "gapOffset": 150.8335, "flip": 0, "wobble": false, "preLocked": false, "start": 3.6539}, {"speed": 1.497, "gap": 47.5733, "gaps": 1, "gapOffset": 154.7149, "flip": 0, "wobble": false, "preLocked": true, "start": 2.0746}, {"speed": 1.3854, "gap": 47.5733, "gaps": 1, "gapOffset": 170.2976, "flip": 0, "wobble": false, "preLocked": false, "start": 4.0506}, {"speed": 1.1959, "gap": 47.5733, "gaps": 1, "gapOffset": 133.5249, "flip": 0, "wobble": false, "preLocked": false, "start": 2.8953}, {"speed": 1.2262, "gap": 47.5733, "gaps": 1, "gapOffset": 167.5137, "flip": 0, "wobble": false, "preLocked": false, "start": 2.7991}]},
+{"n": 18, "boss": null, "hint": null, "limit": 13.9, "rings": [{"speed": -1.7127, "gap": 46.9277, "gaps": 1, "gapOffset": 134.1574, "flip": 0, "wobble": true, "preLocked": false, "start": 2.2917}, {"speed": -1.3643, "gap": 46.9277, "gaps": 1, "gapOffset": 151.3187, "flip": 0, "wobble": false, "preLocked": true, "start": 6.0385}, {"speed": -1.0212, "gap": 46.9277, "gaps": 1, "gapOffset": 162.0077, "flip": 0, "wobble": false, "preLocked": true, "start": 6.0209}, {"speed": -1.2614, "gap": 46.9277, "gaps": 2, "gapOffset": 175.3875, "flip": 0, "wobble": true, "preLocked": false, "start": 1.2737}, {"speed": 1.1819, "gap": 46.9277, "gaps": 1, "gapOffset": 172.384, "flip": 0, "wobble": false, "preLocked": false, "start": 4.4262}, {"speed": 1.0721, "gap": 46.9277, "gaps": 1, "gapOffset": 165.6517, "flip": 0, "wobble": false, "preLocked": false, "start": 4.0738}]},
+{"n": 19, "boss": null, "hint": null, "limit": 19.2, "rings": [{"speed": -1.4409, "gap": 49.6753, "gaps": 1, "gapOffset": 138.1916, "flip": 0, "wobble": true, "preLocked": false, "start": 2.7279}, {"speed": 1.518, "gap": 49.6753, "gaps": 1, "gapOffset": 159.4098, "flip": 0, "wobble": false, "preLocked": false, "start": 2.8192}, {"speed": -1.1509, "gap": 49.6753, "gaps": 1, "gapOffset": 148.6582, "flip": 0, "wobble": false, "preLocked": false, "start": 5.1188}, {"speed": -0.9666, "gap": 49.6753, "gaps": 1, "gapOffset": 131.7803, "flip": 0, "wobble": false, "preLocked": true, "start": 3.7042}, {"speed": 1.1705, "gap": 49.6753, "gaps": 1, "gapOffset": 175.0473, "flip": 0, "wobble": false, "preLocked": true, "start": 3.7207}, {"speed": 1.1142, "gap": 49.6753, "gaps": 1, "gapOffset": 160.2129, "flip": 0, "wobble": false, "preLocked": false, "start": 4.0414}]},
+{"n": 20, "boss": "Merkez", "hint": "Ortadaki kilitli halka yolu gösteriyor", "limit": 14.6, "rings": [{"speed": 2, "gap": 44.9005, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 5.8335}, {"speed": -1.4, "gap": 44.9005, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 1.2626}, {"speed": 1, "gap": 44.9005, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": true, "start": 4.7124}, {"speed": 1.4, "gap": 44.9005, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 1.4566}, {"speed": -2, "gap": 44.9005, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 1.903}]},
+{"n": 21, "boss": null, "hint": null, "limit": 21.6, "rings": [{"speed": -1.8344, "gap": 51.8413, "gaps": 1, "gapOffset": 136.4067, "flip": 0, "wobble": false, "preLocked": true, "start": 5.3815}, {"speed": 1.5841, "gap": 51.8413, "gaps": 1, "gapOffset": 166.9927, "flip": 0, "wobble": true, "preLocked": false, "start": 5.682}, {"speed": 1.2815, "gap": 51.8413, "gaps": 1, "gapOffset": 149.9611, "flip": 0, "wobble": false, "preLocked": true, "start": 5.3289}, {"speed": -1.2408, "gap": 51.8413, "gaps": 1, "gapOffset": 178.8662, "flip": 0, "wobble": true, "preLocked": false, "start": 1.5883}, {"speed": 1.3032, "gap": 51.8413, "gaps": 1, "gapOffset": 156.9448, "flip": 3.0286, "wobble": false, "preLocked": false, "start": 2.5792}, {"speed": -1.3786, "gap": 51.8413, "gaps": 1, "gapOffset": 143.8804, "flip": 0, "wobble": false, "preLocked": false, "start": 3.6973}]},
+{"n": 22, "boss": null, "hint": null, "limit": 17.6, "rings": [{"speed": -1.078, "gap": 69.5949, "gaps": 1, "gapOffset": 155.9248, "flip": 2.2691, "wobble": true, "preLocked": false, "start": 0.7815}, {"speed": -1.7097, "gap": 69.5949, "gaps": 1, "gapOffset": 179.2752, "flip": 2.1935, "wobble": false, "preLocked": false, "start": 3.7341}, {"speed": -1.3032, "gap": 69.5949, "gaps": 1, "gapOffset": 163.358, "flip": 0, "wobble": true, "preLocked": false, "start": 4.9329}, {"speed": -1.5262, "gap": 69.5949, "gaps": 1, "gapOffset": 177.5313, "flip": 1.7828, "wobble": true, "preLocked": false, "start": 1.8649}, {"speed": -1.3858, "gap": 69.5949, "gaps": 1, "gapOffset": 167.9845, "flip": 1.6751, "wobble": false, "preLocked": false, "start": 2.9028}, {"speed": 1.5805, "gap": 69.5949, "gaps": 1, "gapOffset": 169.0361, "flip": 0, "wobble": true, "preLocked": false, "start": 3.9601}]},
+{"n": 23, "boss": null, "hint": null, "limit": 10, "rings": [{"speed": -1.7117, "gap": 63.0371, "gaps": 1, "gapOffset": 136.0385, "flip": 0, "wobble": false, "preLocked": true, "start": 5.8824}, {"speed": 1.1886, "gap": 63.0371, "gaps": 1, "gapOffset": 141.3632, "flip": 0, "wobble": false, "preLocked": false, "start": 4.1125}, {"speed": 1.3831, "gap": 63.0371, "gaps": 1, "gapOffset": 152.9921, "flip": 0, "wobble": true, "preLocked": false, "start": 2.7142}, {"speed": -1.6462, "gap": 63.0371, "gaps": 1, "gapOffset": 175.0086, "flip": 2.2634, "wobble": true, "preLocked": false, "start": 1.4363}, {"speed": -1.9053, "gap": 63.0371, "gaps": 1, "gapOffset": 139.5125, "flip": 0, "wobble": false, "preLocked": false, "start": 1.9517}, {"speed": 1.3376, "gap": 63.0371, "gaps": 1, "gapOffset": 173.3129, "flip": 0, "wobble": false, "preLocked": true, "start": 5.9169}]},
+{"n": 24, "boss": null, "hint": null, "limit": 13.4, "rings": [{"speed": -1.566, "gap": 37.7085, "gaps": 1, "gapOffset": 155.0542, "flip": 0, "wobble": false, "preLocked": true, "start": 1.1153}, {"speed": 1.827, "gap": 37.7085, "gaps": 1, "gapOffset": 139.7634, "flip": 0, "wobble": true, "preLocked": false, "start": 6.0861}, {"speed": 1.9114, "gap": 37.7085, "gaps": 1, "gapOffset": 176.2174, "flip": 0, "wobble": false, "preLocked": false, "start": 0.6609}, {"speed": 1.7594, "gap": 37.7085, "gaps": 1, "gapOffset": 150.911, "flip": 0, "wobble": false, "preLocked": true, "start": 1.0578}, {"speed": 1.1361, "gap": 37.7085, "gaps": 1, "gapOffset": 141.5625, "flip": 0, "wobble": false, "preLocked": false, "start": 5.6738}, {"speed": 1.8751, "gap": 37.7085, "gaps": 1, "gapOffset": 175.9926, "flip": 0, "wobble": false, "preLocked": false, "start": 0.1249}]},
+{"n": 25, "boss": null, "hint": null, "limit": 24.4, "rings": [{"speed": -1.1964, "gap": 48.6548, "gaps": 1, "gapOffset": 166.7428, "flip": 0, "wobble": false, "preLocked": false, "start": 2.0786}, {"speed": -1.5053, "gap": 48.6548, "gaps": 1, "gapOffset": 178.3804, "flip": 0, "wobble": true, "preLocked": false, "start": 2.2891}, {"speed": -1.1445, "gap": 48.6548, "gaps": 1, "gapOffset": 130.9818, "flip": 3.0524, "wobble": true, "preLocked": false, "start": 4.0411}, {"speed": 1.4338, "gap": 48.6548, "gaps": 1, "gapOffset": 172.6441, "flip": 2.067, "wobble": false, "preLocked": false, "start": 2.8336}, {"speed": 1.8973, "gap": 48.6548, "gaps": 1, "gapOffset": 137.4093, "flip": 0, "wobble": false, "preLocked": true, "start": 2.8123}, {"speed": -1.4187, "gap": 48.6548, "gaps": 1, "gapOffset": 142.2265, "flip": 0, "wobble": false, "preLocked": false, "start": 4.2645}]},
+{"n": 26, "boss": null, "hint": null, "limit": 17.1, "rings": [{"speed": 1.9891, "gap": 47.9895, "gaps": 2, "gapOffset": 147.9563, "flip": 0, "wobble": false, "preLocked": false, "start": 5.9194}, {"speed": 1.5585, "gap": 47.9895, "gaps": 2, "gapOffset": 130.0098, "flip": 2.6951, "wobble": false, "preLocked": false, "start": 3.6327}, {"speed": -2.024, "gap": 47.9895, "gaps": 1, "gapOffset": 141.2513, "flip": 2.5, "wobble": false, "preLocked": false, "start": 4.3999}, {"speed": -1.2439, "gap": 47.9895, "gaps": 1, "gapOffset": 153.2109, "flip": 3.0037, "wobble": false, "preLocked": false, "start": 5.4691}, {"speed": -1.5532, "gap": 47.9895, "gaps": 2, "gapOffset": 136.9203, "flip": 2.0382, "wobble": false, "preLocked": false, "start": 6.0889}, {"speed": -1.2841, "gap": 47.9895, "gaps": 1, "gapOffset": 174.3632, "flip": 0, "wobble": false, "preLocked": true, "start": 3.9455}]},
+{"n": 27, "boss": null, "hint": null, "limit": 14.6, "rings": [{"speed": 1.7921, "gap": 50.7377, "gaps": 1, "gapOffset": 140.2008, "flip": 0, "wobble": false, "preLocked": false, "start": 3.0566}, {"speed": -1.4899, "gap": 50.7377, "gaps": 1, "gapOffset": 165.4715, "flip": 2.2655, "wobble": true, "preLocked": false, "start": 2.4652}, {"speed": -1.7039, "gap": 50.7377, "gaps": 1, "gapOffset": 164.9835, "flip": 0, "wobble": false, "preLocked": true, "start": 6.1592}, {"speed": -1.2358, "gap": 50.7377, "gaps": 1, "gapOffset": 157.0203, "flip": 0, "wobble": false, "preLocked": false, "start": 2.2028}, {"speed": -1.5763, "gap": 50.7377, "gaps": 1, "gapOffset": 163.3392, "flip": 0, "wobble": false, "preLocked": true, "start": 6.1233}, {"speed": 1.6803, "gap": 50.7377, "gaps": 1, "gapOffset": 156.4586, "flip": 0, "wobble": false, "preLocked": false, "start": 5.1818}]},
+{"n": 28, "boss": null, "hint": null, "limit": 23, "rings": [{"speed": 2.0244, "gap": 52.219, "gaps": 1, "gapOffset": 173.8423, "flip": 1.7829, "wobble": false, "preLocked": false, "start": 5.351}, {"speed": -1.8035, "gap": 52.219, "gaps": 1, "gapOffset": 157.0954, "flip": 0, "wobble": false, "preLocked": false, "start": 0.4571}, {"speed": 1.1691, "gap": 52.219, "gaps": 1, "gapOffset": 179.836, "flip": 0, "wobble": false, "preLocked": false, "start": 3.2013}, {"speed": -1.3627, "gap": 52.219, "gaps": 1, "gapOffset": 172.019, "flip": 2.8802, "wobble": true, "preLocked": false, "start": 3.4368}, {"speed": -1.5078, "gap": 52.219, "gaps": 1, "gapOffset": 178.4108, "flip": 0, "wobble": false, "preLocked": false, "start": 4.4268}, {"speed": -1.8359, "gap": 52.219, "gaps": 1, "gapOffset": 142.6742, "flip": 2.3587, "wobble": false, "preLocked": false, "start": 1.4227}]},
+{"n": 29, "boss": null, "hint": null, "limit": 17, "rings": [{"speed": -1.4629, "gap": 53.8018, "gaps": 1, "gapOffset": 138.4771, "flip": 0, "wobble": false, "preLocked": false, "start": 3.3964}, {"speed": 2.0246, "gap": 53.8018, "gaps": 1, "gapOffset": 171.1487, "flip": 0, "wobble": true, "preLocked": false, "start": 3.348}, {"speed": 2.1022, "gap": 53.8018, "gaps": 1, "gapOffset": 138.3986, "flip": 0, "wobble": false, "preLocked": true, "start": 3.8649}, {"speed": 2.1558, "gap": 53.8018, "gaps": 1, "gapOffset": 154.2741, "flip": 0, "wobble": false, "preLocked": false, "start": 4.8397}, {"speed": 1.9505, "gap": 53.8018, "gaps": 1, "gapOffset": 144.2193, "flip": 0, "wobble": false, "preLocked": false, "start": 5.0092}, {"speed": -2.1375, "gap": 53.8018, "gaps": 1, "gapOffset": 169.4507, "flip": 0, "wobble": false, "preLocked": false, "start": 5.2923}]},
+{"n": 30, "boss": "Metronom", "hint": "Halkalar sallanıyor, orta noktadan geçerken yakala", "limit": 11.5, "rings": [{"speed": 1.5, "gap": 34.5067, "gaps": 1, "gapOffset": 150, "flip": 1.2, "wobble": false, "preLocked": false, "start": 3.8611}, {"speed": -1.6, "gap": 34.5067, "gaps": 1, "gapOffset": 150, "flip": 1.2, "wobble": false, "preLocked": false, "start": 5.5492}, {"speed": 1.4, "gap": 34.5067, "gaps": 1, "gapOffset": 150, "flip": 1.2, "wobble": false, "preLocked": false, "start": 3.7126}, {"speed": -1.5, "gap": 34.5067, "gaps": 1, "gapOffset": 150, "flip": 1.2, "wobble": false, "preLocked": false, "start": 5.545}, {"speed": 1.6, "gap": 34.5067, "gaps": 1, "gapOffset": 150, "flip": 1.2, "wobble": false, "preLocked": false, "start": 3.7321}]},
+{"n": 31, "boss": null, "hint": null, "limit": 22.2, "rings": [{"speed": -1.2169, "gap": 40.6691, "gaps": 1, "gapOffset": 141.6611, "flip": 0, "wobble": false, "preLocked": false, "start": 3.7526}, {"speed": 1.6973, "gap": 40.6691, "gaps": 1, "gapOffset": 134.3931, "flip": 0, "wobble": true, "preLocked": false, "start": 4.2184}, {"speed": 1.5274, "gap": 40.6691, "gaps": 1, "gapOffset": 154.021, "flip": 3.1116, "wobble": false, "preLocked": false, "start": 3.2598}, {"speed": 1.37, "gap": 40.6691, "gaps": 1, "gapOffset": 146.0649, "flip": 0, "wobble": false, "preLocked": true, "start": 0.6379}, {"speed": 1.4894, "gap": 40.6691, "gaps": 1, "gapOffset": 142.457, "flip": 0, "wobble": false, "preLocked": true, "start": 0.6485}, {"speed": 1.444, "gap": 40.6691, "gaps": 1, "gapOffset": 162.156, "flip": 0, "wobble": false, "preLocked": false, "start": 1.0129}]},
+{"n": 32, "boss": null, "hint": null, "limit": 21.3, "rings": [{"speed": 1.5979, "gap": 46.6913, "gaps": 1, "gapOffset": 166.3197, "flip": 0, "wobble": false, "preLocked": false, "start": 4.0083}, {"speed": 1.9789, "gap": 46.6913, "gaps": 1, "gapOffset": 131.042, "flip": 2.2334, "wobble": false, "preLocked": false, "start": 2.3108}, {"speed": -1.8773, "gap": 46.6913, "gaps": 1, "gapOffset": 149.6246, "flip": 0, "wobble": true, "preLocked": false, "start": 5.4329}, {"speed": 1.7238, "gap": 46.6913, "gaps": 1, "gapOffset": 169.4057, "flip": 0, "wobble": false, "preLocked": false, "start": 1.4165}, {"speed": -1.4369, "gap": 46.6913, "gaps": 1, "gapOffset": 136.9524, "flip": 0, "wobble": false, "preLocked": false, "start": 5.3178}, {"speed": 1.7351, "gap": 46.6913, "gaps": 1, "gapOffset": 140.0689, "flip": 0, "wobble": false, "preLocked": false, "start": 2.1271}]},
+{"n": 33, "boss": null, "hint": null, "limit": 18.1, "rings": [{"speed": -1.7068, "gap": 47.3078, "gaps": 1, "gapOffset": 155.0257, "flip": 3.1136, "wobble": true, "preLocked": false, "start": 5.7849}, {"speed": -2.0188, "gap": 47.3078, "gaps": 1, "gapOffset": 164.5466, "flip": 0, "wobble": false, "preLocked": false, "start": 5.867}, {"speed": 2.1871, "gap": 47.3078, "gaps": 1, "gapOffset": 152.6375, "flip": 2.4351, "wobble": true, "preLocked": false, "start": 2.3517}, {"speed": -1.7107, "gap": 47.3078, "gaps": 1, "gapOffset": 159.9598, "flip": 0, "wobble": false, "preLocked": false, "start": 0.6596}, {"speed": -2.226, "gap": 47.3078, "gaps": 1, "gapOffset": 142.7577, "flip": 2.9977, "wobble": false, "preLocked": false, "start": 3.8491}, {"speed": -1.6836, "gap": 47.3078, "gaps": 1, "gapOffset": 143.0104, "flip": 2.6433, "wobble": true, "preLocked": false, "start": 5.4427}]},
+{"n": 34, "boss": null, "hint": null, "limit": 11.5, "rings": [{"speed": 1.9194, "gap": 44.4733, "gaps": 1, "gapOffset": 172.7279, "flip": 0, "wobble": false, "preLocked": false, "start": 1.0245}, {"speed": 1.9896, "gap": 44.4733, "gaps": 1, "gapOffset": 167.3198, "flip": 0, "wobble": true, "preLocked": false, "start": 5.4068}, {"speed": 1.3408, "gap": 44.4733, "gaps": 1, "gapOffset": 168.1231, "flip": 0, "wobble": false, "preLocked": false, "start": 3.1465}, {"speed": 2.2878, "gap": 44.4733, "gaps": 1, "gapOffset": 141.8271, "flip": 0, "wobble": false, "preLocked": false, "start": 3.6182}, {"speed": -1.836, "gap": 44.4733, "gaps": 1, "gapOffset": 171.979, "flip": 0, "wobble": false, "preLocked": false, "start": 5.5038}, {"speed": -1.5688, "gap": 44.4733, "gaps": 1, "gapOffset": 150.4455, "flip": 0, "wobble": false, "preLocked": true, "start": 2.6217}]},
+{"n": 35, "boss": null, "hint": null, "limit": 10, "rings": [{"speed": 2.0519, "gap": 44.5681, "gaps": 1, "gapOffset": 148.9573, "flip": 2.189, "wobble": true, "preLocked": false, "start": 5.8911}, {"speed": -1.5503, "gap": 44.5681, "gaps": 1, "gapOffset": 173.3318, "flip": 0, "wobble": true, "preLocked": false, "start": 0.8953}, {"speed": 2.2305, "gap": 44.5681, "gaps": 1, "gapOffset": 132.5016, "flip": 0, "wobble": true, "preLocked": false, "start": 5.1574}, {"speed": 2.0639, "gap": 44.5681, "gaps": 1, "gapOffset": 160.0493, "flip": 0, "wobble": false, "preLocked": true, "start": 1.4631}, {"speed": -1.3163, "gap": 44.5681, "gaps": 1, "gapOffset": 143.8667, "flip": 1.6774, "wobble": false, "preLocked": false, "start": 3.6861}, {"speed": -2.3415, "gap": 44.5681, "gaps": 1, "gapOffset": 146.6241, "flip": 0, "wobble": false, "preLocked": true, "start": 1.4369}]},
+{"n": 36, "boss": null, "hint": null, "limit": 13.3, "rings": [{"speed": -1.4795, "gap": 45.0789, "gaps": 1, "gapOffset": 149.8061, "flip": 0, "wobble": false, "preLocked": false, "start": 0.0927}, {"speed": -1.9613, "gap": 45.0789, "gaps": 1, "gapOffset": 163.8212, "flip": 0, "wobble": false, "preLocked": false, "start": 4.7743}, {"speed": 1.641, "gap": 45.0789, "gaps": 1, "gapOffset": 147.1464, "flip": 0, "wobble": true, "preLocked": false, "start": 2.2417}, {"speed": -1.8604, "gap": 45.0789, "gaps": 1, "gapOffset": 135.9048, "flip": 0, "wobble": false, "preLocked": false, "start": 5.576}, {"speed": -2.4084, "gap": 45.0789, "gaps": 1, "gapOffset": 168.9598, "flip": 0, "wobble": false, "preLocked": false, "start": 3.3141}, {"speed": -1.4189, "gap": 45.0789, "gaps": 1, "gapOffset": 157.881, "flip": 0, "wobble": false, "preLocked": false, "start": 3.7481}]},
+{"n": 37, "boss": null, "hint": null, "limit": 15.2, "rings": [{"speed": -2.3162, "gap": 109.0148, "gaps": 1, "gapOffset": 155.7282, "flip": 1.5797, "wobble": true, "preLocked": false, "start": 3.7605}, {"speed": -2.4774, "gap": 109.0148, "gaps": 1, "gapOffset": 170.5216, "flip": 0, "wobble": false, "preLocked": true, "start": 0.1262}, {"speed": 2.3504, "gap": 109.0148, "gaps": 1, "gapOffset": 147.1052, "flip": 0, "wobble": true, "preLocked": false, "start": 1.502}, {"speed": 1.9165, "gap": 109.0148, "gaps": 1, "gapOffset": 135.3175, "flip": 1.9808, "wobble": false, "preLocked": false, "start": 0.8062}, {"speed": 1.3874, "gap": 109.0148, "gaps": 1, "gapOffset": 131.624, "flip": 0, "wobble": false, "preLocked": false, "start": 0.7681}, {"speed": 2.252, "gap": 109.0148, "gaps": 1, "gapOffset": 163.0655, "flip": 0, "wobble": false, "preLocked": true, "start": 0.114}]},
+{"n": 38, "boss": null, "hint": null, "limit": 16.2, "rings": [{"speed": -1.6299, "gap": 43.4873, "gaps": 1, "gapOffset": 175.2784, "flip": 0, "wobble": true, "preLocked": false, "start": 1.8686}, {"speed": -1.6334, "gap": 43.4873, "gaps": 1, "gapOffset": 148.9009, "flip": 1.8402, "wobble": false, "preLocked": false, "start": 4.0087}, {"speed": -1.6176, "gap": 43.4873, "gaps": 1, "gapOffset": 168.7829, "flip": 0, "wobble": false, "preLocked": true, "start": 2.9558}, {"speed": -2.0039, "gap": 43.4873, "gaps": 1, "gapOffset": 154.32, "flip": 0, "wobble": false, "preLocked": false, "start": 2.5162}, {"speed": 1.8519, "gap": 43.4873, "gaps": 1, "gapOffset": 166.4764, "flip": 2.1332, "wobble": false, "preLocked": false, "start": 1.5718}, {"speed": -2.3341, "gap": 43.4873, "gaps": 1, "gapOffset": 144.8613, "flip": 0, "wobble": true, "preLocked": false, "start": 4.3591}]},
+{"n": 39, "boss": null, "hint": null, "limit": 10, "rings": [{"speed": -1.8382, "gap": 80.6625, "gaps": 1, "gapOffset": 154.5818, "flip": 0, "wobble": true, "preLocked": false, "start": 1.5196}, {"speed": 1.936, "gap": 80.6625, "gaps": 1, "gapOffset": 135.2969, "flip": 0, "wobble": false, "preLocked": false, "start": 6.0089}, {"speed": -2.3418, "gap": 80.6625, "gaps": 1, "gapOffset": 156.2073, "flip": 0, "wobble": false, "preLocked": true, "start": 4.7218}, {"speed": 2.4393, "gap": 80.6625, "gaps": 1, "gapOffset": 161.2833, "flip": 0, "wobble": false, "preLocked": false, "start": 0.9123}, {"speed": -1.4918, "gap": 80.6625, "gaps": 1, "gapOffset": 179.551, "flip": 2.5306, "wobble": false, "preLocked": false, "start": 4.0503}, {"speed": -2.0703, "gap": 80.6625, "gaps": 1, "gapOffset": 136.924, "flip": 0, "wobble": false, "preLocked": true, "start": 4.7786}]},
+{"n": 40, "boss": "Çatal", "hint": "Her halkada iki kapı var, hangisini seçtiğin sonrakini belirler", "limit": 11.5, "rings": [{"speed": 1.2, "gap": 30.0175, "gaps": 2, "gapOffset": 175.4006, "flip": 0, "wobble": false, "preLocked": false, "start": 1.7104}, {"speed": -1.5, "gap": 30.0175, "gaps": 2, "gapOffset": 157.739, "flip": 0, "wobble": false, "preLocked": false, "start": 3.8919}, {"speed": 1.3, "gap": 30.0175, "gaps": 2, "gapOffset": 164.8354, "flip": 0, "wobble": false, "preLocked": false, "start": 1.7028}, {"speed": -1.1, "gap": 30.0175, "gaps": 2, "gapOffset": 179.1166, "flip": 0, "wobble": false, "preLocked": false, "start": 0.4711}, {"speed": 1.6, "gap": 30.0175, "gaps": 2, "gapOffset": 156.0356, "flip": 0, "wobble": false, "preLocked": false, "start": 2.2713}]},
+{"n": 41, "boss": null, "hint": null, "limit": 10.4, "rings": [{"speed": 2.486, "gap": 53.6634, "gaps": 1, "gapOffset": 164.8334, "flip": 0, "wobble": false, "preLocked": false, "start": 3.4864}, {"speed": 2.5947, "gap": 53.6634, "gaps": 1, "gapOffset": 176.2149, "flip": 0, "wobble": false, "preLocked": true, "start": 5.5038}, {"speed": 2.4341, "gap": 53.6634, "gaps": 1, "gapOffset": 154.8563, "flip": 2.8908, "wobble": false, "preLocked": false, "start": 0.794}, {"speed": 2.1325, "gap": 53.6634, "gaps": 1, "gapOffset": 133.8708, "flip": 2.5815, "wobble": true, "preLocked": false, "start": 2.905}, {"speed": 2.5604, "gap": 53.6634, "gaps": 1, "gapOffset": 166.5, "flip": 2.7908, "wobble": false, "preLocked": false, "start": 4.9376}, {"speed": 1.855, "gap": 53.6634, "gaps": 1, "gapOffset": 132.6928, "flip": 0, "wobble": false, "preLocked": true, "start": 5.4467}]},
+{"n": 42, "boss": null, "hint": null, "limit": 20.5, "rings": [{"speed": -2.2896, "gap": 49.0331, "gaps": 1, "gapOffset": 164.3128, "flip": 0, "wobble": false, "preLocked": false, "start": 1.7979}, {"speed": -2.4807, "gap": 49.0331, "gaps": 1, "gapOffset": 148.6061, "flip": 2.5422, "wobble": false, "preLocked": false, "start": 0.5455}, {"speed": -2.1649, "gap": 49.0331, "gaps": 1, "gapOffset": 133.9374, "flip": 0, "wobble": true, "preLocked": false, "start": 5.272}, {"speed": -2.5574, "gap": 49.0331, "gaps": 1, "gapOffset": 158.517, "flip": 0, "wobble": false, "preLocked": false, "start": 6.1512}, {"speed": -1.9223, "gap": 49.0331, "gaps": 1, "gapOffset": 174.8677, "flip": 0, "wobble": false, "preLocked": false, "start": 5.7554}, {"speed": -1.945, "gap": 49.0331, "gaps": 1, "gapOffset": 174.1773, "flip": 0, "wobble": false, "preLocked": false, "start": 5.2884}]},
+{"n": 43, "boss": null, "hint": null, "limit": 18.8, "rings": [{"speed": 2.308, "gap": 79.6161, "gaps": 1, "gapOffset": 131.0912, "flip": 0, "wobble": false, "preLocked": false, "start": 6.1892}, {"speed": 2.1441, "gap": 79.6161, "gaps": 1, "gapOffset": 156.7373, "flip": 0, "wobble": false, "preLocked": false, "start": 1.7326}, {"speed": -1.6847, "gap": 79.6161, "gaps": 1, "gapOffset": 176.6024, "flip": 0, "wobble": true, "preLocked": false, "start": 6.2547}, {"speed": 2.5094, "gap": 79.6161, "gaps": 1, "gapOffset": 136.7015, "flip": 0, "wobble": false, "preLocked": false, "start": 1.3643}, {"speed": -2.6115, "gap": 79.6161, "gaps": 1, "gapOffset": 152.3588, "flip": 0, "wobble": false, "preLocked": false, "start": 4.8476}, {"speed": 1.6104, "gap": 79.6161, "gaps": 1, "gapOffset": 174.2202, "flip": 2.6397, "wobble": true, "preLocked": false, "start": 1.2116}]},
+{"n": 44, "boss": null, "hint": null, "limit": 16.8, "rings": [{"speed": 2.4859, "gap": 44.3415, "gaps": 1, "gapOffset": 161.0694, "flip": 0, "wobble": false, "preLocked": false, "start": 3.3155}, {"speed": 1.489, "gap": 44.3415, "gaps": 1, "gapOffset": 147.5162, "flip": 0, "wobble": true, "preLocked": false, "start": 3.6114}, {"speed": -2.4089, "gap": 44.3415, "gaps": 1, "gapOffset": 162.2614, "flip": 2.2808, "wobble": true, "preLocked": false, "start": 0.6447}, {"speed": -2.1177, "gap": 44.3415, "gaps": 1, "gapOffset": 137.4076, "flip": 0, "wobble": false, "preLocked": false, "start": 0.8624}, {"speed": 1.6693, "gap": 44.3415, "gaps": 1, "gapOffset": 138.7856, "flip": 2.9983, "wobble": false, "preLocked": false, "start": 5.8424}, {"speed": 1.7021, "gap": 44.3415, "gaps": 1, "gapOffset": 147.0877, "flip": 0, "wobble": false, "preLocked": false, "start": 0.5263}]},
+{"n": 45, "boss": null, "hint": null, "limit": 13, "rings": [{"speed": -2.7873, "gap": 46.7474, "gaps": 1, "gapOffset": 146.3383, "flip": 0, "wobble": true, "preLocked": false, "start": 5.6761}, {"speed": 1.8396, "gap": 46.7474, "gaps": 1, "gapOffset": 137.573, "flip": 0, "wobble": false, "preLocked": false, "start": 2.3299}, {"speed": -1.6232, "gap": 46.7474, "gaps": 1, "gapOffset": 152.6293, "flip": 0, "wobble": false, "preLocked": false, "start": 6.0078}, {"speed": -2.2271, "gap": 46.7474, "gaps": 1, "gapOffset": 147.2653, "flip": 0, "wobble": false, "preLocked": false, "start": 3.8984}, {"speed": 2.0971, "gap": 46.7474, "gaps": 1, "gapOffset": 163.5744, "flip": 0, "wobble": false, "preLocked": false, "start": 5.0393}, {"speed": 2.6179, "gap": 46.7474, "gaps": 1, "gapOffset": 163.9428, "flip": 0, "wobble": false, "preLocked": false, "start": 5.8678}]},
+{"n": 46, "boss": null, "hint": null, "limit": 22.9, "rings": [{"speed": -2.6992, "gap": 43.4308, "gaps": 1, "gapOffset": 135.5609, "flip": 0, "wobble": false, "preLocked": true, "start": 2.0165}, {"speed": 1.7231, "gap": 43.4308, "gaps": 1, "gapOffset": 162.3741, "flip": 1.4536, "wobble": false, "preLocked": false, "start": 1.7622}, {"speed": 2.762, "gap": 43.4308, "gaps": 1, "gapOffset": 173.7133, "flip": 0, "wobble": false, "preLocked": false, "start": 4.2353}, {"speed": -2.6605, "gap": 43.4308, "gaps": 1, "gapOffset": 153.8778, "flip": 1.9086, "wobble": true, "preLocked": false, "start": 0.1601}, {"speed": -1.7331, "gap": 43.4308, "gaps": 1, "gapOffset": 158.7744, "flip": 3.0569, "wobble": true, "preLocked": false, "start": 2.7656}, {"speed": 2.1447, "gap": 43.4308, "gaps": 1, "gapOffset": 150.1471, "flip": 2.7802, "wobble": false, "preLocked": false, "start": 3.829}]},
+{"n": 47, "boss": null, "hint": null, "limit": 13, "rings": [{"speed": -1.7567, "gap": 51.5131, "gaps": 1, "gapOffset": 174.8433, "flip": 0, "wobble": false, "preLocked": false, "start": 0.1714}, {"speed": 2.3208, "gap": 51.5131, "gaps": 1, "gapOffset": 137.0136, "flip": 0, "wobble": false, "preLocked": false, "start": 3.6389}, {"speed": 2.4469, "gap": 51.5131, "gaps": 1, "gapOffset": 155.8948, "flip": 2.6278, "wobble": false, "preLocked": false, "start": 1.73}, {"speed": 2.8295, "gap": 51.5131, "gaps": 1, "gapOffset": 135.9045, "flip": 0, "wobble": false, "preLocked": false, "start": 5.3418}, {"speed": 2.8281, "gap": 51.5131, "gaps": 1, "gapOffset": 146.655, "flip": 2.9594, "wobble": true, "preLocked": false, "start": 2.5698}, {"speed": 2.5856, "gap": 51.5131, "gaps": 1, "gapOffset": 165.44, "flip": 0, "wobble": true, "preLocked": false, "start": 5.7381}]},
+{"n": 48, "boss": null, "hint": null, "limit": 13.3, "rings": [{"speed": 2.1416, "gap": 45.6065, "gaps": 1, "gapOffset": 164.8859, "flip": 0, "wobble": false, "preLocked": false, "start": 6.0184}, {"speed": 2.3665, "gap": 45.6065, "gaps": 1, "gapOffset": 172.9185, "flip": 0, "wobble": false, "preLocked": false, "start": 5.6694}, {"speed": -2.5906, "gap": 45.6065, "gaps": 1, "gapOffset": 144.1165, "flip": 1.989, "wobble": false, "preLocked": false, "start": 2.7895}, {"speed": 1.8034, "gap": 45.6065, "gaps": 1, "gapOffset": 139.2381, "flip": 0, "wobble": false, "preLocked": true, "start": 0.7614}, {"speed": 2.7381, "gap": 45.6065, "gaps": 1, "gapOffset": 142.9801, "flip": 1.599, "wobble": false, "preLocked": false, "start": 0.2405}, {"speed": -1.8319, "gap": 45.6065, "gaps": 1, "gapOffset": 132.2765, "flip": 2.6947, "wobble": false, "preLocked": false, "start": 4.0854}]},
+{"n": 49, "boss": null, "hint": null, "limit": 13, "rings": [{"speed": 1.8627, "gap": 46.5169, "gaps": 1, "gapOffset": 175.6128, "flip": 1.5076, "wobble": false, "preLocked": false, "start": 4.685}, {"speed": -1.768, "gap": 46.5169, "gaps": 1, "gapOffset": 149.2688, "flip": 0, "wobble": false, "preLocked": false, "start": 1.6008}, {"speed": 2.5901, "gap": 46.5169, "gaps": 1, "gapOffset": 130.1481, "flip": 0, "wobble": false, "preLocked": false, "start": 2.7427}, {"speed": -2.6347, "gap": 46.5169, "gaps": 1, "gapOffset": 171.5738, "flip": 0, "wobble": false, "preLocked": false, "start": 4.8236}, {"speed": 2.6913, "gap": 46.5169, "gaps": 1, "gapOffset": 159.3714, "flip": 0, "wobble": false, "preLocked": false, "start": 1.7818}, {"speed": -2.7697, "gap": 46.5169, "gaps": 1, "gapOffset": 149.3032, "flip": 0, "wobble": false, "preLocked": false, "start": 3.3626}]},
+{"n": 50, "boss": "Tavşan ile kaplumbağa", "hint": "Yavaşlar sabırlı, hızlılar keskin nişan ister", "limit": 13.3, "rings": [{"speed": 0.5, "gap": 36.3061, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 3.7412}, {"speed": -2.4, "gap": 36.3061, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 2.5389}, {"speed": 0.6, "gap": 36.3061, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 1.386}, {"speed": -2.5, "gap": 36.3061, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 2.5425}, {"speed": 0.5, "gap": 36.3061, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 0.587}, {"speed": -2.3, "gap": 36.3061, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 1.381}]},
+{"n": 51, "boss": null, "hint": null, "limit": 11.5, "rings": [{"speed": 2.714, "gap": 94.327, "gaps": 1, "gapOffset": 175.6286, "flip": 0, "wobble": false, "preLocked": true, "start": 1.6446}, {"speed": -2.2943, "gap": 94.327, "gaps": 1, "gapOffset": 136.5411, "flip": 0, "wobble": true, "preLocked": false, "start": 6.1003}, {"speed": 1.5511, "gap": 94.327, "gaps": 1, "gapOffset": 152.2768, "flip": 2.1817, "wobble": false, "preLocked": false, "start": 4.3483}, {"speed": -2.2703, "gap": 94.327, "gaps": 1, "gapOffset": 165.4659, "flip": 0, "wobble": false, "preLocked": false, "start": 1.4367}, {"speed": -2.3903, "gap": 94.327, "gaps": 1, "gapOffset": 179.5649, "flip": 0, "wobble": false, "preLocked": false, "start": 1.3023}, {"speed": 1.976, "gap": 94.327, "gaps": 1, "gapOffset": 176.9158, "flip": 1.5034, "wobble": false, "preLocked": false, "start": 2.4128}]},
+{"n": 52, "boss": null, "hint": null, "limit": 11.1, "rings": [{"speed": -2.7401, "gap": 41.4246, "gaps": 1, "gapOffset": 145.3695, "flip": 0, "wobble": false, "preLocked": true, "start": 1.2326}, {"speed": -2.3337, "gap": 41.4246, "gaps": 1, "gapOffset": 172.3264, "flip": 0, "wobble": false, "preLocked": false, "start": 1.4963}, {"speed": -1.8844, "gap": 41.4246, "gaps": 1, "gapOffset": 160.7984, "flip": 0, "wobble": false, "preLocked": false, "start": 1.9094}, {"speed": 2.044, "gap": 41.4246, "gaps": 1, "gapOffset": 159.8918, "flip": 0, "wobble": false, "preLocked": false, "start": 4.9403}, {"speed": 2.6461, "gap": 41.4246, "gaps": 1, "gapOffset": 171.5546, "flip": 1.6792, "wobble": true, "preLocked": false, "start": 2.6338}, {"speed": -2.0452, "gap": 41.4246, "gaps": 1, "gapOffset": 169.9561, "flip": 0, "wobble": false, "preLocked": true, "start": 1.2753}]},
+{"n": 53, "boss": null, "hint": null, "limit": 14.4, "rings": [{"speed": 2.4568, "gap": 42.1674, "gaps": 2, "gapOffset": 156.9456, "flip": 0, "wobble": false, "preLocked": false, "start": 5.6599}, {"speed": 2.1405, "gap": 42.1674, "gaps": 1, "gapOffset": 131.6277, "flip": 1.4729, "wobble": false, "preLocked": false, "start": 5.2976}, {"speed": 2.519, "gap": 42.1674, "gaps": 1, "gapOffset": 172.0965, "flip": 2.7338, "wobble": false, "preLocked": false, "start": 5.8307}, {"speed": 2.845, "gap": 42.1674, "gaps": 1, "gapOffset": 134.0676, "flip": 0, "wobble": false, "preLocked": true, "start": 1.502}, {"speed": 1.6057, "gap": 42.1674, "gaps": 2, "gapOffset": 167.5745, "flip": 1.9021, "wobble": false, "preLocked": false, "start": 0.0002}, {"speed": 2.3779, "gap": 42.1674, "gaps": 2, "gapOffset": 172.8382, "flip": 0, "wobble": false, "preLocked": false, "start": 4.9879}]},
+{"n": 54, "boss": null, "hint": null, "limit": 16.7, "rings": [{"speed": -2.1804, "gap": 43.1358, "gaps": 1, "gapOffset": 133.1356, "flip": 0, "wobble": true, "preLocked": false, "start": 4.4516}, {"speed": 2.7334, "gap": 43.1358, "gaps": 1, "gapOffset": 165.9445, "flip": 2.866, "wobble": false, "preLocked": false, "start": 2.644}, {"speed": 1.9572, "gap": 43.1358, "gaps": 1, "gapOffset": 168.6976, "flip": 0, "wobble": false, "preLocked": true, "start": 4.6329}, {"speed": -2.7093, "gap": 43.1358, "gaps": 1, "gapOffset": 145.5279, "flip": 0, "wobble": false, "preLocked": true, "start": 4.6221}, {"speed": 2.858, "gap": 43.1358, "gaps": 1, "gapOffset": 156.0903, "flip": 0, "wobble": false, "preLocked": false, "start": 2.9005}, {"speed": 1.7689, "gap": 43.1358, "gaps": 1, "gapOffset": 170.0081, "flip": 2.7661, "wobble": false, "preLocked": false, "start": 1.6936}]},
+{"n": 55, "boss": null, "hint": null, "limit": 15.5, "rings": [{"speed": -1.7891, "gap": 68.0223, "gaps": 1, "gapOffset": 179.2451, "flip": 2.246, "wobble": false, "preLocked": false, "start": 5.148}, {"speed": -2.048, "gap": 68.0223, "gaps": 1, "gapOffset": 144.4074, "flip": 0, "wobble": false, "preLocked": false, "start": 3.0726}, {"speed": -2.7646, "gap": 68.0223, "gaps": 1, "gapOffset": 172.1471, "flip": 2.4674, "wobble": false, "preLocked": false, "start": 5.3373}, {"speed": 1.5782, "gap": 68.0223, "gaps": 1, "gapOffset": 159.111, "flip": 2.3042, "wobble": false, "preLocked": false, "start": 3.5088}, {"speed": 1.7379, "gap": 68.0223, "gaps": 1, "gapOffset": 161.4773, "flip": 0, "wobble": false, "preLocked": false, "start": 4.192}, {"speed": -2.4078, "gap": 68.0223, "gaps": 1, "gapOffset": 152.7317, "flip": 2.1116, "wobble": false, "preLocked": false, "start": 3.9577}]},
+{"n": 56, "boss": null, "hint": null, "limit": 15.2, "rings": [{"speed": -2.0307, "gap": 41.5921, "gaps": 1, "gapOffset": 157.1783, "flip": 0, "wobble": false, "preLocked": false, "start": 4.745}, {"speed": -2.547, "gap": 41.5921, "gaps": 1, "gapOffset": 170.3159, "flip": 0, "wobble": false, "preLocked": true, "start": 2.3019}, {"speed": 1.9601, "gap": 41.5921, "gaps": 1, "gapOffset": 130.2943, "flip": 0, "wobble": false, "preLocked": false, "start": 0.9938}, {"speed": -2.6821, "gap": 41.5921, "gaps": 1, "gapOffset": 173.6475, "flip": 0, "wobble": false, "preLocked": false, "start": 2.0275}, {"speed": -2.6496, "gap": 41.5921, "gaps": 1, "gapOffset": 162.4521, "flip": 1.8672, "wobble": false, "preLocked": false, "start": 0.0422}, {"speed": 2.0008, "gap": 41.5921, "gaps": 1, "gapOffset": 167.232, "flip": 2.8214, "wobble": false, "preLocked": false, "start": 3.1953}]},
+{"n": 57, "boss": null, "hint": null, "limit": 12.6, "rings": [{"speed": 2.6415, "gap": 40.8512, "gaps": 1, "gapOffset": 153.4178, "flip": 0, "wobble": false, "preLocked": false, "start": 4.617}, {"speed": -2.8494, "gap": 40.8512, "gaps": 1, "gapOffset": 178.4703, "flip": 0, "wobble": false, "preLocked": false, "start": 0.0846}, {"speed": -2.1863, "gap": 40.8512, "gaps": 1, "gapOffset": 174.1198, "flip": 0, "wobble": false, "preLocked": true, "start": 3.9969}, {"speed": -1.8283, "gap": 40.8512, "gaps": 1, "gapOffset": 134.2199, "flip": 0, "wobble": false, "preLocked": false, "start": 1.1009}, {"speed": 2.3489, "gap": 40.8512, "gaps": 2, "gapOffset": 176.392, "flip": 2.3059, "wobble": false, "preLocked": false, "start": 2.2652}, {"speed": -2.08, "gap": 40.8512, "gaps": 1, "gapOffset": 135.4576, "flip": 0, "wobble": false, "preLocked": true, "start": 3.933}]},
+{"n": 58, "boss": null, "hint": null, "limit": 20.2, "rings": [{"speed": -2.7899, "gap": 80.7577, "gaps": 1, "gapOffset": 168.504, "flip": 0, "wobble": true, "preLocked": false, "start": 4.2561}, {"speed": 1.8139, "gap": 80.7577, "gaps": 1, "gapOffset": 171.0043, "flip": 3.0973, "wobble": false, "preLocked": false, "start": 0.3036}, {"speed": 2.3709, "gap": 80.7577, "gaps": 1, "gapOffset": 162.3789, "flip": 0, "wobble": true, "preLocked": false, "start": 0.0442}, {"speed": -1.7651, "gap": 80.7577, "gaps": 1, "gapOffset": 177.309, "flip": 0, "wobble": false, "preLocked": true, "start": 6.1582}, {"speed": -2.0531, "gap": 80.7577, "gaps": 1, "gapOffset": 176.127, "flip": 2.785, "wobble": false, "preLocked": false, "start": 6.0146}, {"speed": 1.8709, "gap": 80.7577, "gaps": 1, "gapOffset": 156.3802, "flip": 2.9792, "wobble": true, "preLocked": false, "start": 5.7065}]},
+{"n": 59, "boss": null, "hint": null, "limit": 14.5, "rings": [{"speed": 2.3514, "gap": 42.1977, "gaps": 1, "gapOffset": 178.6042, "flip": 0, "wobble": true, "preLocked": false, "start": 5.6173}, {"speed": 2.0921, "gap": 42.1977, "gaps": 1, "gapOffset": 134.8749, "flip": 0, "wobble": true, "preLocked": false, "start": 2.5522}, {"speed": 2.5252, "gap": 42.1977, "gaps": 1, "gapOffset": 141.3977, "flip": 0, "wobble": false, "preLocked": true, "start": 3.3816}, {"speed": -1.7426, "gap": 42.1977, "gaps": 1, "gapOffset": 155.499, "flip": 2.1408, "wobble": false, "preLocked": false, "start": 0.0132}, {"speed": -2.1728, "gap": 42.1977, "gaps": 1, "gapOffset": 134.584, "flip": 0, "wobble": false, "preLocked": true, "start": 3.3295}, {"speed": -2.4249, "gap": 42.1977, "gaps": 1, "gapOffset": 174.4153, "flip": 0, "wobble": true, "preLocked": false, "start": 3.6996}]},
+{"n": 60, "boss": "Büyük kasa", "hint": "Son kasa. Her şey bir arada", "limit": 22.6, "rings": [{"speed": 1, "gap": 87.2858, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": true, "start": 4.7124}, {"speed": -1.9, "gap": 87.2858, "gaps": 1, "gapOffset": 150, "flip": 2.1, "wobble": false, "preLocked": false, "start": 2.3143}, {"speed": 1.6, "gap": 87.2858, "gaps": 1, "gapOffset": 165, "flip": 0, "wobble": false, "preLocked": false, "start": 3.4023}, {"speed": -1.4, "gap": 87.2858, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": true, "preLocked": false, "start": 4.8461}, {"speed": 2.1, "gap": 87.2858, "gaps": 1, "gapOffset": 150, "flip": 1.7, "wobble": false, "preLocked": false, "start": 5.3293}, {"speed": -1.7, "gap": 87.2858, "gaps": 1, "gapOffset": 150, "flip": 0, "wobble": false, "preLocked": false, "start": 2.3988}]}
+]};
+</script>
+<script>
+(() => {
+  const DATA = window.KASA_LEVELS, LEVELS = DATA.levels, MAX_LEVEL = LEVELS.length;
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const lvlEl = document.getElementById('lvl'), hintEl = document.getElementById('hint');
+  const clockEl = document.getElementById('clock'), barEl = document.getElementById('bar'), barFill = document.getElementById('barFill');
+  const N = 720, BIN = TAU / N, NEED_BINS = Math.ceil(NEED / BIN);
+  let W = 0, H = 0, colors = {};
+  let level = 1, bests = {};
+  try { const s = parseInt(localStorage.getItem('kasa2-level'), 10); if (s >= 1 && s <= MAX_LEVEL) level = s; } catch (e) {}
+  try { bests = JSON.parse(localStorage.getItem('kasa2-best') || '{}') || {}; } catch (e) {}
+  let L = null, rings = [], mask = null, anyLocked = false, state = 'idle', active = 0;
+  let attempts = 1, endTimer = 0, flash = 0, shake = 0, crashRing = -1, levelTime = 0, finishTime = 0;
+  let fireAngle = 0, ballDist = 0, lastLocked = -1, lockPulse = 0;
+
+  // Yeni bir özellik ilk kez görüldüğü levelde kısa bir öğretici ipucu gösterilir
+  const TEACH = { 1: 'Dokun, dış halkayı kilitle', 2: 'Sarı kama ortak açıklık. Sonraki boşluğu ona hizala', 3: 'Yıldızlar, kasa açıldığında kalan açıklığın genişliğine göre', 4: 'İpucu: ilk kilidi, ikinci halkanın boşluğu yaklaşırken vur' };
+  const features = { preLocked: 'Kareli halka baştan kilitli, kanalın yönünü o belirler', gaps2: 'İki kapılı halka: hangi kapıyı kullandığın sonrakileri etkiler', flip: 'Kırmızı noktalı halkalar ara ara yön değiştirir', wobble: 'Bazı halkalar hızlanıp yavaşlıyor' };
+  const firstSeen = {};
+  LEVELS.forEach(l => {
+    const has = { preLocked: l.rings.some(r => r.preLocked), gaps2: l.rings.some(r => r.gaps === 2), flip: l.rings.some(r => r.flip), wobble: l.rings.some(r => r.wobble) };
+    for (const k in has) if (has[k] && !l.boss && !(k in firstSeen)) firstSeen[k] = l.n;
+  });
+  for (const k in firstSeen) if (!TEACH[firstSeen[k]]) TEACH[firstSeen[k]] = features[k];
+
+  const fmt = t => t.toFixed(1).replace('.', ',');
+  const starStr = s => '★'.repeat(s) + '☆'.repeat(3 - s);
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    ['bg','ink','ball','fail','win','muted'].forEach(k => colors[k] = cs.getPropertyValue('--' + k).trim());
+  }
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', readColors);
+
+  function geo() {
+    const S = Math.min(W, H) || 380;
+    const outer = S * 0.44, inner = S * 0.17, n = rings.length;
+    const step = n > 1 ? (outer - inner) / (n - 1) : 0;
+    return { S, outer, inner, step, ballR: S * 0.022, radius: i => outer - i * step, lw: Math.max(5, Math.min(9, S * 0.018)) };
+  }
+
+  function applyRing(r) {
+    const half = r.gap * DEG / 2, cs = gapCenters(r);
+    for (let b = 0; b < N; b++) {
+      if (!mask[b]) continue;
+      const a = (b + 0.5) * BIN;
+      mask[b] = cs.some(c => Math.abs(norm(a - c)) <= half) ? 1 : 0;
+    }
+    anyLocked = true;
+  }
+  function runs() {
+    const out = []; let start = -1;
+    for (let b = 0; b < N; b++) if (!mask[b]) { start = b; break; }
+    if (start < 0) return [{ from: 0, to: TAU, len: N }];
+    let cur = 0, curStart = 0;
+    for (let k = 1; k <= N; k++) {
+      const b = (start + k) % N;
+      if (mask[b]) { if (!cur) curStart = b; cur++; }
+      else if (cur) { out.push({ from: curStart * BIN, to: (curStart + cur) * BIN, len: cur }); cur = 0; }
+    }
+    return out;
+  }
+  function largestRun() {
+    let best = { len: 0, from: 0, to: 0 };
+    for (const r of runs()) if (r.len > best.len) best = r;
+    return { len: best.len, center: (best.from + best.to) / 2 };
+  }
+  function nextActive(from) { let i = from; while (i < rings.length && rings[i].locked) i++; return i; }
+
+  function loadLevel(n, keepAttempts) {
+    level = n; L = LEVELS[n - 1];
+    rings = liveRings(L.rings);
+    mask = new Uint8Array(N).fill(1); anyLocked = false;
+    rings.forEach(r => { if (r.locked) applyRing(r); });
+    active = nextActive(0); state = 'idle'; crashRing = -1; lastLocked = -1;
+    levelTime = 0; endTimer = 0; ballDist = 0; flash = 0; shake = 0;
+    if (!keepAttempts) attempts = 1;
+    lvlEl.textContent = L.boss ? `${n}, patron` : n;
+    const b = bests[n];
+    if (L.boss && attempts === 1) hintEl.textContent = `${L.boss}: ${L.hint}`;
+    else if (attempts > 1) hintEl.textContent = `Deneme ${attempts}` + (b ? `, en iyin ${starStr(b.s)}` : '');
+    else if (TEACH[n] && !b) hintEl.textContent = TEACH[n];
+    else hintEl.textContent = b ? `En iyin ${starStr(b.s)} ${fmt(b.t)} sn` : 'Dokun, sıradaki halkayı kilitle';
+    try { localStorage.setItem('kasa2-level', String(n)); } catch (e) {}
+    updateClock();
+  }
+
+  function crash(msg, ring) {
+    state = 'crash'; crashRing = ring; flash = 1; shake = 1; endTimer = 0.9;
+    hintEl.textContent = msg;
+  }
+
+  function tap() {
+    if (state !== 'idle' || active >= rings.length) return;
+    const r = rings[active];
+    r.locked = true; lastLocked = active; lockPulse = 1;
+    applyRing(r);
+    const run = largestRun();
+    if (run.len < NEED_BINS) { crash('Açıklık kapandı', active); return; }
+    active = nextActive(active + 1);
+    if (active >= rings.length) {
+      state = 'fire'; fireAngle = run.center; ballDist = 0; finishTime = levelTime; endTimer = 1.4;
+      // Hassasiyet: mükemmel hizada kalacak açıklığa göre ne kadarını koruyabildin
+      const minGap = Math.min(...L.rings.map(x => x.gap)) * DEG;
+      const q = (run.len * BIN - NEED) / (minGap - NEED);
+      const s = q >= DATA.q3 ? 3 : q >= DATA.q2 ? 2 : 1;
+      const prev = bests[level];
+      const better = !prev || s > prev.s || (s === prev.s && finishTime < prev.t);
+      if (better) { bests[level] = { s, t: +finishTime.toFixed(2) }; try { localStorage.setItem('kasa2-best', JSON.stringify(bests)); } catch (e) {} }
+      const label = s === 3 ? 'Temiz açılış' : s === 2 ? 'İyi açılış' : 'Kıl payı';
+      hintEl.textContent = `${label} ${starStr(s)} ${fmt(finishTime)} sn${better && prev ? ', rekor' : ''}`;
+    }
+  }
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); tap(); });
+  window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); tap(); } });
+  document.getElementById('reset').addEventListener('click', e => { e.stopPropagation(); loadLevel(1); });
+
+  function updateClock() {
+    const shown = state === 'fire' ? finishTime : levelTime;
+    const left = Math.max(0, L.limit - shown);
+    clockEl.textContent = fmt(left);
+    const low = left < L.limit * 0.25;
+    clockEl.classList.toggle('low', low); barEl.classList.toggle('low', low);
+    barFill.style.transform = `scaleX(${left / L.limit})`;
+  }
+
+  function update(dt) {
+    if (state === 'idle') {
+      levelTime += dt;
+      stepRings(rings, dt, levelTime);
+      if (levelTime >= L.limit) crash('Süre doldu', -2);
+    } else if (state === 'fire') {
+      ballDist += geo().S * 1.3 * dt;
+      endTimer -= dt;
+      if (flash === 0 && endTimer > 0.6 && ballDist > geo().outer) flash = 1;
+      if (endTimer <= 0) loadLevel(Math.min(level + 1, MAX_LEVEL));
+    } else if (state === 'crash') {
+      endTimer -= dt;
+      if (endTimer <= 0) { attempts++; loadLevel(level, true); }
+    }
+    flash = Math.max(0, flash - dt * 2);
+    shake = Math.max(0, shake - dt * 3);
+    lockPulse = Math.max(0, lockPulse - dt * 4);
+    updateClock();
+  }
+
+  function drawRing(r, R) {
+    const half = r.gap * DEG / 2;
+    const cs = gapCenters(r).map(c => ((c % TAU) + TAU) % TAU).sort((a, b) => a - b);
+    for (let i = 0; i < cs.length; i++) {
+      const a0 = cs[i] + half;
+      const a1 = (i + 1 < cs.length ? cs[i + 1] : cs[0] + TAU) - half;
+      if (a1 > a0) { ctx.beginPath(); ctx.arc(0, 0, R, a0, a1); ctx.stroke(); }
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const g = geo();
+    const sx = shake ? (Math.random() - 0.5) * 12 * shake : 0;
+    const sy = shake ? (Math.random() - 0.5) * 12 * shake : 0;
+    ctx.save(); ctx.translate(W / 2 + sx, H / 2 + sy);
+
+    ctx.globalAlpha = L.boss ? 0.14 : 0.07; ctx.fillStyle = L.boss ? colors.ball : colors.ink;
+    ctx.font = `600 ${g.S * 0.5}px Fredoka, "Trebuchet MS", sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(level, 0, g.S * 0.03);
+    ctx.globalAlpha = 1;
+
+    if (anyLocked && state !== 'crash') {
+      for (const run of runs()) {
+        const wide = run.len >= NEED_BINS;
+        ctx.fillStyle = wide ? colors.ball : colors.fail;
+        ctx.globalAlpha = wide ? 0.22 : 0.15;
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        ctx.arc(0, 0, g.outer + g.S * 0.05, run.from, run.to); ctx.closePath(); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Sıradaki halka belirgin, daha sonrakiler yarı saydam: ileriyi okumak mümkün
+    const upcoming = state === 'idle' ? nextActive(active + 1) : -1;
+    ctx.lineCap = 'round';
+    rings.forEach((r, i) => {
+      const R = g.radius(i);
+      let col = colors.ink, alpha = r.locked ? 1 : 0.4, lw = g.lw;
+      if (i === upcoming) alpha = 0.75;
+      if (i === active && state === 'idle') { col = colors.ball; alpha = 1; lw = g.lw * 1.25; }
+      if (i === crashRing || crashRing === -2) { col = colors.fail; alpha = 1; }
+      if (i === lastLocked && lockPulse > 0) lw = g.lw * (1 + lockPulse * 0.8);
+      ctx.strokeStyle = col; ctx.globalAlpha = alpha; ctx.lineWidth = lw;
+      drawRing(r, R);
+      ctx.globalAlpha = 1;
+      const a = r.angle + Math.PI;
+      if (r.preLocked) { ctx.fillStyle = colors.ink; ctx.fillRect(Math.cos(a) * R - 4, Math.sin(a) * R - 4, 8, 8); }
+      if (r.flip && !r.locked) { ctx.fillStyle = colors.fail; ctx.beginPath(); ctx.arc(Math.cos(a) * R, Math.sin(a) * R, 4, 0, TAU); ctx.fill(); }
+    });
+
+    const d = state === 'fire' ? ballDist : 0;
+    ctx.fillStyle = state === 'crash' ? colors.fail : colors.ball;
+    ctx.beginPath(); ctx.arc(Math.cos(fireAngle) * d, Math.sin(fireAngle) * d, g.ballR, 0, TAU); ctx.fill();
+    ctx.restore();
+
+    if (flash > 0) {
+      ctx.globalAlpha = flash * 0.18;
+      ctx.fillStyle = state === 'crash' ? colors.fail : colors.win;
+      ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+    }
+  }
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = cv.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000); last = now;
+    update(dt); draw();
+    requestAnimationFrame(frame);
+  }
+
+  readColors();
+  window.addEventListener('resize', resize);
+  resize();
+  loadLevel(level);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
