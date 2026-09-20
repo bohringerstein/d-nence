@@ -153,16 +153,39 @@ Yazı tipi: Fredoka (400 ve 600), yedek olarak sistem sans-serif. Tüm metinler 
 
 **İpuçları.** Alt çubuktaki metin şu önceliğe göre seçilir:
 1. Patron leveli, ilk deneme: `"<ad>: <açıklama>"`.
-2. İkinci ve sonraki denemeler: `"Deneme N"`, varsa en iyi yıldızla birlikte.
-3. Öğretici ipucu (yalnızca level daha önce bitirilmemişse):
+2. **Öğretici ipucu (yalnızca level daha önce bitirilmemişse).** İkinci ve sonraki denemelerde önüne deneme sayısı eklenir: `"Deneme N · <ipucu>"`.
+   *Neden bu sırada:* öğretici ipucu eskiden deneme sayacının altındaydı ve ilk kayıpta kayboluyordu. Oysa oyuncu kuralı tam da kaybettiği için öğrenmeye çalışır; Level 2'deki "Sarı kama ortak açıklık" cümlesi oyunun belkemiğidir ve tek bir kayıpla siliniyordu.
+3. İkinci ve sonraki denemeler (öğretici ipucu yoksa): `"Deneme N"`, varsa en iyi yıldızla birlikte.
+4. Öğretici ipucu metinleri:
    - Level 1: "Dokun, dış halkayı kilitle"
    - Level 2: "Sarı kama ortak açıklık. Sonraki boşluğu ona hizala"
    - Level 3: "Yıldızlar, kasa açıldığında kalan açıklığın genişliğine göre"
    - Level 4: "İpucu: ilk kilidi, ikinci halkanın boşluğu yaklaşırken vur"
    - Her özelliğin patron olmayan ilk göründüğü level (tablodan otomatik hesaplanır): kareli halka, iki kapılı halka, yön değiştiren halka, hızlanan halka için kısa birer açıklama. Metinler referans sürümdeki `features` nesnesindedir.
-4. Aksi halde en iyi skor ya da "Dokun, sıradaki halkayı kilitle".
+5. Aksi halde en iyi skor ya da "Dokun, sıradaki halkayı kilitle".
 
 **Erişilebilirlik ve cihaz:** güvenli alan boşlukları (çentik, ana ekran çubuğu) hesaba katılır; ekran yakınlaştırma ve kaydırma kapalıdır; açık/koyu tema desteklenir; hareket azaltma ayarı açıksa sarsıntı ve flaş kapatılır.
+
+**Işığa duyarlılık.** Oyunun görsel uyaranı uluslararası rehberlerdeki eşiklerle karşılaştırıldı (telefon: 7 cm ekran, 32 cm mesafe).
+
+| Ölçüt | Rehber eşiği | Kasa | Sonuç |
+|---|---|---|---|
+| Yanıp sönme sıklığı | saniyede 3'ten fazla | en kötü hâlde 1,1 | eşiğin çok altında |
+| Flaş şiddeti | %10 parlaklık sıçraması | %18 opaklık, 0,5 sn'de sönüyor | sınırda, sıklık düşük |
+| Açık-koyu çizgi çifti | 5'ten fazla | 6 halkalı levelde 6 | **eşik üstü** |
+| Uzamsal frekans | 1–4 çevrim/derece riskli | 1,48 | **riskli bantta** |
+| Kontrast (Michelson) | 0,4 üstü riskli | halka/zemin 0,93–0,96 | **eşik üstü** |
+| Desenin görüş açısı | "geniş alan kaplayan" | 11°, oyun alanının %13,8'i | küçük, koruyucu |
+| Yön değiştirme sıklığı | kritik bant 15–25 Hz | 0,31–0,83 Hz | çok uzakta |
+
+Desen üç ölçütü işaretliyor ama en belirleyicisini kaçırıyor: telefonda yalnızca 11° kaplıyor ve çizgiler ince (doluluk %33). Baş dönmesi riski ihmal edilebilir — dönen desenin kendi kendine dönme yanılsaması (vection) yaratması için genellikle 60°+ görüş alanı gerekir. En olası rahatsızlık kaynağı dönen halkalar değil, kayıptaki ekran sarsıntısıdır.
+
+Bunun üzerine iki şey zorunludur:
+
+1. **İlk açılışta bir kez uyarı gösterilir** ve ayarlar paneliyle birlikte sunulur. Panel açıkken **oyun durur**: uyarıyı okumak oyuncunun süresini yakmamalıdır.
+2. **"Deseni yumuşat" ayarı** kilitsiz halkaların opaklığını 0,40'tan 0,25'e indirir. Ölçülen etki: açık temada halka/zemin kontrastı 0,40 → **0,24** (eşiğin altına iner), koyu temada 0,82 → 0,69. Koyu temada eşiğin altına inmek halkaları oynanamayacak kadar görünmez yapardı; açık-üstüne-koyu çizim doğası gereği yüksek kontrastlıdır ve bu dürüstçe kabul edilir.
+
+Ayrıca **"Hareketi azalt"** ayarı, sistem tercihinden bağımsız olarak sarsıntıyı ve flaşı kapatır (ikisinden biri açıksa kapalıdır).
 
 ## 8. Level sistemi
 

@@ -12,6 +12,7 @@ import { tuvalKur, ciz } from "./game/render.ts";
 import { renkleriOku, hareketAzalt, tercihleriIzle } from "./game/theme.ts";
 import { ogreticiTablosu, ipucu, yildizYazisi, sureYazisi } from "./game/hints.ts";
 import { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel } from "./game/storage.ts";
+import { ayarlariOku, ayarlariYaz, halkaOpakligi, UYARI_METIN } from "./game/ayarlar.ts";
 import { kabukKur } from "./ui/shell.ts";
 
 const tablo = tabloHam as LevelTable;
@@ -32,10 +33,14 @@ const ui = kabukKur(hedef);
 const kayit = oku();
 const ogretici = ogreticiTablosu(tablo.levels);
 
+const ayarlar = ayarlariOku();
 let renk = renkleriOku();
-let azalt = hareketAzalt();
+// Sistem tercihi VEYA oyuncunun kendi seçimi; ikisinden biri yeterli.
+let azalt = hareketAzalt() || ayarlar.hareketAzalt;
 let durum: LevelState = null as unknown as LevelState;
 let bitti = false;
+/** Ayarlar paneli açıkken oyun durur: uyarıyı okumak oyuncunun süresini yakmamalı. */
+let panelAcik = false;
 
 const tuval = tuvalKur(ui.canvas, () => { if (durum) cizVeYaz(); });
 const girdi = girdiBagla(ui.canvas);
@@ -66,7 +71,7 @@ function saatiGuncelle(): void {
 
 let sonFlas = -1;
 function cizVeYaz(): void {
-  ciz(tuval, durum, renk, { hareketAzalt: azalt });
+  ciz(tuval, durum, renk, { hareketAzalt: azalt, halkaOpakligi: halkaOpakligi(ayarlar) });
   // Flaş canvas yerine ayrı bir katmanda: tam ekran dolgu geniş ekranda 4 ms tutuyordu.
   const f = azalt ? 0 : durum.flash * 0.18;
   if (f !== sonFlas) {
@@ -97,7 +102,7 @@ function dokunusIsle(): void {
 // ---- Döngü -----------------------------------------------------------------
 const oyun = dongu({
   adim(dt) {
-    if (bitti) return false;
+    if (bitti || panelAcik) { girdi.temizle(); return false; }
     dokunusIsle();
     const s = step(durum, dt);
     if (s.tip === "sureDoldu") { yaz("Süre doldu"); return true; }
@@ -111,8 +116,9 @@ const oyun = dongu({
   },
   cizim(dt) {
     if (bitti) return;
+    // Panel açıkken halkalar donar ama çizim sürer: oyuncu ayarın etkisini anında görür.
     const g = tuval.yerlesim(durum.rings.length);
-    decay(durum, dt, g.S, g.outer);
+    if (!panelAcik) decay(durum, dt, g.S, g.outer);
     saatiGuncelle();
     cizVeYaz();
   }
@@ -146,11 +152,47 @@ ui.reset.addEventListener("click", e => {
   ui.reset.blur();   // sonraki Enter oyuna gitsin, düğmeye değil
 });
 
-tercihleriIzle(() => { renk = renkleriOku(); azalt = hareketAzalt(); });
+tercihleriIzle(() => { renk = renkleriOku(); azalt = hareketAzalt() || ayarlar.hareketAzalt; });
+
+// ---- Ayarlar paneli --------------------------------------------------------
+function ayarPaneliAc(ilkAcilis = false): void {
+  panelAcik = true;
+  ui.desenKutu.checked = ayarlar.desenYumusat;
+  ui.hareketKutu.checked = ayarlar.hareketAzalt;
+  // Uyarı yalnızca ilk açılışta; sonrasında panel sade kalır.
+  ui.uyari.textContent = ilkAcilis ? UYARI_METIN : "";
+  ui.ayarPanel.hidden = false;
+  ui.ayarKapat.focus();
+}
+
+function ayarlariUygula(): void {
+  ayarlar.desenYumusat = ui.desenKutu.checked;
+  ayarlar.hareketAzalt = ui.hareketKutu.checked;
+  azalt = hareketAzalt() || ayarlar.hareketAzalt;
+  ayarlariYaz(ayarlar);
+  sonFlas = -1;   // flaş katmanı yeni ayara göre tazelensin
+}
+
+ui.ayarAc.addEventListener("click", e => { e.stopPropagation(); if (!bitti) ayarPaneliAc(); ui.ayarAc.blur(); });
+ui.desenKutu.addEventListener("change", ayarlariUygula);
+ui.hareketKutu.addEventListener("change", ayarlariUygula);
+ui.ayarKapat.addEventListener("click", () => {
+  ayarlariUygula();
+  ayarlar.uyariGoruldu = true;
+  ayarlariYaz(ayarlar);
+  ui.ayarPanel.hidden = true;
+  ui.ayarKapat.blur();
+  panelAcik = false;
+  // Panelde geçen süre levele yazılmasın: level baştan başlar.
+  levelYukle(durum.level.n);
+});
 
 levelYukle(kayit.level);
 tuval.boyutla();
 oyun.basla();
+
+// Işığa duyarlılık uyarısı ilk açılışta bir kez (bkz. game/ayarlar.ts).
+if (!ayarlar.uyariGoruldu) ayarPaneliAc(true);
 
 // Geliştirme sırasında elle sınamak için; oyun bunu kullanmaz ve üretim derlemesine girmez.
 if (import.meta.env.DEV) {

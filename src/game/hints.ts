@@ -45,7 +45,16 @@ export interface IpucuGirdi {
 
 export function ipucu({ level, deneme, rekor, ogretici }: IpucuGirdi): string {
   if (level.boss && deneme === 1) return `${level.boss}: ${level.hint}`;
+
+  // Öğretici ipucu deneme sayacını EZER, tersi değil.
+  //
+  // Eskiden "Deneme N" öndeydi ve ilk kayıpta öğretici metin kayboluyordu. Oysa oyuncu
+  // kuralı tam da kaybettiği için öğrenmeye çalışıyor: Level 2'deki "Sarı kama ortak
+  // açıklık" cümlesi oyunun belkemiği ve tek kayıpla siliniyordu. Deneme sayısı yine
+  // görünüyor, sadece ipucunun önüne geçmiyor.
+  const ogr = !rekor ? ogretici[level.n] : undefined;
+  if (ogr) return deneme > 1 ? `Deneme ${deneme} · ${ogr}` : ogr;
+
   if (deneme > 1) return `Deneme ${deneme}` + (rekor ? `, en iyin ${yildizYazisi(rekor.s)}` : "");
-  if (ogretici[level.n] && !rekor) return ogretici[level.n];
   return rekor ? `En iyin ${yildizYazisi(rekor.s)} ${sureYazisi(rekor.t)} sn` : "Dokun, sıradaki halkayı kilitle";
 }

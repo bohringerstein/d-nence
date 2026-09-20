@@ -1,0 +1,49 @@
+// Erişilebilirlik ayarları ve ilk açılış uyarısı.
+//
+// Oyunun görsel uyaranı ışığa duyarlılık rehberlerindeki eşiklerle karşılaştırıldı
+// (docs/SPEC.md, 7. bölüm "Işığa duyarlılık"). Yanıp sönme eşiklerin çok altında, ama
+// 6 halkalı levellerde desen üç ölçütü birden işaretliyor: yarıçapta 6 açık-koyu çift
+// (eşik >5), 1,48 çevrim/derece uzamsal frekans (riskli bant 1-4) ve 0,96 Michelson
+// kontrast (riskli >0,4). Deseni küçük tutan şey görüş açısı: telefonda sadece 11°.
+// Yine de bir uyarı ve bir yumuşatma seçeneği sunuyoruz.
+
+const KEY = "kasa:ayarlar:v1";
+
+export interface Ayarlar {
+  /** Kilitsiz halkaların opaklığı düşürülür; en yüksek kontrastlı durumu hedefler. */
+  desenYumusat: boolean;
+  /** Sistem tercihinden bağımsız olarak sarsıntı ve flaşı kapatır. */
+  hareketAzalt: boolean;
+  /** İlk açılış uyarısı gösterildi mi. */
+  uyariGoruldu: boolean;
+}
+
+const varsayilan = (): Ayarlar => ({ desenYumusat: false, hareketAzalt: false, uyariGoruldu: false });
+
+export function ayarlariOku(): Ayarlar {
+  try {
+    const ham = localStorage.getItem(KEY);
+    if (!ham) return varsayilan();
+    const o = JSON.parse(ham) as Record<string, unknown>;
+    const a = varsayilan();
+    if (typeof o.desenYumusat === "boolean") a.desenYumusat = o.desenYumusat;
+    if (typeof o.hareketAzalt === "boolean") a.hareketAzalt = o.hareketAzalt;
+    if (typeof o.uyariGoruldu === "boolean") a.uyariGoruldu = o.uyariGoruldu;
+    return a;
+  } catch {
+    return varsayilan();
+  }
+}
+
+export function ayarlariYaz(a: Ayarlar): void {
+  try { localStorage.setItem(KEY, JSON.stringify(a)); } catch { /* kayıt olmadan da oynanır */ }
+}
+
+/** Kilitsiz halkaların çizim opaklığı. */
+export const halkaOpakligi = (a: Ayarlar): number => a.desenYumusat ? 0.25 : 0.4;
+
+export const UYARI_BASLIK = "Başlamadan önce";
+export const UYARI_METIN =
+  "Kasa'da iç içe dönen halkalar var. Işığa duyarlı epilepsi ya da desenlerden " +
+  "rahatsız olma geçmişin varsa, aşağıdaki \"Deseni yumuşat\" seçeneğini açabilir " +
+  "ve ara vererek oynayabilirsin.";

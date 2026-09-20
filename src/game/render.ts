@@ -95,9 +95,11 @@ function halkaCiz(ctx: CanvasRenderingContext2D, r: Ring, R: number): void {
 
 export interface CizimSecenekleri {
   hareketAzalt: boolean;
+  /** Kilitsiz halkaların opaklığı. "Deseni yumuşat" açıkken düşer (bkz. game/ayarlar.ts). */
+  halkaOpakligi: number;
 }
 
-export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt }: CizimSecenekleri): void {
+export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halkaOpakligi }: CizimSecenekleri): void {
   const { ctx, W, H } = t;
   if (W === 0 || H === 0) return;
   const g = t.yerlesim(s.rings.length);
@@ -165,9 +167,9 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt }: Ci
   s.rings.forEach((r, i) => {
     const R = g.radius(i);
     let renkli = renk.ink;
-    let alpha = r.locked ? 1 : 0.4;
+    let alpha = r.locked ? 1 : halkaOpakligi;
     let kalinlik = g.lineWidth;
-    if (i === sonraki) alpha = 0.75;
+    if (i === sonraki) alpha = Math.min(0.75, halkaOpakligi + 0.35);
     const aktif = i === s.active && s.asama === "idle";
     if (aktif) { renkli = renk.ball; alpha = 1; kalinlik = g.lineWidth * 1.25; }
     if (i === s.crashRing || s.crashRing === HEPSI) { renkli = renk.fail; alpha = 1; }

@@ -143,20 +143,46 @@ button {
 }
 button:focus-visible { outline: 2px solid var(--ball); outline-offset: 2px; }
 
-/* Bitiş ekranı: 60. levelden sonra. Prototipte oyun sessizce 60'ı tekrarlıyordu. */
-.bitis {
+/* Örtü: bitiş ekranı ve ayarlar paneli aynı kabuğu kullanır. */
+.ortu {
   position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   padding: 24px;
+  z-index: 10;
 }
-.bitis[hidden] { display: none; }
-.bitisKutu { text-align: center; max-width: 22rem; }
-.bitisKutu h2 { font-size: 1.8rem; font-weight: 600; margin: 0 0 0.5rem; color: var(--ball); }
-.bitisKutu p { margin: 0 0 1.25rem; color: var(--ink); line-height: 1.5; }
-.bitisKutu button { color: var(--ink); padding: 8px 20px; }
+.ortu[hidden] { display: none; }
+.kutu { text-align: center; max-width: 22rem; width: 100%; }
+.kutu h2 { font-size: 1.6rem; font-weight: 600; margin: 0 0 0.5rem; color: var(--ball); }
+.kutu p { margin: 0 0 1.25rem; color: var(--ink); line-height: 1.5; }
+.kutu button { color: var(--ink); padding: 8px 20px; margin-top: 0.5rem; }
+
+/* Işığa duyarlılık uyarısı: ilk açılışta gösterilir (src/game/ayarlar.ts). */
+.uyari {
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-align: left;
+  border-left: 3px solid var(--ball);
+  padding-left: 0.75rem;
+}
+.uyari:empty { display: none; }
+
+.secenek {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  text-align: left;
+  padding: 0.6rem 0;
+  cursor: pointer;
+}
+.secenek input { width: 1.15rem; height: 1.15rem; margin-top: 0.15rem; flex: 0 0 auto; accent-color: var(--ball); }
+.secenek b { display: block; font-weight: 600; color: var(--ink); }
+.secenek small { display: block; color: var(--muted); font-size: 0.85rem; line-height: 1.35; }
+
+/* Alt çubuktaki ayar düğmesi dar ekranda "Baştan başla"yı sıkıştırmasın. */
+.ikon { padding: 4px 10px; font-size: 0.9rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .bar i { transition: none; }

@@ -12,6 +12,12 @@ export interface Kabuk {
   bitisMetin: HTMLElement;
   bitisDugme: HTMLButtonElement;
   flas: HTMLElement;
+  ayarAc: HTMLButtonElement;
+  ayarPanel: HTMLElement;
+  ayarKapat: HTMLButtonElement;
+  desenKutu: HTMLInputElement;
+  hareketKutu: HTMLInputElement;
+  uyari: HTMLElement;
 }
 
 const HTML = `
@@ -28,10 +34,27 @@ const HTML = `
   </div>
   <footer>
     <span id="hint" role="status" aria-live="polite"></span>
+    <button id="ayarAc" type="button" class="ikon" aria-label="Ayarlar">Ayarlar</button>
     <button id="reset" type="button">Baştan başla</button>
   </footer>
-  <div class="bitis" id="bitis" hidden role="dialog" aria-modal="true" aria-labelledby="bitisBaslik">
-    <div class="bitisKutu">
+
+  <div class="ortu" id="ayarPanel" hidden role="dialog" aria-modal="true" aria-labelledby="ayarBaslik">
+    <div class="kutu">
+      <h2 id="ayarBaslik">Ayarlar</h2>
+      <p class="uyari" id="uyari"></p>
+      <label class="secenek">
+        <input type="checkbox" id="desenKutu">
+        <span><b>Deseni yumuşat</b><small>Kilitlenmemiş halkalar daha soluk çizilir.</small></span>
+      </label>
+      <label class="secenek">
+        <input type="checkbox" id="hareketKutu">
+        <span><b>Hareketi azalt</b><small>Kayıptaki sarsıntı ve ekran flaşı kapanır.</small></span>
+      </label>
+      <button id="ayarKapat" type="button">Tamam</button>
+    </div>
+  </div>
+  <div class="ortu" id="bitis" hidden role="dialog" aria-modal="true" aria-labelledby="bitisBaslik">
+    <div class="kutu">
       <h2 id="bitisBaslik">Kasa açıldı</h2>
       <p id="bitisMetin"></p>
       <button id="bitisDugme" type="button">Baştan oyna</button>
@@ -59,6 +82,12 @@ export function kabukKur(hedef: HTMLElement): Kabuk {
     bitis: bul(hedef, "bitis"),
     bitisMetin: bul(hedef, "bitisMetin"),
     bitisDugme: bul<HTMLButtonElement>(hedef, "bitisDugme"),
-    flas: bul(hedef, "flas")
+    flas: bul(hedef, "flas"),
+    ayarAc: bul<HTMLButtonElement>(hedef, "ayarAc"),
+    ayarPanel: bul(hedef, "ayarPanel"),
+    ayarKapat: bul<HTMLButtonElement>(hedef, "ayarKapat"),
+    desenKutu: bul<HTMLInputElement>(hedef, "desenKutu"),
+    hareketKutu: bul<HTMLInputElement>(hedef, "hareketKutu"),
+    uyari: bul(hedef, "uyari")
   };
 }
