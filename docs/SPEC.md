@@ -265,7 +265,24 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
 
    **Ama iki terim de yetmez: limit, oyuncunun saate yenilmediğini göstermek zorundadır.** Her aday, insan benzeri oyuncuyla oynatıldıktan sonra kayıplarının kaç tanesinin "süre doldu" olduğuna bakılır. Denemelerin **%10'undan fazlası** saate yeniliyorsa limit %20 adımlarla açılır (tasarım limitinin en çok 2,2 katına kadar). Aday seçiminde bu ölçütü sağlayan ("temiz") bir aday, hedefe 10 puana kadar daha uzak olsa bile sağlamayanı yener. Doğrulama, denemelerinin dörtte birinden fazlasını saate kaybeden bölümleri sayar ve 20'yi (bölümlerin %2'si) aşarsa hata verir.
 
-   *Neden:* çözücü açgözlüdür, ilk uygun hizalanmayı alır; insan daha iyisini bekler. Hizalanma fırsatının seyrek olduğu bölümlerde 1,5 kat pay yetmiyordu ve oyuncu bütün kilitleri doğru yapıp **son kilitte** saate yeniliyordu. Ölçüm: eski tabloda 1000 bölümün **123'ünde** kayıpların yarısından fazlası süre dolmasıydı, bazılarında %100. O bölümlerde oyun hassasiyet oyunu olmaktan çıkıp bekleme oyunu oluyordu — türdeki en kötü kayıp hissi, çünkü oyuncu hata yapmadığı hâlde kaybeder. Yeni tabloda bu sayı **16**. Yan etki olarak zorluk hak ettiği yere kaydı: en dar boşluk ortalaması 38,8°'den 36,2°'ye indi (hassasiyet arttı) ve 85° tavanına dayanan bölüm sayısı 47'den 9'a düştü.
+   *Neden:* çözücü açgözlüdür, ilk uygun hizalanmayı alır; insan daha iyisini bekler. Hizalanma fırsatının seyrek olduğu bölümlerde 1,5 kat pay yetmiyordu ve oyuncu bütün kilitleri doğru yapıp **son kilitte** saate yeniliyordu. Ölçüm: eski tabloda 1000 bölümün **123'ünde** kayıpların yarısından fazlası süre dolmasıydı, bazılarında %100. O bölümlerde oyun hassasiyet oyunu olmaktan çıkıp bekleme oyunu oluyordu — türdeki en kötü kayıp hissi, çünkü oyuncu hata yapmadığı hâlde kaybeder.
+
+   **Ve bunun bir de ÖTEKİ ucu var: limitin tavanı.** Süre bir zorluk kaldıracıdır; oyuncu halkaların ikinci turunu bekleyebiliyorsa zamanlama kararı kararsızlaşır ve oyun "doğru anı yakala"dan "otur bekle"ye döner. Bunu ölçen büyüklük **γ**'dır:
+
+   ```
+   P_i = 2π / (g_i × |ω_i|)                    bir halkanın fırsat periyodu
+   γ   = (limit − m × REACT) / Σ P_i           halka başına kaç TUR izlemeye vakit var
+   ```
+
+   `g_i` o halkadaki kapı sayısıdır (iki kapılı halkada fırsat iki kat sık gelir). `wobble` hızı 0,3–1,7 kat arasında salındırır ama sinüsün ortalaması sıfırdır: periyodu değiştirmez. `flip` halkası tam tur atmayabilir, gidiş-dönüş çevrimi daha uzunsa o esas alınır.
+
+   **Tavan γ ≤ 1,3'tür**, üretimde zorlanır ve doğrulamada tek ihlal bile hata verir. Taban ile tavan çakışırsa — yani bir yapı hem saate yenilme üretiyor hem tavanı aşıyorsa — **limit zorlanmaz, aday elenir** ve başka bir halka yapısı denenir (deneme hakkı bu yüzden 24'ten 36'ya çıkarıldı).
+
+   *Neden 1,3:* simülasyona "gözlemci oyuncu" eklenip ölçüldü — bir halkaya nişan alabilmek için önce onu belirli bir süre izlemek zorunda olan oyuncu. Bir tam tur izlemesi gereken oyuncu bölümlerin %2,2'sini kazanıyor; yarım tur izleyen %57'sini. Yani bütçe "**halka başına yarım tur izle, sonra karar ver**" olmalı ve 1,3 buna bir tur artı pay bırakır.
+
+   *Ayrıca ölçüldü:* limiti %40 kısaltmak usta oyuncuyu yalnızca 0,5 puan etkiliyor (%82,7 → %82,2) ama ortalama oyuncunun süre kayıplarını ikiye katlıyor (%6 → %12,3). Yani saat, iyi oyuncuyla çok iyi oyuncuyu ayırmaz; zayıf oyuncuyu ezer. **Beceriyi ayıran kaldıraç boşluk genişliğidir, saat değil** — saatin işi yalnızca taahhüde zorlamaktır.
+
+   Üç kuralın birlikte sonucu (eski tablo → yeni tablo): saate yenilmenin baskın olduğu bölüm **123 → 4**, γ en yüksek **1,90 → 1,31**, γ ortalama 0,83 → 0,86, en dar boşluk ortalaması **38,8° → 36,1°** (zorluk saatten hassasiyete kaydı), 85° tavanına dayanan bölüm 47 → 9.
 5. **İnsan benzeri oyuncu.** Dokunuşları ortalama 0 ve standart sapma 60 ms olan normal dağılımla sapar; kalan payın %70'ini kullanmaya razıdır. Her aday 50 kez oynatılır.
    **Sapma simetrik uygulanır (zorunlu).** Erken ya da geç dokunuş, tüm halkaları birlikte ileri veya geri sarar — tek halkanın açısını kaydırmak değildir. Aksi halde `wobble` çarpanı ve `flip` sayacı hesaba katılmaz; bu hata bir önceki sürümde kazanma oranını level başına 19 puana kadar şişiriyordu.
 6. **Yön değiştiren halkanın dönüşü görülebilmeli.** Oyuncu dıştan içe gider ve her kilit kabaca 0,6 saniye alır; bir halkanın kilitlenme anı `0,3 + 0,6 × (önündeki hareketli halka sayısı)` olarak tahmin edilir. `flip` yalnızca kilitlenmesi 1,2 saniyeden geç olan halkalara verilir ve periyodu o sürenin %70'ine sığdırılır. Erken kilitlenen halkanın `flip`'i kaldırılır.

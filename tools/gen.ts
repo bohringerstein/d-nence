@@ -299,7 +299,12 @@ function finalize(rings: RawRing[], n: number): Finalized | null {
   const want = tasarimLimiti(n, moving);
   // Tasarım limiti kural; çözücü sığmıyorsa aday zaten elenir (bkz. tune), ama son çare olarak
   // limit yine de çözücünün üstünde kalır ki level bitirilebilir olsun.
-  const limit = +Math.max(want, best * 1.5 + 1.5).toFixed(1);
+  const guvenli = best * 1.5 + 1.5;
+  // Bekleme bütçesi tavanı (bkz. GAMA_TAVAN). Çözülebilirlik tavanı aşıyorsa bu yapıya
+  // adil bir süre verilemez demektir: aday elenir, limit zorlanmaz.
+  const tavan = gamaTavani(def);
+  if (guvenli > tavan) return null;
+  const limit = +Math.min(Math.max(want, guvenli), tavan).toFixed(1);
   return { def, best, limit, want, roomy: best <= want * 0.65 };
 }
 /**
@@ -427,6 +432,44 @@ const SURE_KAYBI_ESIGI = 0.10;
 /** Limit tasarım değerinin bu katından fazla açılmaz: süre baskısı büsbütün kaybolmasın. */
 const SURE_TAVANI = 2.2;
 
+/**
+ * Bir halkanın boşluğunun, sabitlenmiş kanalın üstünden geçme periyodu (saniye).
+ *
+ * İki kapılı halkada fırsat iki kat sık gelir. `wobble` hızı 0,3x-1,7x arasında
+ * salındırır ama sinüsün ortalaması sıfırdır: ortalama açısal hızı ve dolayısıyla
+ * periyodu değiştirmez. `flip` halkası ise tam tur atmayabilir — gidiş-dönüş çevrimi
+ * daha uzunsa onu esas alırız, yoksa tavan o halkaya haksız yere dar gelir.
+ */
+function firsatPeriyodu(r: RingDef): number {
+  const temel = TAU / (Math.max(1, r.gaps) * Math.abs(r.speed));
+  return r.flip > 0 ? Math.max(temel, 2 * r.flip) : temel;
+}
+
+/**
+ * γ = (limit − m × REACT) / Σ fırsat periyodu — "halka başına kaç TUR izlemeye vakit var".
+ *
+ * Süre sınırının gerçek anlamı budur ve bir TAVANI olmalıdır: oyuncu halkaların ikinci
+ * turunu bekleyebiliyorsa zamanlama kararı kararsızlaşır, oyun "doğru anı yakala"dan
+ * "otur bekle"ye döner. Ölçüm: γ ortalaması 0,92 ama 39 bölüm 1,4'ün üstündeydi, en
+ * gevşeği 2,45. Simülasyonda halkayı bir tam tur izlemek zorunda olan oyuncu %2,2
+ * kazanıyor, yarım tur izleyen %58,8 — yani bütçe "yarım tur izle, sonra karar ver".
+ *
+ * Taban (süre kaybı onarımı) ile tavan çakışırsa aday elenir; limit zorlanmaz.
+ */
+const GAMA_TAVAN = 1.3;
+
+function gamaTavani(def: RingDef[]): number {
+  const h = def.filter(r => !r.preLocked);
+  const toplamP = h.reduce((s, r) => s + firsatPeriyodu(r), 0);
+  return GAMA_TAVAN * toplamP + h.length * REACT;
+}
+
+const gamaHesapla = (def: RingDef[], limit: number): number => {
+  const h = def.filter(r => !r.preLocked);
+  const toplamP = h.reduce((s, r) => s + firsatPeriyodu(r), 0);
+  return toplamP > 0 ? (limit - h.length * REACT) / toplamP : Infinity;
+};
+
 function tune(rawRings: RawRing[], want: number, n: number, lo = 0.012, hi = 0.45): Candidate | null {
   let best: Candidate | null = null;
   for (let it = 0; it < 8; it++) {
@@ -437,9 +480,13 @@ function tune(rawRings: RawRing[], want: number, n: number, lo = 0.012, hi = 0.4
     let L: Finalized = aday;
     let ev = evaluate(L, 50);
     // Süre dolması baskın kayıp sebebiyse yapı değil limit yanlıştır: limiti aç.
+    const tavan = gamaTavani(L.def);
     for (let tur = 0; tur < 5 && ev.sureKaybi > SURE_KAYBI_ESIGI; tur++) {
       const yeni = +(L.limit * 1.2).toFixed(1);
       if (yeni > L.want * SURE_TAVANI) break;
+      // Bekleme bütçesi tavanı tabandan önce gelir: saate yenilmeyi azaltmak uğruna
+      // oyuncuya ikinci turu bekleme lüksü verilmez. Aday öyleyse elenir.
+      if (yeni > tavan) break;
       L = { ...L, limit: yeni };
       ev = evaluate(L, 50);
     }
@@ -462,9 +509,13 @@ function generate(log: Log = () => {}): LevelTable {
     let pick: Candidate | null = null;
     // Bandın dışında kalırsak aday denemeye devam: 1000 bölümde birkaç zor vaka
     // normal deneme sayısıyla tutturulamıyor ve eşiği gevşetmek yanlış çözüm olurdu.
-    const olagan = boss ? 6 : 8, enCok = boss ? 18 : 24;
+    // Taban (saate yenilme) ile tavan (γ) çakıştığında doğru cevap ikisini de bükmek
+    // değil, O YAPIYI elemektir: daha çok aday denenir. Patronların yapısı elle
+    // tasarlandığı için orada çeşitlilik sınırlı, deneme sayısı da öyle.
+    const olagan = boss ? 6 : 8, enCok = boss ? 24 : 36;
     for (let k = 0; k < enCok; k++) {
-      if (k >= olagan && pick && Math.abs(pick.win - want) <= BAND * 0.9) break;
+      if (k >= olagan && pick && Math.abs(pick.win - want) <= BAND * 0.9
+          && pick.sureKaybi <= SURE_KAYBI_ESIGI) break;
       const raw = boss ? boss.rings() : candidate(n);
       const c = tune(raw, want, n);
       if (c) {
@@ -543,6 +594,10 @@ function verify(): number {
   // Denemelerin dörtte birinden fazlası saate yenilen bölümler: orada oyun hassasiyet
   // oyunu olmaktan çıkıp bekleme oyunu olur (bkz. SURE_KAYBI_ESIGI).
   const sureliler: string[] = [];
+  // Süre sınırının ÖTEKİ ucu: γ tavanını aşan, yani oyuncunun halkaların ikinci turunu
+  // bekleyebildiği bölümler (bkz. GAMA_TAVAN). İkisi karşıt hatalardır, ayrı sayılır.
+  const gevsekler: string[] = [];
+  const gamalar: number[] = [];
 
   for (const l of data.levels) {
     const ad = `${l.n}${l.boss ? "*" : ""}`;
@@ -556,7 +611,13 @@ function verify(): number {
     if (best == null) sorunlar.push(`${ad}: referans çözücü bitiremiyor`);
     else if (best > l.limit * SOLVER_HEADROOM) sorunlar.push(`${ad}: çözücü ${best.toFixed(1)} sn, limit ${l.limit} sn — pay yok`);
     if (Math.abs(sapma) > (l.boss ? BAND_BOSS : BAND)) sorunlar.push(`${ad}: kazanma %${Math.round(ev.win * 100)}, hedef %${Math.round(hedef * 100)} (${sapma > 0 ? "+" : ""}${Math.round(sapma * 100)} puan)`);
-    if (l.limit < tasarimLimiti(l.n, moving) - 0.05) sorunlar.push(`${ad}: limit tasarım değerinin altında`);
+    // Tasarım limiti kuraldır ama bekleme bütçesi tavanı onu kesebilir (bkz. GAMA_TAVAN):
+    // hızlı halkalı bir bölümde tasarım süresi oyuncuya ikinci turu bekletirdi.
+    const altSinir = Math.min(tasarimLimiti(l.n, moving), gamaTavani(l.rings));
+    if (l.limit < altSinir - 0.05) sorunlar.push(`${ad}: limit tasarım değerinin altında`);
+    const g = gamaHesapla(l.rings, l.limit);
+    gamalar.push(g);
+    if (g > GAMA_TAVAN + 0.05) gevsekler.push(`${ad}: γ ${g.toFixed(2)}`);
     if (ev.sureKaybi > SURE_KAYBI_VERIFY) sureliler.push(`${ad}: denemelerin %${Math.round(ev.sureKaybi * 100)}'i süre dolmasıyla bitiyor`);
     oranlar.push(ev.win);
     rows.push(`${ad}:${Math.round(ev.win * 100)}%`);
@@ -603,9 +664,17 @@ function verify(): number {
       sureliler.slice(0, 6).join("; ") + (sureliler.length > 6 ? " …" : ""));
   }
 
+  // γ tavanı üreticide zorlanır; burada tek bir ihlal bile kaçak demektir.
+  if (gevsekler.length) {
+    sorunlar.push(`${gevsekler.length} bölümde γ tavanı (${GAMA_TAVAN}) aşılmış — oyuncu ikinci turu bekleyebiliyor: ` +
+      gevsekler.slice(0, 6).join("; ") + (gevsekler.length > 6 ? " …" : ""));
+  }
+
+  const gOrt = gamalar.reduce((a, b) => a + b, 0) / gamalar.length;
   console.log(rows.join("  "));
   console.log(`yıldız dağılımı (ustalık referansı): 3★ %${Math.round(pay[0] * 100)}  2★ %${Math.round(pay[1] * 100)}  1★ %${Math.round(pay[2] * 100)}`);
   console.log(`saate yenilmenin baskın olduğu bölüm: ${sureliler.length} / ${LEVEL_COUNT}`);
+  console.log(`γ (halka başına izlenebilen tur): ortalama ${gOrt.toFixed(2)}, en yüksek ${Math.max(...gamalar).toFixed(2)}, tavan ${GAMA_TAVAN}`);
 
   // Baştan kilitli halkalar kalan halkalara yeterli pay bırakıyor mu? (bkz. EN_AZ_PAY)
   for (const l of data.levels) {
