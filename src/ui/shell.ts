@@ -24,6 +24,8 @@ export interface Kabuk {
   nasilIcerik: HTMLElement;
   nasilKapat: HTMLButtonElement;
   nasilAc: HTMLButtonElement;
+  /** Örtü açıkken inert edilen arka plan öğeleri (üst çubuk, süre çubuğu, oyun alanı, alt çubuk). */
+  arka: HTMLElement[];
 }
 
 const HTML = `
@@ -88,8 +90,15 @@ export function kabukKur(hedef: HTMLElement, nasilHtml: string): Kabuk {
   // "Nasıl oynanır" içeriği ayrı bir modülden gelir (ui/nasil.ts) ve kapatma
   // düğmesi burada eklenir ki bul() onu bulabilsin.
   const ic = hedef.querySelector("#nasilIcerik");
-  if (ic) ic.innerHTML = nasilHtml + '<button id="nasilKapat" type="button">Anladım</button>';
+  // Kapatma düğmesi kendi yapışkan şeridinde: kutu kaydırılabilir ve düğme en altta
+  // kalınca ilk açılışta görünmüyordu (bkz. styles.css .nasilAlt).
+  if (ic) ic.innerHTML = nasilHtml +
+    '<div class="nasilAlt"><button id="nasilKapat" type="button">Anladım</button></div>';
+  const arka = Array.from(
+    hedef.querySelectorAll<HTMLElement>(".app > header, .app > .bar, .app > .alan, .app > footer"));
+  if (arka.length !== 4) throw new Error("arka plan öğeleri eksik: " + arka.length);
   return {
+    arka,
     kok: hedef,
     clock: bul(hedef, "clock"),
     bar: bul(hedef, "bar"),

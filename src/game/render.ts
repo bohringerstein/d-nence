@@ -136,29 +136,61 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
   ctx.translate(W / 2 + sx, H / 2 + sy);
 
   // 1) Arka planda levelin numarası
+  //
+  // İki düzeltme var:
+  // (a) Genişlik sınırı. Punto sabit S*0,5 idi; dört hanede ("1000") metnin yarı
+  //     genişliği en dış halkayı da, temizlenen kutuyu da aşıyordu ve sarsıntıda iz
+  //     bırakabiliyordu. Ölçülüp gerekirse küçültülür — yalnızca 4 hanede devreye girer.
+  // (b) Topun çevresi. Rakamın gövdesi tam topun altından geçiyordu (1, 4, 7 gibi
+  //     merkezden geçen rakamlarda, yani herkesin gördüğü Level 1'de). Rakam çizildikten
+  //     sonra merkezde yumuşak kenarlı bir delik silinir; halkalar henüz çizilmediği için
+  //     silme yalnızca rakama dokunur.
+  const metin = String(s.level.n);
+  let punto = g.S * 0.5;
+  ctx.font = `600 ${punto}px Fredoka, "Trebuchet MS", sans-serif`;
+  const yariGenislik = ctx.measureText(metin).width / 2;
+  if (yariGenislik > g.outer) {
+    punto *= g.outer / yariGenislik;
+    ctx.font = `600 ${punto}px Fredoka, "Trebuchet MS", sans-serif`;
+  }
   ctx.globalAlpha = s.level.boss ? 0.14 : 0.07;
   ctx.fillStyle = s.level.boss ? renk.ball : renk.ink;
-  ctx.font = `600 ${g.S * 0.5}px Fredoka, "Trebuchet MS", sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(String(s.level.n), 0, g.S * 0.03);
+  ctx.fillText(metin, 0, g.S * 0.03);
   ctx.globalAlpha = 1;
+
+  const delikDis = g.ballR * 4;
+  const delik = ctx.createRadialGradient(0, 0, g.ballR * 1.6, 0, 0, delikDis);
+  delik.addColorStop(0, "rgba(0,0,0,1)");
+  delik.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.fillStyle = delik;
+  ctx.beginPath();
+  ctx.arc(0, 0, delikDis, 0, TAU);
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
 
   // 2) Açıklık kamaları
   if (s.anyLocked && s.asama !== "crash") {
     const dis = g.outer + g.S * KAMA_TASMA;
+    // Geçer ve geçmez kama eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15).
+    // Açık temada ikisinin zemine göre kontrastı 1,17 ve 1,20 çıkıyordu; aralarındaki
+    // fark 1,03:1, yani fiilen ayırt edilemiyorlardı ve ayrım tamamen renk tonuna
+    // kalıyordu. Artık ayrım DOLGU VAR/YOK: geçer kama %35 dolu, geçmez kama yalnızca
+    // kesik konturlu. Aradaki fark 1,03 -> 1,28 ve renkten bağımsız ikinci bir kanal.
     for (const bolge of aciklikBolgeleri(s)) {
       const genis = canPass(bolge.w);
-      ctx.fillStyle = genis ? renk.ball : renk.fail;
-      ctx.globalAlpha = genis ? 0.22 : 0.15;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.arc(0, 0, dis, bolge.from, bolge.to);
       ctx.closePath();
-      ctx.fill();
-      // Renk körlüğü için ikinci işaret: yetersiz kama kesik konturla çevrilir,
-      // böylece "geçer mi" bilgisi yalnızca kırmızı/sarı ayrımına bağlı kalmaz.
-      if (!genis) {
+      if (genis) {
+        ctx.fillStyle = renk.ball;
+        ctx.globalAlpha = 0.35;
+        ctx.fill();
+      } else {
+        // Renk körlüğü için ikinci işaret ve artık tek işaret: kesik kontur.
         ctx.globalAlpha = 0.9;
         ctx.strokeStyle = renk.fail;
         ctx.lineWidth = 1.5;

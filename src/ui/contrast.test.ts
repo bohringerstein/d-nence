@@ -16,7 +16,8 @@ function blokRenkleri(baslangic: string): Record<string, string> {
   assert.ok(i >= 0, "CSS bloğu bulunamadı: " + baslangic);
   const govde = css.slice(i, css.indexOf("}", i));
   const out: Record<string, string> = {};
-  for (const m of govde.matchAll(/--([a-z]+):\s*(#[0-9A-Fa-f]{6})/g)) out[m[1]] = m[2];
+  // Tire de kabul edilir: --ui-accent gibi çok parçalı adlar atlanmasın.
+  for (const m of govde.matchAll(/--([a-z-]+):\s*(#[0-9A-Fa-f]{6})/g)) out[m[1]] = m[2];
   return out;
 }
 
@@ -51,7 +52,7 @@ const temalar: Array<[string, Record<string, string>]> = [["açık", acik], ["ko
 
 test("CSS'te iki tema da tam renk kümesi tanımlıyor", () => {
   for (const [ad, t] of temalar) {
-    for (const k of ["bg", "ink", "ball", "fail", "win", "muted", "track"]) {
+    for (const k of ["bg", "ink", "ball", "fail", "win", "muted", "track", "ui-accent"]) {
       assert.ok(t[k], `${ad} temada --${k} eksik`);
     }
   }
@@ -70,12 +71,13 @@ test("metin renkleri arka planda okunabilir (WCAG AA, 4.5:1)", () => {
 });
 
 test("sayaç rengi büyük punto eşiğini geçiyor (3:1)", () => {
-  // fail: kalan süre azalınca sayaç kırmızıya döner (1,5rem, kalın = büyük punto).
+  // fail: kalan süre azalınca sayaç kırmızıya döner (1,9rem, kalın = büyük punto).
   //
   // --ball ve --win bu ölçüte dahil DEĞİL, çünkü ikisi de okunacak metin taşımıyor:
-  //   --ball  açık temada 1,97:1. Top ve sıradaki halka; ikisi de artık ince koyu
-  //           kenarla çiziliyor (render.ts), şekil renkten bağımsız okunuyor.
-  //           Oyunun imza rengi olduğu için koyultulmadı.
+  //   --ball  açık temada 1,97:1. Yalnızca canvas'ta kullanılır (top, sıradaki halka,
+  //           geçer kama); ikisi de ince koyu kenarla ya da haleyle çizilir, şekil
+  //           renkten bağımsız okunur. Oyunun imza rengi olduğu için koyultulmadı.
+  //           Arayüz öğelerinde kullanılmadığı ayrıca sınanıyor (aşağıda).
   //   --win   yalnızca başarı flaşında ve %18 opaklıkla kullanılıyor; okunacak bir
   //           öğe değil, kısa süreli bir geri bildirim.
   const sorun: string[] = [];
@@ -90,7 +92,9 @@ test("süre çubuğu arka plandan ayırt edilebiliyor", () => {
   const sorun: string[] = [];
   for (const [ad, t] of temalar) {
     const oluk = kontrast(t.track, t.bg);
-    if (oluk < 1.2) sorun.push(`${ad} tema: --track / --bg = ${oluk.toFixed(2)}:1, oluk görünmüyor`);
+    // Eşik 1,2 iken koyu temadaki 1,28 geçiyordu ama boş çubuk fiilen görünmüyordu:
+    // CSS'teki yorum açık temayı bilerek 1,42'ye çekmiş, koyu temayı atlamıştı.
+    if (oluk < 1.35) sorun.push(`${ad} tema: --track / --bg = ${oluk.toFixed(2)}:1, oluk görünmüyor`);
     const dolu = kontrast(t.ink, t.track);
     if (dolu < 3) sorun.push(`${ad} tema: --ink / --track = ${dolu.toFixed(2)}:1, dolu kısım seçilmiyor`);
   }
@@ -108,19 +112,47 @@ test("halkalar arka plandan ayırt edilebiliyor (en soluk halka dahil)", () => {
   assert.deepEqual(sorun, [], sorun.join("; "));
 });
 
-test("açıklık kamaları birbirinden ayırt edilebiliyor", () => {
-  // Yeterli kama sarı %22, yetersiz kama kırmızı %15 opaklıkla çizilir.
-  // Renk körlüğü için kesik kontur da var (render.ts), ama kamalar yine de
-  // birbirinden ve arka plandan ayrılmalı.
+/** render.ts'teki geçer kama opaklığı. Geçmez kama doldurulmaz. */
+const KAMA_OPAKLIK = 0.35;
+
+test("geçer ve geçmez kama birbirinden ayırt edilebiliyor", () => {
+  // Eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15). Açık temada zemine göre
+  // 1,17 ve 1,20 çıkıyorlardı, yani aralarındaki fark 1,03:1 idi: fiilen ayırt
+  // edilemiyorlardı ve "geçer mi" bilgisi tamamen renk tonuna kalıyordu.
+  //
+  // Artık ayrım DOLGU VAR/YOK: geçmez kama boş bırakılıp yalnızca kesik konturla
+  // çevriliyor (render.ts). Ayrım hem parlaklığa hem doluluğa bağlı, yani renkten
+  // bağımsız iki kanal taşıyor. Geçmez kamanın rengi çıplak zemindir.
   const sorun: string[] = [];
   for (const [ad, t] of temalar) {
-    const genis = harmanla(t.ball, t.bg, 0.22);
-    const dar = harmanla(t.fail, t.bg, 0.15);
-    if (kontrast(genis, t.bg) < 1.1) sorun.push(`${ad} tema: sarı kama arka planda kayboluyor`);
-    if (kontrast(dar, t.bg) < 1.05) sorun.push(`${ad} tema: kırmızı kama arka planda kayboluyor`);
-    // İki kamanın birbirinden RENKLE ayrılması beklenmiyor: ikisi de düşük opaklıkta
-    // yıkama ve açık temada 1,03:1 kalıyorlar. Ayrım kesik konturla yapılıyor
-    // (render.ts), ki renk körlüğü için zaten doğru çözüm bu.
+    const gecer = harmanla(t.ball, t.bg, KAMA_OPAKLIK);
+    const ayrim = kontrast(gecer, t.bg);
+    if (ayrim < 1.2) {
+      sorun.push(`${ad} tema: geçer/geçmez kama ayrımı ${ayrim.toFixed(2)}:1 (en az 1,2 gerek)`);
+    }
   }
   assert.deepEqual(sorun, [], sorun.join("; "));
+});
+
+test("arayüz vurgusu metin dışı kontrast eşiğini geçiyor (3:1)", () => {
+  // --ui-accent onay kutusunun işaretli/işaretsiz farkını taşır. Bu daha önce --ball idi
+  // ve açık temada 1,97:1 veriyordu: "deseni yumuşat" ayarının durumu, tam da o ayara
+  // ihtiyacı olan kişi için okunmuyordu.
+  const sorun: string[] = [];
+  for (const [ad, t] of temalar) {
+    const o = kontrast(t["ui-accent"], t.bg);
+    if (o < 3) sorun.push(`${ad} tema: --ui-accent / --bg = ${o.toFixed(2)}:1 (en az 3 gerek)`);
+  }
+  assert.deepEqual(sorun, [], sorun.join("; "));
+});
+
+test("amber arayüz öğelerinde kullanılmıyor", () => {
+  // --ball canvas'ta kalır (top, sıradaki halka, geçer kama): orada şekil, kalınlık ve
+  // koyu hale ikinci kanalı taşır. Ama metin rengi, odak halkası ve accent-color'da tek
+  // kanal renktir ve açık temada 1,97:1 okunmaz. Bu test o ayrımın geri kaymasını
+  // engeller; dekoratif kullanımlar (border gibi) kapsam dışıdır.
+  const yasak = new RegExp(
+    "(^|[;{\\s])(color|accent-color|outline)\\s*:\\s*[^;}]*var\\(--ball\\)", "g");
+  const bulunan = [...css.matchAll(yasak)].map(m => m[0].trim());
+  assert.deepEqual(bulunan, [], "arayüzde var(--ball): " + bulunan.join(" | "));
 });

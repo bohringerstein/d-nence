@@ -4,7 +4,7 @@ import { LEVEL_COUNT, validateTable, STAR_LABEL } from "./core/index.ts";
 import type { LevelTable, Best } from "./core/index.ts";
 // Level tablosu JS paketine GÖMÜLMEZ, ayrı bir dosya olarak indirilir.
 // 1000 bölümde tablo 643 KB; bu kadar veriyi JavaScript nesne sabiti olarak
-// ayrıştırmak telefonda yarım saniye yer, JSON.parse aynı veriyi ~10 kat hızlı okur.
+// ayrıştırmak telefonda yarım saniye yer, JSON.parse aynı veriyi `10 kat hızlı okur.
 // Servis çalışanı dosyayı önbelleğe aldığı için çevrimdışı çalışma etkilenmez.
 import tabloUrl from "../data/levels.json?url";
 
@@ -140,11 +140,13 @@ function bitisGoster(): void {
     `${LEVEL_COUNT} kasanın hepsini açtın. ${b} levelde toplam ${y} yıldız topladın` +
     (y < b * 3 ? `; ${b * 3} yıldızın tamamı için levelleri daha temiz açman gerek.` : ". Hepsi temiz.");
   ui.bitis.hidden = false;
+  arkaKilit(true);
   ui.bitisDugme.focus({ preventScroll: true });
 }
 
 ui.bitisDugme.addEventListener("click", () => {
   ui.bitis.hidden = true;
+  arkaKilit(false);
   bitti = false;
   bastanBasla(kayit);
   levelYukle(1);
@@ -154,6 +156,7 @@ ui.reset.addEventListener("click", e => {
   e.stopPropagation();
   bitti = false;
   ui.bitis.hidden = true;
+  arkaKilit(false);
   bastanBasla(kayit);
   levelYukle(1);
   ui.reset.blur();   // sonraki Enter oyuna gitsin, düğmeye değil
@@ -174,9 +177,20 @@ if (!renklerHazir()) {
   window.addEventListener("load", () => { if (renklerHazir()) renk = renkleriOku(); }, { once: true });
 }
 
+/**
+ * Örtü açıkken arka planı Tab ile gezilemez yapar.
+ *
+ * `aria-modal="true"` yalnızca ekran okuyucuya bilgi verir; klavye odağını tutmaz.
+ * Bu olmadan Tab örtüden çıkıp arkadaki düğmelere gidiyordu.
+ */
+function arkaKilit(kapali: boolean): void {
+  for (const el of ui.arka) el.toggleAttribute("inert", kapali);
+}
+
 // ---- Ayarlar paneli --------------------------------------------------------
 function ayarPaneliAc(): void {
   panelAcik = true;
+  arkaKilit(true);
   ui.desenKutu.checked = ayarlar.desenYumusat;
   ui.hareketKutu.checked = ayarlar.hareketAzalt;
   ui.titresimKutu.checked = ayarlar.titresim;
@@ -203,6 +217,7 @@ ui.ayarAc.addEventListener("click", e => { e.stopPropagation(); if (!bitti) ayar
 // ---- Nasıl oynanır ---------------------------------------------------------
 function nasilAc(): void {
   panelAcik = true;
+  arkaKilit(true);
   ui.ayarPanel.hidden = true;
   ui.nasil.hidden = false;
   // Önce odak (kaydırmadan), sonra başa sar: ters sırada tarayıcı kutuyu aşağı kaydırıyor.
@@ -213,6 +228,7 @@ function nasilAc(): void {
 ui.nasilAc.addEventListener("click", () => { ayarlariUygula(); nasilAc(); });
 ui.nasilKapat.addEventListener("click", () => {
   ui.nasil.hidden = true;
+  arkaKilit(false);
   ui.nasilKapat.blur();
   ayarlar.uyariGoruldu = true;
   ayarlariYaz(ayarlar);
@@ -227,6 +243,7 @@ ui.ayarKapat.addEventListener("click", () => {
   ayarlar.uyariGoruldu = true;
   ayarlariYaz(ayarlar);
   ui.ayarPanel.hidden = true;
+  arkaKilit(false);
   ui.ayarKapat.blur();
   panelAcik = false;
   // Panelde geçen süre levele yazılmasın: level baştan başlar.

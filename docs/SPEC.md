@@ -129,13 +129,15 @@ Durumlar: `idle` (oynanıyor), `fire` (top fırlıyor), `crash` (kayıp).
 Dikey düzen, yukarıdan aşağıya:
 
 1. **Üst çubuk:** solda "Dönence", ortada kalan süre (0,1 sn hassasiyet, virgülle), sağda "Level N" (patron levelinde "N, patron").
+   Ağırlık **sayaçtadır**: başlık künye tonunda ve küçük punto, sayaç en büyük öğe. Dördü de aynı puntodayken (başlık 24, sayaç 24, level 22,4 px) hiyerarşi okunmuyordu; oysa başlık hiç değişmez, sayaç oyunun tek dinamik sayısıdır.
 2. **Süre çubuğu:** kalan süre oranında dolu ince çubuk. Son %25'te çubuk ve sayaç kırmızıya döner.
 3. **Oyun alanı:** kalan tüm alan.
-4. **Alt çubuk:** solda ipucu/durum metni, sağda "Baştan başla" düğmesi.
+4. **Alt çubuk:** ipucu/durum metni **tam genişlikte kendi satırında**, altında "Ayarlar" ve "Baştan başla" düğmeleri.
+   İpucu düğmelerle aynı satırı paylaştığında 360 piksellik telefonda kendisine 112 piksel kalıyordu ve metnin yarısı kırpılıyordu — oyunun kuralı öğrettiği tek yer bu satır, üstelik 100 patron levelinde de aynı şey oluyordu. İpucuna **iki satırlık yer sabit ayrılır**: tek/iki satır arasında gidip gelmek alt çubuğun yüksekliğini oynatıyor ve halkaları dikeyde zıplatıyordu. Dikey ekranda halka çapını genişlik sınırladığı için alt çubuğun büyümesi oyun alanından bir şey götürmez.
 
 Oyun alanında çizim sırası:
-1. Arka planda levelin numarası, büyük ve çok soluk (patron levelinde sarı).
-2. Açıklık kamaları: yeterince geniş olanlar sarı %22, yetersiz olanlar kırmızı %15 opaklık. Yalnızca en az bir halka kilitliyken.
+1. Arka planda levelin numarası, büyük ve çok soluk (patron levelinde sarı). Punto `S × 0,5`'tir, ama metnin yarı genişliği en dış halkayı aşarsa oranla küçültülür — dört hanede ("1000") rakam hem halkaları hem temizlenen kutuyu taşıyordu. Rakam çizildikten hemen sonra merkezde yumuşak kenarlı bir delik silinir: gövdesi tam topun altından geçiyordu (1, 4, 7 gibi merkezden geçen rakamlarda, yani Level 1'de).
+2. Açıklık kamaları, yalnızca en az bir halka kilitliyken. **Geçer kama sarı %35 dolu; geçmez kama doldurulmaz**, yalnızca kesik kırmızı konturla çevrilir. Eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15) ve açık temada aralarındaki fark 1,03:1 idi — fiilen ayırt edilemiyorlardı. Yeni modelde ayrım hem parlaklığa hem doluluğa bağlıdır, yani renkten bağımsız iki kanal taşır (açık tema 1,28:1, koyu tema 2,43:1).
 3. Halkalar: kilitli olanlar tam opak; sıradaki (aktif) halka sarı ve kalın; ondan sonraki halka %75; diğerleri %40. Kilitlenme anında çizgi kısa süre kalınlaşır.
 4. İşaretler: baştan kilitli halkada küçük kare, yön değiştiren halkada kırmızı nokta (boşluğun tam karşısında).
 5. Top.
@@ -152,10 +154,21 @@ Oyun alanında çizim sırası:
 | Hata | `#E5484D` | `#FF6369` |
 | Başarı | `#2E9E6A` | `#4CC38A` |
 | Soluk metin | `#5A6E79` | `#7F98A4` |
+| Oluk (süre çubuğu) | `#BCCBD3` | `#2A4250` |
+| Arayüz vurgusu | `#9A6200` | `#FFC93C` |
+
+"Top/vurgu" (`--ball`) **yalnızca canvas'ta** kullanılır: top, sıradaki halka ve geçer kama. Arayüz öğeleri (örtü başlıkları, odak halkası, onay kutusu) "arayüz vurgusu"nu (`--ui-accent`) kullanır — aradaki fark açık temada okunabilirliktir, aşağıya bakınız.
 
 Yazı tipi: Fredoka (400 ve 600), yedek olarak sistem sans-serif. Tüm metinler Türkçedir.
 
-**Kontrast.** Metin renkleri arka planda en az 4,5:1 olmalıdır (WCAG AA). Açık temadaki soluk metin bu yüzden `#6B8390`'dan `#5A6E79`'a koyultuldu (3,40:1 → 4,56:1). Top ve sıradaki halkanın amber rengi korundu, ama ikisi de ince koyu bir kenarla çizilir: açık zeminde amber tek başına 1,97:1 verir ve şekil renkten bağımsız okunmalıdır. Yetersiz açıklık kaması ayrıca kesik konturla işaretlenir, böylece "geçer mi" bilgisi kırmızı/sarı ayrımına bağlı kalmaz. Ölçümler `src/ui/contrast.test.ts` içinde sınanır.
+**Kontrast.** Metin renkleri arka planda en az 4,5:1 olmalıdır (WCAG AA); metin dışı öğeler (odak halkası, onay kutusu durumu) en az 3:1. Açık temadaki soluk metin bu yüzden `#6B8390`'dan `#5A6E79`'a koyultuldu (3,40:1 → 4,56:1).
+
+Amber açık temada zeminle yalnızca **1,97:1** yapar. Bu yüzden iki farklı yol izlenir:
+
+- **Canvas'ta amber kalır.** Top ve sıradaki halka ince koyu bir kenarla ya da haleyle çizilir; şekil, kalınlık ve hale ikinci kanalı taşır, okunurluk tek başına renge bağlı değildir. Oyunun imza rengi olduğu için koyultulmadı.
+- **Arayüzde amber kullanılmaz.** Örtü başlıkları ve odak halkası `--ink` (11,1:1), onay kutusu `--ui-accent` (5,10:1). Onay kutusu özellikle önemli: durumu okunmayan ayar "deseni yumuşat" idi, yani tam da o ayara ihtiyacı olan kişi açık mı kapalı mı olduğunu göremiyordu. Bu ayrımın geri kaymasını bir test engeller.
+
+Süre çubuğunun oluğu iki temada da zeminden ayrılmalıdır (açık 1,42:1, koyu 1,53:1). Ölçümlerin tamamı `src/ui/contrast.test.ts` içinde sınanır.
 
 **İpuçları.** Alt çubuktaki metin şu önceliğe göre seçilir:
 1. Patron leveli, ilk deneme: `"<ad>: <açıklama>"`.
@@ -170,7 +183,11 @@ Yazı tipi: Fredoka (400 ve 600), yedek olarak sistem sans-serif. Tüm metinler 
    - Her özelliğin patron olmayan ilk göründüğü level (tablodan otomatik hesaplanır): kareli halka, iki kapılı halka, yön değiştiren halka, hızlanan halka için kısa birer açıklama. Metinler referans sürümdeki `features` nesnesindedir.
 5. Aksi halde en iyi skor ya da "Dokun, sıradaki halkayı kilitle".
 
-**Erişilebilirlik ve cihaz:** güvenli alan boşlukları (çentik, ana ekran çubuğu) hesaba katılır; ekran yakınlaştırma ve kaydırma kapalıdır; açık/koyu tema desteklenir; hareket azaltma ayarı açıksa sarsıntı ve flaş kapatılır.
+**Erişilebilirlik ve cihaz:** güvenli alan boşlukları (çentik, ana ekran çubuğu) hesaba katılır; ekran yakınlaştırma ve kaydırma kapalıdır; açık/koyu tema desteklenir; hareket azaltma ayarı açıksa sarsıntı ve flaş kapatılır. Ayrıca:
+
+- **Dokunma hedefleri en az 44 pikseldir.** Tek dokunuşla oynanan bir oyunda düğmelerin ıskalanması kabul edilemez.
+- **Örtü açıkken arka plan `inert`'tir.** `aria-modal="true"` yalnızca ekran okuyucuya bilgi verir, klavye odağını tutmaz; bu olmadan Tab örtüden çıkıp arkadaki düğmelere gidiyordu.
+- **"Nasıl oynanır" ekranının kapatma düğmesi yapışkandır** (kutunun altında sabit). Kutu kaydırılabilir ve düğme en altta kalınca ilk açılışta görünmüyordu. Bu ekranda Esc ve zemine tıklama **bilerek yoktur**: kapatmak "gördüm" bayrağını yazar ve ekranda ışığa duyarlılık uyarısı da vardır, kazara atlanmamalıdır. Ayarlar ve bitiş ekranı için böyle bir kısıt yoktur.
 
 **Işığa duyarlılık.** Oyunun görsel uyaranı uluslararası rehberlerdeki eşiklerle karşılaştırıldı (telefon: 7 cm ekran, 32 cm mesafe).
 

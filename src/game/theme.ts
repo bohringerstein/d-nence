@@ -10,7 +10,7 @@ const ANAHTARLAR = ["bg", "ink", "ball", "fail", "win", "muted"] as const;
 /**
  * Yedek palet: styles.css'teki değerlerin aynısı.
  *
- * Neden gerekli: canvas'ta ~ctx.fillStyle = ""~ hata vermez, SESSİZCE yok sayılır ve
+ * Neden gerekli: canvas'ta `ctx.fillStyle = ""` hata vermez, SESSİZCE yok sayılır ve
  * önceki değer (varsayılan siyah) kalır. CSS henüz uygulanmamışken renkler okunursa
  * tüm oyun siyah beyaz çizilir. Telefonda tam olarak bu oldu: geliştirme sunucusunda
  * CSS ayrı bir istekle geliyor ve yavaş bağlantıda ilk okumaya yetişmiyor.
