@@ -99,7 +99,11 @@ q = (en büyük açıklık − NEED) / (minGap − NEED)
 1 yıldız: aksi      "Kıl payı"
 ```
 
-`q3` ve `q2` level tablosunun en üstünde gelir (şu an 0,46 ve 0,25). Bu eşikler sanal oyuncuların kazandığı oyunların sırasıyla %75'lik ve %40'lık dilimlerinden hesaplanmıştır. Değerler tablo her üretildiğinde yeniden hesaplanır; oyun bunları `levels.json`'dan okur, koda gömmez.
+`q3` ve `q2` level tablosunun en üstünde gelir. **Bu belgeye sayı yazılmaz**: değerler tablo her üretildiğinde yeniden hesaplanır (bu yazının yazıldığı sırada 0,88 ve 0,68). Oyun bunları `levels.json`'dan okur, koda gömmez.
+
+**Eşikler ustalık referansından hesaplanır.** Yıldız "iyi oynamanın" karşılığıdır, ortalama oyuncunun değil. Bu yüzden eşikler, açıklığın en geniş anını bekleyip vuran ve zamanlaması 35 ms sapan bir oyuncunun (`playUsta`, `tools/gen.ts`) her levelde 25 kez oynadığı sonuçların %75'lik ve %40'lık dilimlerinden alınır. Hedef: bu oyuncu levellerin yaklaşık %25'inde 3 yıldız, %60'ında en az 2 yıldız alsın.
+
+*Neden:* eşikler eskiden zorluk kalibrasyonunda kullanılan `play()` modelinin yüzdeliklerinden geliyordu, ama o model nişan almaz — açıklık yeterince genişleyince basar. Nişan almayı öğrenen gerçek bir oyuncu 60 levelin 52'sinde 3 yıldız alıyor, 11-20 arasında %100'e çıkıyordu; ustalığın gidecek yeri kalmıyordu.
 
 **Rekor:** her level için en iyi `{ yıldız, süre }` saklanır. Daha çok yıldız her zaman daha iyidir; eşit yıldızda kısa süre kazanır.
 
@@ -187,8 +191,17 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
    *Neden:* limit eskiden doğrudan çözücü süresinden geliyordu; çözücü "uygun hizalanma ne zaman gelirse" beklediği için bu süre gürültüydü. Sonuçta komşu leveller arasında 15 sn'ye varan sıçramalar oluyor ve ekrandaki en büyük sayı zorluk hakkında ters sinyal veriyordu.
 5. **İnsan benzeri oyuncu.** Dokunuşları ortalama 0 ve standart sapma 60 ms olan normal dağılımla sapar; kalan payın %70'ini kullanmaya razıdır. Her aday 50 kez oynatılır.
    **Sapma simetrik uygulanır (zorunlu).** Erken ya da geç dokunuş, tüm halkaları birlikte ileri veya geri sarar — tek halkanın açısını kaydırmak değildir. Aksi halde `wobble` çarpanı ve `flip` sayacı hesaba katılmaz; bu hata bir önceki sürümde kazanma oranını level başına 19 puana kadar şişiriyordu.
-6. **Ayarlama ve sıralama.** Her level için tolerans süresi ikili aramayla ayarlanır, böylece kazanma oranı hedef eğriye oturur: `hedef(n) = 0,97 − 0,57 × ((n−1)/59)^1,1`. Bu eğri %97'den %40'a iner. Normal leveller bir öncekinden kolay olamaz (en fazla 3 puan tolerans).
-7. **Patron levelleri** (10, 20, 30, 40, 50, 60) elle tasarlanmıştır ve hedef eğrinin 12 puan altına ayarlanır: Ayna, Merkez, Metronom, Çatal, Tavşan ile kaplumbağa, Büyük kasa. Tasarımları `gen.js` içindeki `BOSSES` nesnesindedir.
+6. **Yön değiştiren halkanın dönüşü görülebilmeli.** Oyuncu dıştan içe gider ve her kilit kabaca 0,6 saniye alır; bir halkanın kilitlenme anı `0,3 + 0,6 × (önündeki hareketli halka sayısı)` olarak tahmin edilir. `flip` yalnızca kilitlenmesi 1,2 saniyeden geç olan halkalara verilir ve periyodu o sürenin %70'ine sığdırılır. Erken kilitlenen halkanın `flip`'i kaldırılır.
+   *Neden:* eski tabloda 68 flip halkasının 55'i (%81) hiç dönmeden kilitleniyordu. İpucu 13. levelde çıkıyor ama dönüş ilk kez 30. levelde, Metronom patronunda görülebiliyordu — oyuncu mekaniği bir patronda, cezayla öğreniyordu. Yeni tabloda bu oran %7 (kalanlar elle tasarlanan patronlar).
+
+7. **Baştan kilitli halkalar için taban pay.** Baştan kilitli halkalar uygulandıktan sonra kalan her hareketli halkaya en az **6°** hata payı düşmelidir: `(başlangıç açıklığı − NEED_PASS) ≥ kalan halka × 6°`. Sağlamayan aday elenir.
+   *Neden:* tipik bir oyuncunun 60 ms'lik zamanlama sapması yaklaşık 1,5 rad/sn hızda 5°'ye denk gelir. Eski tabloda L60'ta halka başına 3,7°, L57'de 4,1°, L46'da 4,4° kalıyordu; bu levellerde ilk dokunuş oyuncu ne olduğunu göremeden kaybettiriyordu.
+
+8. **Zorluk ritmi: nefes levelleri.** Patron olmayan her 4. level hedef eğrinin **12 puan üstünde** tutulur ve monotonluk kısıtından muaftır (kendisi de sonraki levellerin tavanını yükseltmez).
+   *Neden:* sıradan oyuncuyu kaçıran şey tek bir zor level değil, zor levellerin arka arkaya gelmesidir. Test oyuncuları 44-57 arasında 12 levelin 9'unu "duvar" olarak işaretledi ve art arda 20-29 kayıp serileri yaşadı.
+
+9. **Ayarlama ve sıralama.** Her level için tolerans süresi ikili aramayla ayarlanır, böylece kazanma oranı hedef eğriye oturur: `hedef(n) = 0,97 − 0,57 × ((n−1)/59)^1,1`. Bu eğri %97'den %40'a iner. Nefes levelleri (8. madde) bu eğrinin 12 puan üstüne alınır. Normal leveller bir öncekinden kolay olamaz (en fazla 3 puan tolerans); nefes levelleri bu kısıttan muaftır.
+10. **Patron levelleri** (10, 20, 30, 40, 50, 60) elle tasarlanmıştır ve hedef eğrinin 12 puan altına ayarlanır: Ayna, Merkez, Metronom, Çatal, Tavşan ile kaplumbağa, Büyük kasa. Tasarımları `gen.js` içindeki `BOSSES` nesnesindedir.
 
 Üretici sabit bir tohumla çalışır, her çalıştırmada birebir aynı tabloyu verir.
 
@@ -204,8 +217,9 @@ npm run check        # hepsi bir arada
 
 `npm run verify` şunları denetler: şema (alan türleri, boşluk ve açı sınırları), her levelin referans
 çözücüyle bitirilebilirliği, çözücünün süre sınırının en fazla %90'ını kullanması, kazanma
-oranının hedef eğriden en fazla 15 puan sapması, normal levellerin bir öncekinden belirgin kolay
-olmaması, ve yıldız dağılımının %15–35 aralığında 3 yıldız vermesi.
+oranının hedef eğriden en fazla 15 puan sapması, normal levellerin (nefes levelleri hariç) bir
+öncekinden belirgin kolay olmaması, baştan kilitli halkaların taban payı bırakması, yön değiştiren
+halkaların dönüşlerinin görülebilmesi, ve ustalık referansının levellerin %15–35'inde 3 yıldız alması.
 
 **Kural:** oyunun hareket, geometri veya açıklık kurallarında yapılan her değişiklikten sonra `src/core/` güncellenmeli, tablo yeniden üretilmeli ve `npm run check` geçmelidir. Oyun kodu çekirdek mantığı kendi içinde kopyalamamalıdır: açıklık maskesi, en büyük açıklık, geçiş eşiği (`NEED_PASS`) ve yıldız kuralı yalnızca `src/core/` içinde yaşar. `src/core/` DOM'a, dosya sistemine ya da herhangi bir ortama bağımlı değildir; bu yüzden hem tarayıcıda hem Node'da aynı kodu çalıştırır.
 

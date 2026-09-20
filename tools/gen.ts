@@ -9,7 +9,7 @@ import {
   canPass, stepRings, liveRings, validateTable, solve,
   OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio
 } from "../src/core/index.ts";
-import type { RingDef, Level, LevelTable } from "../src/core/index.ts";
+import type { RingDef, LevelTable, Open } from "../src/core/index.ts";
 
 /** Üretim sırasındaki ham halka: tanıma gapScale eklenir, gap'i sizeGaps hesaplar. */
 interface RawRing extends RingDef { gapScale?: number }
@@ -76,6 +76,13 @@ function sizeGaps(rings: RawRing[], tolSec: number): void {
 }
 
 const GAP_MAX = GAP_MAX_DEG;
+/**
+ * Baştan kilitli halkalardan sonra kalan her halkaya düşmesi gereken en az hata payı.
+ * Tipik bir oyuncunun 60 ms'lik zamanlama sapması ~1,5 rad/sn hızda 5°'ye denk gelir;
+ * bunun altında ilk dokunuş kaçınılmaz ölüme dönüşür. Test oyuncuları tam olarak bundan
+ * şikâyet etti: L60'ta halka başına 3,7°, L57'de 4,1°, L46'da 4,4° kalıyordu.
+ */
+const EN_AZ_PAY = 6 * DEG;
 // 17. levelden sonra halka sayısı 6'da sabitleniyordu; 60 levelin 41'i aynı yapıdaydı.
 // Bu ritim araya daha az halkalı ama daha dar boşluklu (hassasiyet isteyen) leveller serpiştirir.
 const RHYTHM = [6, 6, 5, 6, 4, 6, 5, 6];
@@ -83,6 +90,33 @@ const ringCount = (n: number): number => { const grow = Math.min(2 + Math.floor(
 // Süre limiti artık tasarım girdisi: hareketli halka sayısından gelir ve geç levellerde kademeli sıkılaşır.
 // Çözücü süresi limiti belirlemez, yalnızca "bu limit yeterli mi" diye denetlenir.
 const limitFor = (n: number, moving: number): number => +((4 + 2 * moving) * (1 - 0.22 * ((n - 1) / 59))).toFixed(1);
+
+/**
+ * Bir halkanın kilitlenme anının kabaca tahmini: oyuncu dıştan içe gider ve her kilit
+ * ~0,6 saniye alır.
+ */
+const tahminiKilitAni = (sira: number): number => 0.3 + sira * 0.6;
+
+/**
+ * Yön değiştiren halkanın dönüşü, o halka kilitlenmeden ÖNCE görülebilmeli.
+ * Ölçüm: eski tabloda 68 flip halkasının 55'i (%81) hiç dönmeden kilitleniyordu; ipucu
+ * 13. levelde çıkıyor ama dönüş ilk kez 30. levelde (Metronom patronu) görülebiliyordu.
+ * Oyuncu mekaniği bir patronda, cezayla öğreniyordu.
+ *
+ * Kural: flip yalnızca kilitlenmesi 1,2 saniyeden geç olan halkalara verilir ve periyot
+ * o süreye sığacak şekilde kısaltılır. Erken kilitlenen halkanın flip'i kaldırılır.
+ */
+function gorunurFlip(rings: RawRing[]): void {
+  let sira = 0;
+  for (const r of rings) {
+    if (r.preLocked) continue;
+    const an = tahminiKilitAni(sira);
+    sira++;
+    if (!r.flip) continue;
+    if (an < 1.2) { r.flip = 0; continue; }          // bu halka dönüşü gösteremeyecek kadar erken kilitlenir
+    r.flip = Math.min(r.flip, an * 0.7);             // periyodu kilitlenme anına sığdır
+  }
+}
 
 function candidate(n: number): RawRing[] {
   const count = ringCount(n);
@@ -93,11 +127,14 @@ function candidate(n: number): RawRing[] {
     rings.push({ speed: dir * base * (0.7 + R() * 0.6), gap: 0, gapScale: 0.82 + R() * 0.36, gaps: n >= 11 && R() < 0.3 ? 2 : 1, gapOffset: 130 + R() * 50,
       flip: n >= 12 && R() < Math.min(0.2 + n * 0.008, 0.45) ? 1.4 + R() * 1.8 : 0, wobble: n >= 18 && R() < 0.3, preLocked: false, start: R() * TAU });
   }
+  gorunurFlip(rings);
   if (n >= 6 && R() < 0.5) {
     const pre = n >= 15 && count >= 4 && R() < 0.5 ? 2 : 1, anchor = R() * TAU, picks: number[] = [];
     while (picks.length < pre) { const k = Math.floor(R() * count); if (!picks.includes(k)) picks.push(k); }
     picks.forEach((k, j) => { Object.assign(rings[k], { preLocked: true, gaps: 1, flip: 0, wobble: false, start: anchor + (j ? (R() - 0.5) * 0.15 : 0) }); });
   }
+  // preLocked atamasi siralamayi degistirdigi icin gorunurluk yeniden hesaplanir.
+  gorunurFlip(rings);
   // Bosluk genisligini tune() belirler; burada hesaplamak gereksizdi ve yan etkisi
   // (gap > 80 ise gaps 2 -> 1) uretilen iki kapili halkalarin %80'ini yok ediyordu.
   return rings;
@@ -128,6 +165,14 @@ const BOSSES: Record<number, Boss | undefined> = {
 
 function finalize(rings: RawRing[], n: number): Finalized | null {
   const def = rings.map(r => ({ speed: rnd4(r.speed), gap: rnd4(r.gap), gaps: r.gaps, gapOffset: rnd4(r.gapOffset), flip: rnd4(r.flip), wobble: r.wobble, preLocked: r.preLocked, start: rnd4(((r.start % TAU) + TAU) % TAU) }));
+  // Baştan kilitli halkalar kanalı fazla daralttıysa aday elenir (bkz. EN_AZ_PAY).
+  const canli = liveRings(def);
+  const baslangic = initialOpen(canli);
+  if (baslangic !== OPEN_ALL) {
+    const kalan = canli.filter(r => !r.locked).length;
+    const pay = largestOpen(baslangic).w - NEED_PASS;
+    if (pay < kalan * EN_AZ_PAY) return null;
+  }
   const cozum = solve(def); if (!cozum) return null;
   const best = cozum.t;
   const moving = def.filter(r => !r.preLocked).length;
@@ -137,13 +182,66 @@ function finalize(rings: RawRing[], n: number): Finalized | null {
   const limit = +Math.max(want, best * 1.5 + 1.5).toFixed(1);
   return { def, best, limit, want, roomy: best <= want * 0.65 };
 }
+/**
+ * Ustalık referansı: açıklığın EN GENİŞ anını bekleyip vuran, zamanlaması keskin oyuncu.
+ *
+ * Yıldız eşikleri bundan hesaplanır, zorluk eğrisi ise play() ile. Sebep: eşikler
+ * "iyi oynamak" ölçüsüdür, ortalama oyuncu ölçüsü değil. Eski tabloda eşikler play()'in
+ * yüzdeliklerinden geliyordu ve play() nişan almıyordu; sonuçta nişan almayı öğrenen bir
+ * oyuncu 60 levelin ~52'sinde 3 yıldız alıyor, 11-20 arasında %100'e çıkıyordu.
+ */
+const USTA_SAPMA = 0.035;   // keskin ama insan: ~35 ms zamanlama sapmasi
+
+function playUsta(def: RingDef[], limit: number): PlayResult {
+  const rs = liveRings(def), dt = 1 / 120;
+  let open: Open = initialOpen(rs), t = 0, last = 0;
+  for (let i = 0; i < rs.length; i++) {
+    const r = rs[i]; if (r.locked) continue;
+    let done = false, oncekiGenis = -1;
+    while (t < limit) {
+      let want = false;
+      if (t >= last + REACT) {
+        const p = peekOpen(open, r);
+        if (open === OPEN_ALL) want = true;
+        // Tepe noktası: açıklık daralmaya başladıysa en geniş an geçildi demektir.
+        else if (canPass(p.w) && oncekiGenis >= 0 && p.w < oncekiGenis) want = true;
+        oncekiGenis = p.w;
+      }
+      if (want) {
+        // Usta da insan: tepe noktasini bulur ama tam ustune basamaz.
+        const e = gauss() * USTA_SAPMA;
+        const sdt = e >= 0 ? dt : -dt;
+        for (let k = Math.abs(e); k > 0; k -= dt) { const lt = sdt > 0 ? t + sdt : t; stepRings(rs, sdt, lt); t += sdt; }
+        open = lockOpen(open, r);
+        if (!canPass(largestOpen(open).w)) return { win: false, t };
+        r.locked = true; last = t; done = true; break;
+      }
+      t += dt; stepRings(rs, dt, t);
+    }
+    if (!done) return { win: false, t };
+  }
+  const minGap = Math.min(...def.map(r => r.gap)) * DEG;
+  return { win: true, t, q: starRatio(largestOpen(open).w, minGap) };
+}
+
 function evaluate(L: { def: RingDef[]; limit: number }, trials = 50): Evaluated {
   es = 777; let w = 0; const qs: number[] = [];
   for (let k = 0; k < trials; k++) { const r = play(L.def, L.limit); if (r.win) { w++; qs.push(r.q as number); } }
   return { win: w / trials, qs };
 }
 
-const target = (n: number): number => 0.97 - 0.57 * Math.pow((n - 1) / 59, 1.1);
+const egri = (n: number): number => 0.97 - 0.57 * Math.pow((n - 1) / 59, 1.1);
+
+/**
+ * Nefes levelleri: her 4. level (patronlar hariç) hedef eğrinin belirgin üstünde tutulur.
+ * Test oyuncuları 44-57 arasında 12 levelin 9'unu "duvar" olarak işaretledi ve art arda
+ * 20-29 kayıp serileri yaşadı; sıradan oyuncuyu kaçıran şey tek bir zor level değil,
+ * zor levellerin arka arkaya gelmesi.
+ */
+const NEFES_ARALIGI = 4;
+const NEFES_BONUS = 0.12;
+const nefesMi = (n: number): boolean => !BOSSES[n] && n % NEFES_ARALIGI === 0;
+const target = (n: number): number => Math.min(0.95, egri(n) + (nefesMi(n) ? NEFES_BONUS : 0));
 // Yapıyı sabit tutup tolerans süresini ayarlayarak kazanma oranını hedefe oturt
 function tune(rawRings: RawRing[], want: number, n: number, lo = 0.03, hi = 0.45): Candidate | null {
   let best: Candidate | null = null;
@@ -166,7 +264,10 @@ function generate(log: Log = () => {}): LevelTable {
   const levels: Candidate[] = []; const allQ: number[] = []; let prev = 1;
   for (let n = 1; n <= 60; n++) {
     const boss = BOSSES[n];
-    const want = boss ? target(n) - 0.12 : Math.min(target(n), prev);
+    // Nefes levelleri monotonluk kısıtından muaf: eğrinin üstüne çıkmaları gerekiyor.
+    const want = boss ? target(n) - 0.12
+      : nefesMi(n) ? target(n)
+      : Math.min(target(n), prev);
     let pick: Candidate | null = null;
     for (let k = 0; k < (boss ? 6 : 8); k++) {
       const raw = boss ? boss.rings() : candidate(n);
@@ -183,12 +284,21 @@ function generate(log: Log = () => {}): LevelTable {
       if (pick && pick.roomy && Math.abs(pick.win - want) < 0.03) break;
     }
     if (!pick) { console.error('level', n, 'bulunamadı'); process.exit(1); }
-    if (boss) Object.assign(pick, { boss: boss.name, hint: boss.hint }); else prev = Math.min(prev, pick.win + 0.03);
-    pick.qs.forEach(q => allQ.push(q));
+    // Nefes leveli ilerleyen zorluk çizgisini yukarı çekmemeli: prev'i o güncellemez.
+    if (boss) Object.assign(pick, { boss: boss.name, hint: boss.hint });
+    else if (!nefesMi(n)) prev = Math.min(prev, pick.win + 0.03);
+    // Yıldız eşikleri için ustalık referansı her levelde 25 kez oynatılır (bkz. playUsta).
+    es = 4242;
+    for (let k = 0; k < 25; k++) {
+      const usta = playUsta(pick.def, pick.limit);
+      if (usta.win) allQ.push(usta.q as number);
+    }
     levels.push(pick);
   }
   allQ.sort((a, b) => a - b);
-  const pct = (p: number): number => allQ[Math.floor(allQ.length * p)];
+  // Ustalık referansının levellerin %25'inde 3 yıldız, %60'ında en az 2 yıldız alması
+  // hedefleniyor: 3 yıldız gerçekten iyi oynamanın karşılığı olsun.
+  const pct = (p: number): number => allQ[Math.min(allQ.length - 1, Math.floor(allQ.length * p))];
   const out = { q3: +pct(0.75).toFixed(2), q2: +pct(0.4).toFixed(2), levels: levels.map((l, i) => ({ n: i + 1, boss: l.boss || null, hint: l.hint || null, limit: l.limit, rings: l.def })) };
   log('yıldız eşikleri q3/q2:', out.q3, out.q2);
   log(levels.map((l, i) => `${i + 1}${l.boss ? '*' : ''}:${Math.round(l.win * 100)}%/${l.limit}s/${l.def.length}h/${Math.round(l.def[0].gap)}°`).join('  '));
@@ -229,20 +339,54 @@ function verify(): number {
     else if (best > l.limit * SOLVER_HEADROOM) sorunlar.push(`${ad}: çözücü ${best.toFixed(1)} sn, limit ${l.limit} sn — pay yok`);
     if (Math.abs(sapma) > BAND) sorunlar.push(`${ad}: kazanma %${Math.round(ev.win * 100)}, hedef %${Math.round(hedef * 100)} (${sapma > 0 ? "+" : ""}${Math.round(sapma * 100)} puan)`);
     if (l.limit < limitFor(l.n, moving) - 0.05) sorunlar.push(`${ad}: limit tasarım değerinin altında`);
-    if (!l.boss) {
+    // Nefes levelleri (bkz. nefesMi) kasten eğrinin üstündedir; monotonluk onları kapsamaz.
+    if (!l.boss && !nefesMi(l.n)) {
       if (oncekiNormal != null && ev.win > oncekiNormal + 0.06) sorunlar.push(`${ad}: bir önceki normal levelden belirgin kolay`);
       oncekiNormal = ev.win;
     }
     rows.push(`${ad}:${Math.round(ev.win * 100)}%`);
   }
 
-  // Yıldız dağılımı: eşikler yüzdelikten geldiği için ~%25/%35/%40 çıkmalı
-  const tumQ: number[] = data.levels.flatMap((l: Level) => evaluate({ def: l.rings, limit: l.limit }, 30).qs);
+  // Yıldız dağılımı USTALIK REFERANSINA göre ölçülür (bkz. playUsta): eşikler
+  // "iyi oynamanın karşılığı" olduğu için ortalama oyuncuyla değil ustayla kalibre edilir.
+  const tumQ: number[] = [];
+  for (const l of data.levels) {
+    es = 4242;
+    for (let k = 0; k < 25; k++) {
+      const u = playUsta(l.rings, l.limit);
+      if (u.win) tumQ.push(u.q as number);
+    }
+  }
   const pay = [tumQ.filter(q => q >= data.q3).length, tumQ.filter(q => q < data.q3 && q >= data.q2).length, tumQ.filter(q => q < data.q2).length].map(v => v / tumQ.length);
-  if (pay[0] < 0.15 || pay[0] > 0.35) sorunlar.push(`3 yıldız oranı %${Math.round(pay[0] * 100)} — %15-35 dışında`);
+  if (pay[0] < 0.15 || pay[0] > 0.35) sorunlar.push(`ustanın 3 yıldız oranı %${Math.round(pay[0] * 100)} — %15-35 dışında`);
 
   console.log(rows.join("  "));
-  console.log(`yıldız dağılımı: 3★ %${Math.round(pay[0] * 100)}  2★ %${Math.round(pay[1] * 100)}  1★ %${Math.round(pay[2] * 100)}`);
+  console.log(`yıldız dağılımı (ustalık referansı): 3★ %${Math.round(pay[0] * 100)}  2★ %${Math.round(pay[1] * 100)}  1★ %${Math.round(pay[2] * 100)}`);
+
+  // Baştan kilitli halkalar kalan halkalara yeterli pay bırakıyor mu? (bkz. EN_AZ_PAY)
+  for (const l of data.levels) {
+    const canli = liveRings(l.rings);
+    const b = initialOpen(canli);
+    if (b === OPEN_ALL) continue;
+    const kalan = canli.filter(r => !r.locked).length;
+    const p = largestOpen(b).w - NEED_PASS;
+    if (p < kalan * EN_AZ_PAY) {
+      sorunlar.push(`${l.n}: baştan kilitli halkalardan sonra halka başına ${(p / kalan / DEG).toFixed(1)}° pay kalıyor (en az ${(EN_AZ_PAY / DEG).toFixed(0)}° gerek)`);
+    }
+  }
+
+  // Yön değiştiren halka kilitlenmeden önce dönüşünü gösterebiliyor mu? (bkz. gorunurFlip)
+  for (const l of data.levels) {
+    if (l.boss) continue;   // patronlar elle tasarlandı
+    let sira = 0;
+    for (const r of l.rings) {
+      if (r.preLocked) continue;
+      const an = tahminiKilitAni(sira); sira++;
+      if (r.flip > 0 && r.flip >= an) {
+        sorunlar.push(`${l.n}: flip periyodu ${r.flip.toFixed(1)}s, halka ~${an.toFixed(1)}s'de kilitleniyor — oyuncu dönüşü göremez`);
+      }
+    }
+  }
 
   if (process.argv.includes("--deterministic")) {
     const tekrar = serialize(generate());
