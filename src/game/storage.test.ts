@@ -69,12 +69,12 @@ test("bozuk tek rekor diğerlerini götürmez", () => {
       4: { s: "2", t: 3 },        // yanlış tür
       5: null,
       6: { s: 1, t: 12.5 },
-      999: { s: 3, t: 1 },        // aralık dışı level
-      abc: { s: 3, t: 1 }         // sayı olmayan anahtar
+      [LEVEL_COUNT + 1]: { s: 3, t: 1 },   // aralık dışı level
+      abc: { s: 3, t: 1 }                  // sayı olmayan anahtar
     }
   });
   const k = oku();
-  assert.deepEqual(Object.keys(k.bests).sort(), ["1", "6"]);
+  assert.deepEqual(Object.keys(k.bests).sort((a, b) => +a - +b), ["1", "6"]);
   assert.deepEqual(k.bests[1], { s: 3, t: 4.2 });
   assert.deepEqual(k.bests[6], { s: 1, t: 12.5 });
 });

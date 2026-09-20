@@ -193,9 +193,9 @@ Ayrıca **"Hareketi azalt"** ayarı, sistem tercihinden bağımsız olarak sars�
 
 ## 8. Level sistemi
 
-**500 bölüm** `data/levels.json` içinde hazırdır. Oyun bu dosyayı olduğu gibi okur; **oyun içinde rastgele level üretilmez.**
+**1000 bölüm** `data/levels.json` içinde hazırdır. Oyun bu dosyayı olduğu gibi okur; **oyun içinde rastgele level üretilmez.**
 
-Bölüm sayısı `src/core/levels.ts` içindeki `LEVEL_COUNT` sabitiyle belirlenir: değiştirip `npm run gen` çalıştırmak yeterlidir. Oyun "aa" gibi uzun soluklu olmalıdır; 60 bölüm bir saatte bitiyordu. Bu türde yapı tekrarı rahatsız edici değildir, çünkü bölümler arasındaki fark hız ve boşluk genişliğiyle taşınır ve oyuncu iki bölümü yan yana görmez. Patronlar her 10 bölümde bir gelir (50 patron); altı tasarım sırayla tekrar eder ve her turda hedef eğri aşağıda olduğu için daha zor ayarlanır.
+Bölüm sayısı `src/core/levels.ts` içindeki `LEVEL_COUNT` sabitiyle belirlenir: değiştirip `npm run gen` çalıştırmak yeterlidir. Oyun "aa" gibi uzun soluklu olmalıdır; 60 bölüm bir saatte bitiyordu. Bu türde yapı tekrarı rahatsız edici değildir, çünkü bölümler arasındaki fark hız ve boşluk genişliğiyle taşınır ve oyuncu iki bölümü yan yana görmez. Patronlar her 10 bölümde bir gelir (100 patron); altı tasarım sırayla tekrar eder ve her turda hedef eğri aşağıda olduğu için daha zor ayarlanır.
 
 ```json
 { "q3": 0.46, "q2": 0.25, "levels": [
@@ -203,6 +203,8 @@ Bölüm sayısı `src/core/levels.ts` içindeki `LEVEL_COUNT` sabitiyle belirlen
   ...
 ]}
 ```
+
+Formüllerin türetilmesi ve sınırların nereden geldiği ayrı bir belgededir: **`docs/MATEMATIK.md`**. Zorluk, boşluk genişliği ya da geometriyle ilgili bir değişiklikten önce oraya bakılmalıdır.
 
 Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
 

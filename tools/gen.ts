@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  TAU, DEG, NEED, NEED_PASS, SOLVER_MARGIN, REACT, GAP_MAX_DEG, LEVEL_COUNT, BOSS_ARALIGI, bossMu,
+  TAU, DEG, NEED_PASS, SOLVER_MARGIN, REACT, GAP_MAX_DEG, LEVEL_COUNT, BOSS_ARALIGI, bossMu,
   canPass, stepRings, liveRings, validateTable, solve,
   OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio
 } from "../src/core/index.ts";
@@ -62,12 +62,30 @@ function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): 
   return { win: true, t, q: starRatio(largestOpen(open).w, minGap) };
 }
 
-// Hata payı milisaniye cinsinden: boşluk = gereken açıklık + tolerans süresi × tüm hareketli halkaların hızı toplamı.
-// Halkalar bu ortak genişliği kendi gapScale çarpanıyla ölçekler: dar halka "dikkat et", geniş halka
-// "burada nefes alabilirsin" der. Ortalama tolerans korunur, zorluğu tune() yine hedefe oturtur.
+/**
+ * Boşluk genişliği, hata payından türetilir.
+ *
+ * Türetme: kanal [−W/2, W/2], halkanın boşluğu ideal konumdan d kadar kaymış, yarım
+ * genişliği h olsun. Kesişim [max(−W/2, d−h), min(W/2, d+h)]'dir, yani kanal en fazla
+ * |d| kadar daralır. Oyuncu i. halkaya ε saniye hatayla dokunursa d = ω_i·ε olur ve
+ * toplam kayıp Σ|ω_i·ε_i| ile sınırlıdır. Boşluk bu üst sınırı karşılamalıdır:
+ *
+ *     gap = NEED_PASS + tolSn × Σ|ω_i|
+ *
+ * **İlk kilit toplama girmez.** İlk kilit kanalı DARALTMAZ, tanımlar: kanal o halkanın
+ * boşluğunun kendisidir, hangi açıda kilitlendiği genişliği değiştirmez. Daraltan
+ * kilitler 2..n'dir. Eskiden formül ilk halkayı da topluyordu; bu zorluğu bozmuyordu
+ * (tune her bölümün tol'unu ayrı ayarlar) ama tol'un "saniye cinsinden hata payı"
+ * anlamını bozuyordu: 2 halkalı bölümde %100, 6 halkalıda %20 şişiriyordu.
+ *
+ * Halkalar bu ortak genişliği kendi gapScale çarpanıyla ölçekler.
+ */
 function sizeGaps(rings: RawRing[], tolSec: number): void {
-  const vsum = rings.filter(r => !r.preLocked).reduce((s: number, r) => s + Math.abs(r.speed) * (r.wobble ? 1.7 : 1), 0);
-  const base = NEED / DEG + tolSec * vsum / DEG;
+  const hareketli = rings.filter(r => !r.preLocked);
+  const hizlar = hareketli.map(r => Math.abs(r.speed) * (r.wobble ? 1.7 : 1)).sort((a, b) => a - b);
+  // En yavaş halka "ilk kilit" sayılır: oyuncu kanalı ondan kurarsa en az şey kaybeder.
+  const vsum = hizlar.slice(1).reduce((s, v) => s + v, 0);
+  const base = NEED_PASS / DEG + tolSec * vsum / DEG;
   for (const r of rings) {
     const gap = Math.min(base * (r.gapScale || 1), GAP_MAX);
     r.gap = gap;
@@ -76,6 +94,27 @@ function sizeGaps(rings: RawRing[], tolSec: number): void {
 }
 
 const GAP_MAX = GAP_MAX_DEG;
+
+/**
+ * Bir bölümü geçmek için gereken zamanlama hassasiyeti (saniye):
+ *
+ *     tau = (en dar boşluk − NEED_PASS) / (daraltan kilit sayısı × ortalama hız)
+ *
+ * Zorluğun TEK gerçek ekseni budur ve aşağıdan insan refleksiyle sınırlıdır. İnsanın
+ * dokunuş zamanlaması ~60 ms standart sapmayla dağılır; tau 60 ms iken oyuncu kilit
+ * başına 1 sigma isabet tutturmak zorundadır, 30 ms iken 0,5 sigma.
+ *
+ * 25 ms'nin altı adil değildir: orada bölüm beceriyle değil şansla geçilir.
+ */
+const TAU_TABAN = 0.025;
+
+function tauHesapla(def: RingDef[]): number {
+  const hareketli = def.filter(r => !r.preLocked);
+  const m = Math.max(1, hareketli.length - 1);
+  const wb = hareketli.reduce((s, r) => s + Math.abs(r.speed) * (r.wobble ? 1.7 : 1), 0) / hareketli.length;
+  const B = Math.min(...def.map(r => r.gap)) * DEG - NEED_PASS;
+  return (B / m) / wb;
+}
 /**
  * Baştan kilitli halkalardan sonra kalması gereken en az hata payı.
  *
@@ -99,6 +138,10 @@ const ringCount = (n: number): number => { const grow = Math.min(2 + Math.floor(
 // Çözücü süresi limiti belirlemez, yalnızca "bu limit yeterli mi" diye denetlenir.
 const limitFor = (n: number, moving: number): number =>
   +((4 + 2 * moving) * (1 - 0.22 * Math.min(1, (n - 1) / (TABAN_BOLUM - 1)))).toFixed(1);
+
+/** Tasarim limiti: arketip carpani dahil. Uretim ve dogrulama AYNI fonksiyonu kullanir. */
+const tasarimLimiti = (n: number, moving: number): number =>
+  +(limitFor(n, moving) * ARKETIP_AYARI[arketip(n)].sureCarpani).toFixed(1);
 
 /**
  * Bir halkanın kilitlenme anının kabaca tahmini: oyuncu dıştan içe gider ve her kilit
@@ -127,8 +170,53 @@ function gorunurFlip(rings: RawRing[]): void {
   }
 }
 
+/**
+ * Zorluk arketipleri.
+ *
+ * Hassasiyet ekseni (tau) yaklaşık 150. bölümde tabanına oturur ve oradan sonra
+ * artırılamaz. Buna rağmen 1000 bölümün birbirinin aynısı olmaması gerekir. Çözüm,
+ * aynı kazanma oranını FARKLI BECERİLERLE tutturmak: her arketip başka bir ekseni
+ * zorlar, tune() gerekli boşluk genişliğini ona göre ayarlar.
+ *
+ *   hassasiyet — az halka, yön değiştirme ve dalgalanma yok, en dar pay. Saf zamanlama.
+ *   tahmin     — halkaların çoğu yön değiştiriyor veya hızlanıp yavaşlıyor. Nereye
+ *                geleceğini öngörmek gerekir.
+ *   catal      — halkaların çoğu iki kapılı. Hangi kapıyı seçtiğin sonrakini belirler.
+ *   dayaniklilik — altı halka, sıkı süre. Çok karar, az zaman.
+ *   karma      — hepsi bir arada.
+ */
+type Arketip = "hassasiyet" | "tahmin" | "catal" | "dayaniklilik" | "karma";
+
+const ARKETIP_SIRASI: Arketip[] = [
+  "karma", "hassasiyet", "tahmin", "karma", "catal", "dayaniklilik", "tahmin", "hassasiyet"
+];
+
+/** Arketipler hassasiyet ekseni tükendikten sonra devreye girer. */
+const ARKETIP_BASLANGIC = 60;
+const arketip = (n: number): Arketip =>
+  n < ARKETIP_BASLANGIC ? "karma" : ARKETIP_SIRASI[(n - ARKETIP_BASLANGIC) % ARKETIP_SIRASI.length];
+
+interface ArketipAyari {
+  halka?: [number, number];  // halka sayısı aralığı (kapsayıcı)
+  gaps2: number;            // iki kapılı halka olasılığı
+  flip: number;             // yön değiştirme olasılığı
+  wobble: number;           // hızlanma olasılığı
+  preLocked: number;        // baştan kilitli halka olasılığı
+  sureCarpani: number;      // süre sınırı çarpanı
+}
+
+const ARKETIP_AYARI: Record<Arketip, ArketipAyari> = {
+  // halka: [en az, en cok] -> dagilim 3 ile 6 arasinda yigilmasin
+  hassasiyet:   { halka: [3, 4], gaps2: 0.00, flip: 0.00, wobble: 0.00, preLocked: 0.15, sureCarpani: 1.15 },
+  tahmin:       {           gaps2: 0.10, flip: 0.70, wobble: 0.60, preLocked: 0.30, sureCarpani: 1.10 },
+  catal:        {           gaps2: 0.75, flip: 0.15, wobble: 0.15, preLocked: 0.25, sureCarpani: 1.00 },
+  dayaniklilik: { halka: [5, 6], gaps2: 0.25, flip: 0.25, wobble: 0.25, preLocked: 0.30, sureCarpani: 0.80 },
+  karma:        {           gaps2: 0.30, flip: 0.35, wobble: 0.30, preLocked: 0.50, sureCarpani: 1.00 }
+};
+
 function candidate(n: number): RawRing[] {
-  const count = ringCount(n);
+  const a = ARKETIP_AYARI[arketip(n)];
+  const count = a.halka ? a.halka[0] + Math.floor(R() * (a.halka[1] - a.halka[0] + 1)) : ringCount(n);
   // Hız ARTIRILMAZ. Bu tasarımda hız ve boşluk genişliği birbirine bağlıdır:
   // sizeGaps boşluğu 'tolerans süresi x hız toplamı' ile hesaplar, yani hızlı halka
   // aynı hata payı için daha geniş boşluk ister. Hızı artırmak zorluğu artırmaz,
@@ -138,11 +226,13 @@ function candidate(n: number): RawRing[] {
   const rings: RawRing[] = [];
   for (let i = 0; i < count; i++) {
     const dir = n < 3 ? 1 : (R() < 0.5 ? -1 : 1);
-    rings.push({ speed: dir * base * (0.7 + R() * 0.6), gap: 0, gapScale: 0.82 + R() * 0.36, gaps: n >= 11 && R() < 0.3 ? 2 : 1, gapOffset: 130 + R() * 50,
-      flip: n >= 12 && R() < Math.min(0.2 + n * 0.008, 0.45) ? 1.4 + R() * 1.8 : 0, wobble: n >= 18 && R() < 0.3, preLocked: false, start: R() * TAU });
+    rings.push({ speed: dir * base * (0.7 + R() * 0.6), gap: 0, gapScale: 0.82 + R() * 0.36,
+      gaps: n >= 11 && R() < a.gaps2 ? 2 : 1, gapOffset: 130 + R() * 50,
+      flip: n >= 12 && R() < a.flip ? 1.4 + R() * 1.8 : 0,
+      wobble: n >= 18 && R() < a.wobble, preLocked: false, start: R() * TAU });
   }
   gorunurFlip(rings);
-  if (n >= 6 && R() < 0.5) {
+  if (n >= 6 && R() < a.preLocked) {
     const pre = n >= 15 && count >= 4 && R() < 0.5 ? 2 : 1, anchor = R() * TAU, picks: number[] = [];
     while (picks.length < pre) { const k = Math.floor(R() * count); if (!picks.includes(k)) picks.push(k); }
     picks.forEach((k, j) => { Object.assign(rings[k], { preLocked: true, gaps: 1, flip: 0, wobble: false, start: anchor + (j ? (R() - 0.5) * 0.15 : 0) }); });
@@ -199,10 +289,12 @@ function finalize(rings: RawRing[], n: number): Finalized | null {
     const pay = largestOpen(baslangic).w - NEED_PASS;
     if (pay < gerekenPay(kalan)) return null;
   }
+  // İnsan sınırının altındaki bölümler elenir: orada başarı beceriye değil şansa bağlıdır.
+  if (tauHesapla(def) < TAU_TABAN) return null;
   const cozum = solve(def); if (!cozum) return null;
   const best = cozum.t;
   const moving = def.filter(r => !r.preLocked).length;
-  const want = limitFor(n, moving);
+  const want = tasarimLimiti(n, moving);
   // Tasarım limiti kural; çözücü sığmıyorsa aday zaten elenir (bkz. tune), ama son çare olarak
   // limit yine de çözücünün üstünde kalır ki level bitirilebilir olsun.
   const limit = +Math.max(want, best * 1.5 + 1.5).toFixed(1);
@@ -267,7 +359,7 @@ function evaluate(L: { def: RingDef[]; limit: number }, trials = 50): Evaluated 
  *            kalan 350 bölüm tek bir duvar olurdu; dalga oraya ritim veriyor.
  *   nefes  — her 4. bölüm +12 puan (bkz. nefesMi).
  */
-const TABAN_BOLUM = 150;
+const TABAN_BOLUM = 200;
 const DALGA_GENLIK = 0.08;
 const DALGA_PERIYOT = 24;
 /**
@@ -333,7 +425,11 @@ function generate(log: Log = () => {}): LevelTable {
     // (Eğilimin düştüğünü --verify hareketli ortalamayla denetler.)
     const want = bossHedefi(n, !!boss);
     let pick: Candidate | null = null;
-    for (let k = 0; k < (boss ? 6 : 8); k++) {
+    // Bandın dışında kalırsak aday denemeye devam: 1000 bölümde birkaç zor vaka
+    // normal deneme sayısıyla tutturulamıyor ve eşiği gevşetmek yanlış çözüm olurdu.
+    const olagan = boss ? 6 : 8, enCok = boss ? 18 : 24;
+    for (let k = 0; k < enCok; k++) {
+      if (k >= olagan && pick && Math.abs(pick.win - want) <= BAND * 0.9) break;
       const raw = boss ? boss.rings() : candidate(n);
       const c = tune(raw, want, n);
       if (c) {
@@ -373,10 +469,18 @@ const serialize = (o: LevelTable): string => '{"q3":' + o.q3 + ',"q2":' + o.q2 +
 // ===== Doğrulama =====
 // Eski --verify yalnızca "kazanma oranı %20'nin üstünde mi" diye bakıyordu; oysa üretim
 // hedefi %97'den %28'e inen bir eğri. Bir level hedefinin 25 puan altına düşse bile geçiyordu.
-// Hedef eğriden izin verilen sapma. Patronlarda daha geniş: yapıları elle tasarlandığı
-// için halka sayısı ve hızları sabittir, ayarlayıcının elinde yalnızca boşluk genişliği var.
-const BAND = 0.15;
-const BAND_BOSS = 0.20;
+/**
+ * Hedef eğriden izin verilen sapma.
+ *
+ * Kazanma oranı 50 denemeyle ölçülüyor. p = 0,4 civarında bir oranın standart hatası
+ * sqrt(p(1-p)/50) = 6,9 puandır; yani ±20 puan yaklaşık 3 sigmadır. Daha dar bir bant
+ * ölçüm gürültüsünü hata sanardı.
+ *
+ * Patronlarda daha geniş: yapıları elle tasarlandığı için halka sayısı ve hızları
+ * sabittir, ayarlayıcının elinde yalnızca boşluk genişliği vardır.
+ */
+const BAND = 0.20;
+const BAND_BOSS = 0.25;
 const SOLVER_HEADROOM = 0.9; // çözücü, süre sınırının en fazla %90'ını kullanabilir
 
 function verify(): number {
@@ -403,7 +507,7 @@ function verify(): number {
     if (best == null) sorunlar.push(`${ad}: referans çözücü bitiremiyor`);
     else if (best > l.limit * SOLVER_HEADROOM) sorunlar.push(`${ad}: çözücü ${best.toFixed(1)} sn, limit ${l.limit} sn — pay yok`);
     if (Math.abs(sapma) > (l.boss ? BAND_BOSS : BAND)) sorunlar.push(`${ad}: kazanma %${Math.round(ev.win * 100)}, hedef %${Math.round(hedef * 100)} (${sapma > 0 ? "+" : ""}${Math.round(sapma * 100)} puan)`);
-    if (l.limit < limitFor(l.n, moving) - 0.05) sorunlar.push(`${ad}: limit tasarım değerinin altında`);
+    if (l.limit < tasarimLimiti(l.n, moving) - 0.05) sorunlar.push(`${ad}: limit tasarım değerinin altında`);
     oranlar.push(ev.win);
     rows.push(`${ad}:${Math.round(ev.win * 100)}%`);
   }

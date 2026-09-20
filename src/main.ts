@@ -2,7 +2,11 @@
 import "./styles.css";
 import { LEVEL_COUNT, validateTable, STAR_LABEL } from "./core/index.ts";
 import type { LevelTable, Best } from "./core/index.ts";
-import tabloHam from "../data/levels.json";
+// Level tablosu JS paketine GÖMÜLMEZ, ayrı bir dosya olarak indirilir.
+// 1000 bölümde tablo 643 KB; bu kadar veriyi JavaScript nesne sabiti olarak
+// ayrıştırmak telefonda yarım saniye yer, JSON.parse aynı veriyi ~10 kat hızlı okur.
+// Servis çalışanı dosyayı önbelleğe aldığı için çevrimdışı çalışma etkilenmez.
+import tabloUrl from "../data/levels.json?url";
 
 import { createLevel, tap, step, decay, kalanSure } from "./game/state.ts";
 import type { LevelState } from "./game/state.ts";
@@ -16,7 +20,7 @@ import { ayarlariOku, ayarlariYaz, halkaOpakligi, titret, titresimVarMi } from "
 import { kabukKur } from "./ui/shell.ts";
 import { NASIL_HTML } from "./ui/nasil.ts";
 
-const tablo = tabloHam as LevelTable;
+const tablo = await fetch(tabloUrl).then(r => r.json()) as LevelTable;
 
 const hedef = document.getElementById("app");
 if (!hedef) throw new Error("#app bulunamadı");

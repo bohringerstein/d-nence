@@ -5,11 +5,12 @@ Bu projede tek dokunuşla oynanan, level tabanlı, 2 boyutlu bir mobil oyun olan
 ## Önce oku
 
 1. `docs/SPEC.md`: oyunun tüm kuralları, formülleri ve kabul ölçütleri. Tek doğru kaynak budur.
-2. `reference/kasa.html`: çalışan prototip. Tarayıcıda açılabilir. Şartnamede açıkça yazmayan davranışlarda bunu örnek al.
-3. `src/core/`: halka hareketi, geometri, açıklık hesabı ve yıldız kuralı (TypeScript). **Tek kaynak budur.** Oyun da level üretici de buradan beslenir.
-4. `tools/gen.ts`: level üretici ve doğrulayıcı.
-5. `src/core/*.test.ts`: çekirdek ve tablo testleri.
-6. `data/levels.json`: 60 levellik hazır tablo.
+2. `docs/MATEMATIK.md`: formüllerin türetilmesi. Zorluk, boşluk genişliği ya da geometriye dokunmadan önce oku.
+3. `reference/kasa.html`: çalışan prototip. Tarayıcıda açılabilir. Şartnamede açıkça yazmayan davranışlarda bunu örnek al.
+4. `src/core/`: halka hareketi, geometri, açıklık hesabı ve yıldız kuralı (TypeScript). **Tek kaynak budur.** Oyun da level üretici de buradan beslenir.
+5. `tools/gen.ts`: level üretici ve doğrulayıcı.
+6. `src/core/*.test.ts`: çekirdek ve tablo testleri.
+7. `data/levels.json`: 1000 bölümlük hazır tablo.
 
 ## Kullanıcı hakkında
 

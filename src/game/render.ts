@@ -82,13 +82,22 @@ export function tuvalKur(canvas: HTMLCanvasElement, degisti: () => void): Tuval 
   return kendi;
 }
 
-/** Halkanın çizgili kısımları: boşlukların arasında kalan yaylar. */
-function halkaCiz(ctx: CanvasRenderingContext2D, r: Ring, R: number): void {
+/**
+ * Halkanın çizgili kısımları: boşlukların arasında kalan yaylar.
+ *
+ * lineCap "round" olduğu için yuvarlak uç, yayın bittiği noktadan teğet yönünde
+ * w/2 kadar taşar. Düzeltilmezse GÖRÜNEN boşluk, mantıksal boşluktan her iki uçtan
+ * (w/2)/R radyan dar olur: 360 piksellik bir ekranda eşik geçişte top, görünen
+ * açıklıktan %24 geniş kalıyordu — oyun "geçti" derken göz "değdi" görüyordu.
+ * Yay her iki uçtan bu kadar kısaltılır, böylece yuvarlak uç tam boşluk sınırında biter.
+ */
+function halkaCiz(ctx: CanvasRenderingContext2D, r: Ring, R: number, kalinlik: number): void {
   const yarim = r.gap * DEG / 2;
+  const ucPayi = (kalinlik / 2) / R;
   const merkezler = gapCenters(r).map(wrap).sort((a, b) => a - b);
   for (let i = 0; i < merkezler.length; i++) {
-    const a0 = merkezler[i] + yarim;
-    const a1 = (i + 1 < merkezler.length ? merkezler[i + 1] : merkezler[0] + TAU) - yarim;
+    const a0 = merkezler[i] + yarim + ucPayi;
+    const a1 = (i + 1 < merkezler.length ? merkezler[i + 1] : merkezler[0] + TAU) - yarim - ucPayi;
     if (a1 > a0) { ctx.beginPath(); ctx.arc(0, 0, R, a0, a1); ctx.stroke(); }
   }
 }
@@ -181,13 +190,13 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
       ctx.strokeStyle = renk.ink;
       ctx.globalAlpha = 0.35;
       ctx.lineWidth = kalinlik + 3;
-      halkaCiz(ctx, r, R);
+      halkaCiz(ctx, r, R, kalinlik + 3);
     }
 
     ctx.strokeStyle = renkli;
     ctx.globalAlpha = alpha;
     ctx.lineWidth = kalinlik;
-    halkaCiz(ctx, r, R);
+    halkaCiz(ctx, r, R, kalinlik);
     ctx.globalAlpha = 1;
 
     // 4) İşaretler: en geniş çizili yayın ortasında (bkz. core/rings.ts isaretAcisi).

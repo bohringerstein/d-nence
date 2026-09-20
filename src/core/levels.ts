@@ -32,7 +32,7 @@ export const GAP_MAX_DEG = 85;
  * yapı tekrarı rahatsız edici değildir, çünkü bölümler arasındaki fark hız ve boşluk
  * genişliğiyle taşınır ve oyuncu iki bölümü yan yana görmez.
  */
-export const LEVEL_COUNT = 500;
+export const LEVEL_COUNT = 1000;
 
 /** Her 10 bölümde bir patron. */
 export const BOSS_ARALIGI = 10;

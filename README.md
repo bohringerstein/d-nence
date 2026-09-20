@@ -18,6 +18,7 @@ Claude Code, `CLAUDE.md` dosyasını her oturumda kendiliğinden okur. Bu yüzde
 |---|---|
 | `CLAUDE.md` | Claude Code'un proje yönergesi: kurallar, çalışma planı, seninle nasıl iletişim kuracağı. |
 | `docs/SPEC.md` | Oyunun tam teknik şartnamesi. |
+| `docs/MATEMATIK.md` | Oyunun sayısal temeli: formüllerin türetilmesi ve sınırların nereden geldiği. |
 | `reference/kasa.html` | Çalışan prototip. Çift tıklayıp tarayıcıda oynayabilirsin. |
 | `src/core/` | Oyunun kuralları: geometri, halka hareketi, açıklık, yıldız (TypeScript). Tek kaynak budur. |
 | `src/game/` | Oyun katmanı: durum, döngü, girdi, çizim, kayıt, ipuçları, tema. |

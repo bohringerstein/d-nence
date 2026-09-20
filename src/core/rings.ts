@@ -70,6 +70,8 @@ export { TAU };
  * düşüyordu — oyuncu boşlukta havada duran bir nokta görüyordu.
  */
 export function isaretAcisi(r: Ring): number {
+  // Yuvarlak uçlar yayı kısaltır (bkz. game/render.ts halkaCiz); işaret yayın
+  // ORTASINA konduğu için bu kısalma sonucu değiştirmez.
   const yarim = r.gap * DEG / 2;
   const merkezler = gapCenters(r).map(c => ((c % TAU) + TAU) % TAU).sort((a, b) => a - b);
   let enIyi = merkezler[0] + Math.PI;   // tek kapılı halkada zaten doğru cevap

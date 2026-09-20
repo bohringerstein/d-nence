@@ -162,10 +162,12 @@ test("flip halkası yön değiştirir", () => {
 test("yıldız hesabı", () => {
   const minGap = 40 * DEG;
   assert.equal(C.starCount(C.starRatio(minGap, minGap), 0.4, 0.2), 3, "bosluk hic daralmadiysa 3 yildiz");
-  assert.equal(C.starCount(C.starRatio(C.NEED, minGap), 0.4, 0.2), 1, "kil payi gecildiyse 1 yildiz");
+  assert.equal(C.starCount(C.starRatio(C.NEED_PASS, minGap), 0.4, 0.2), 1, "kil payi gecildiyse 1 yildiz");
   yakin(C.starRatio(minGap, minGap), 1, 1e-12, "tam koruma q = 1");
-  yakin(C.starRatio(C.NEED, minGap), 0, 1e-12, "sinirda q = 0");
-  const orta = C.NEED + 0.3 * (minGap - C.NEED);
+  // Sifir noktasi GECIS ESIGIDIR: oyuncunun kazandigi an odur.
+  yakin(C.starRatio(C.NEED_PASS, minGap), 0, 1e-12, "sinirda q = 0");
+  assert.ok(C.starRatio(C.NEED, minGap) < 0, "esigin altinda q negatif olmali (kaybedilmis genislik)");
+  const orta = C.NEED_PASS + 0.3 * (minGap - C.NEED_PASS);
   yakin(C.starRatio(orta, minGap), 0.3, 1e-9, "ara deger");
   assert.equal(C.starCount(0.3, 0.4, 0.2), 2, "esikler arasi 2 yildiz");
   assert.equal(C.starCount(0.4, 0.4, 0.2), 3, "esikte 3 yildiz");
