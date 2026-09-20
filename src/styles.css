@@ -1,0 +1,143 @@
+/* Renkler tek kaynak: canvas da bunları getComputedStyle ile okur (src/game/theme.ts). */
+:root {
+  --bg: #E9EEF0;
+  --ink: #1D3440;
+  --ball: #E89B00;
+  --fail: #E5484D;
+  --win: #2E9E6A;
+  --muted: #6B8390;
+  --track: #D3DDE1;
+  box-sizing: border-box;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13232B; --ink: #DCE6EA; --ball: #FFC93C;
+    --fail: #FF6369; --win: #4CC38A; --muted: #7F98A4; --track: #22363F;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13232B; --ink: #DCE6EA; --ball: #FFC93C;
+  --fail: #FF6369; --win: #4CC38A; --muted: #7F98A4; --track: #22363F;
+}
+
+*, *::before, *::after { box-sizing: inherit; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+#app { height: 100%; }
+
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* Çentik ve ana ekran çubuğu (şartname 7. bölüm) */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+header, footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  flex: 0 0 auto;
+  gap: 12px;
+}
+
+header h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
+
+.clock {
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.clock.low { color: var(--fail); }
+
+.lvl { font-size: 1.1rem; color: var(--muted); white-space: nowrap; }
+.lvl b { color: var(--ink); font-weight: 600; font-size: 1.4rem; }
+
+.bar {
+  height: 6px;
+  margin: 0 20px;
+  background: var(--track);
+  border-radius: 3px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--ink);
+  transform-origin: left;
+}
+.bar.low i { background: var(--fail); }
+
+canvas {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  display: block;
+  cursor: pointer;
+  /* Çift dokunuşla yakınlaştırma ve kaydırma oyun alanında kapalı */
+  touch-action: none;
+}
+
+footer { font-size: 0.95rem; color: var(--muted); }
+
+/* İpucu iki satıra taşabilir; oyun alanı ResizeObserver ile buna uyum sağlar,
+   ama yine de iki satırla sınırlayıp düzenin zıplamasını azaltıyoruz. */
+#hint {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: var(--muted);
+  background: none;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+button:focus-visible { outline: 2px solid var(--ball); outline-offset: 2px; }
+
+/* Bitiş ekranı: 60. levelden sonra. Prototipte oyun sessizce 60'ı tekrarlıyordu. */
+.bitis {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  padding: 24px;
+}
+.bitis[hidden] { display: none; }
+.bitisKutu { text-align: center; max-width: 22rem; }
+.bitisKutu h2 { font-size: 1.8rem; font-weight: 600; margin: 0 0 0.5rem; color: var(--ball); }
+.bitisKutu p { margin: 0 0 1.25rem; color: var(--ink); line-height: 1.5; }
+.bitisKutu button { color: var(--ink); padding: 8px 20px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bar i { transition: none; }
+}

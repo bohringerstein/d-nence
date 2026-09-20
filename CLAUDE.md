@@ -41,6 +41,8 @@ Her aşamanın sonunda dur, Kader'e ne yaptığını ve nasıl deneyeceğini anl
 1. **İskelet ve çekirdek:** proje kurulumu, çekirdek modül (TypeScript), birim testleri, `tools/` araçlarının bu modülü kullanması, `npm run check` geçmesi.
    *Durum:* çekirdek birleştirildi, testler yazıldı, doğrulama sıkılaştırıldı, üretici ve prototip tek kaynağa bağlandı — hepsi düz JavaScript ile. Kalan: TypeScript + Vite kurulumu (platform kararı sonrası).
 2. **Oyun ekranı:** oyun döngüsü, çizim, dokunma, durumlar, süre, yıldızlar, ipuçları, kayıt. Prototiple yan yana karşılaştırıldığında aynı hissettirmeli.
+   *Durum:* tamamlandı. Oyun `src/game/` altında; durum tek nesnede (`createLevel`), fizik sabit 1/120 adımla biriktiriciyle ilerliyor, sekme arkaplana alınınca duruyor.
 3. **Otomatik oynanış testi:** her levelin referans çözücüyle oyunun kendi döngüsü üzerinden bitirilebildiğini gösteren test.
+   *Durum:* tamamlandı (`src/game/state.test.ts`). Referans çözücü `src/core/solver.ts` içinde tek kopya; üretici de testler de onu kullanır.
 4. **Cila:** tema, güvenli alanlar, hareket azaltma, performans, şartnamedeki kabul ölçütlerinin hepsi.
 5. **Yayın:** PWA ayarları (simge, çevrimdışı çalışma) ya da seçilen platformun paketi.

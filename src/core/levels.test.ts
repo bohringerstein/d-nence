@@ -6,45 +6,14 @@ import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
 import * as C from "./index.ts";
-import type { Open } from "./opening.ts";
 import type { LevelTable } from "./levels.ts";
 import type { RingDef } from "./rings.ts";
 
-const { DEG, TAU, REACT, canPass, stepRings, liveRings, OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen } = C;
+const { DEG, TAU, canPass, stepRings, liveRings, solve } = C;
 
 const data: LevelTable = JSON.parse(
   fs.readFileSync(path.join(import.meta.dirname, "..", "..", "data", "levels.json"), "utf8"));
-const needS = C.NEED_PASS + C.SOLVER_MARGIN;
-
-interface Kilit { i: number; t: number }
-interface Trace { t: number; kilitler: Kilit[]; w: number }
-
-// Referans çözücü, ama kilit anlarını da kaydeder
-function solveTrace(def: RingDef[]): Trace | null {
-  const rs = liveRings(def), dt = 1 / 120;
-  let open: Open = initialOpen(rs);
-  let t = 0, last = 0;
-  const kilitler: Kilit[] = [];
-  for (let i = 0; i < rs.length; i++) {
-    const r = rs[i]; if (r.locked) continue;
-    const rem = rs.filter((x, k) => k > i && !x.locked).length;
-    const until = t + 30; let done = false;
-    while (t < until) {
-      if (t >= last + REACT) {
-        if (open === OPEN_ALL) done = true;
-        else {
-          const cur = largestOpen(open).w, allow = (cur - needS) / (rem + 1);
-          const p = peekOpen(open, r);
-          if (p.w >= needS && cur - p.w <= allow) done = true;
-        }
-        if (done) { open = lockOpen(open, r); r.locked = true; last = t; kilitler.push({ i, t }); break; }
-      }
-      t += dt; stepRings(rs, dt, t);
-    }
-    if (!done) return null;
-  }
-  return { t, kilitler, w: largestOpen(open).w };
-}
+import type { Kilit } from "./solver.ts";
 
 interface Replay { win: boolean; t: number; w: number; kacinci?: number }
 
@@ -56,7 +25,7 @@ function replayWithMask(def: RingDef[], kilitler: Kilit[]): Replay {
   let t = 0, k = 0;
   while (k < kilitler.length) {
     if (t >= kilitler[k].t - 1e-9) {
-      const r = rs[kilitler[k].i];
+      const r = rs[kilitler[k].halka];
       C.applyMask(mask, r); r.locked = true;
       const en = C.maskLargest(mask);
       if (!canPass(en.w)) return { win: false, kacinci: k, w: en.w, t };
@@ -76,7 +45,7 @@ test("tablo dosyası okunabilir ve 60 level içeriyor", () => {
 test("her level referans çözücüyle bitirilebiliyor ve süre sınırına sığıyor", () => {
   const sorun: string[] = [];
   for (const l of data.levels) {
-    const s = solveTrace(l.rings);
+    const s = solve(l.rings);
     if (!s) { sorun.push(`level ${l.n}: çözücü bitiremedi`); continue; }
     if (s.t >= l.limit) sorun.push(`level ${l.n}: çözücü ${s.t.toFixed(1)} sn, limit ${l.limit} sn`);
   }
@@ -86,7 +55,7 @@ test("her level referans çözücüyle bitirilebiliyor ve süre sınırına sı�
 test("çözücünün yolu oyunun maske modelinde de kazanıyor", () => {
   const sorun: string[] = []; let enBuyukFark = 0;
   for (const l of data.levels) {
-    const s = solveTrace(l.rings);
+    const s = solve(l.rings);
     assert.ok(s, `level ${l.n}: çözücü bitiremedi`);
     const g = replayWithMask(l.rings, s.kilitler);
     if (!g.win) sorun.push(`level ${l.n}: ${(g.kacinci ?? 0) + 1}. kilitte maske kapandı (${(g.w / DEG).toFixed(2)}°)`);

@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   TAU, DEG, NEED, NEED_PASS, SOLVER_MARGIN, REACT, GAP_MAX_DEG,
-  canPass, stepRings, liveRings, validateTable,
+  canPass, stepRings, liveRings, validateTable, solve,
   OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio
 } from "../src/core/index.ts";
 import type { RingDef, Level, LevelTable } from "../src/core/index.ts";
@@ -29,27 +29,6 @@ const rnd4 = (x: number): number => Math.round(x * 1e4) / 1e4;
 // Çözücünün kendine bıraktığı pay: geçiş eşiğinin biraz üstünü hedefler ki insan oyuncuya yer kalsın.
 const needS = NEED_PASS + SOLVER_MARGIN;
 
-// Referans çözücü: hemen ilk kilit, hata payını eşit böl, kusursuz zamanlama
-function solve(def: RingDef[]): number | null {
-  const rs = liveRings(def), dt = 1 / 120; let open = initialOpen(rs), t = 0, last = 0;
-  for (let i = 0; i < rs.length; i++) { const r = rs[i]; if (r.locked) continue;
-    const rem = rs.filter((x, k) => k > i && !x.locked).length; const until = t + 30; let done = false;
-    while (t < until) {
-      if (t >= last + REACT) {
-        if (open === OPEN_ALL) done = true;
-        else {
-          const cur = largestOpen(open).w, allow = (cur - needS) / (rem + 1);
-          const p = peekOpen(open, r);
-          if (p.w >= needS && cur - p.w <= allow) done = true;
-        }
-        if (done) { open = lockOpen(open, r); r.locked = true; last = t; break; }
-      }
-      t += dt; stepRings(rs, dt, t);
-    }
-    if (!done) return null;
-  }
-  return t;
-}
 // İnsan benzeri oyuncu: dokunuşu ±sigma sn sapar
 function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): PlayResult {
   const rs = liveRings(def), dt = 1 / 120; let open = initialOpen(rs), t = 0, last = 0;
@@ -149,7 +128,8 @@ const BOSSES: Record<number, Boss | undefined> = {
 
 function finalize(rings: RawRing[], n: number): Finalized | null {
   const def = rings.map(r => ({ speed: rnd4(r.speed), gap: rnd4(r.gap), gaps: r.gaps, gapOffset: rnd4(r.gapOffset), flip: rnd4(r.flip), wobble: r.wobble, preLocked: r.preLocked, start: rnd4(((r.start % TAU) + TAU) % TAU) }));
-  const best = solve(def); if (best == null) return null;
+  const cozum = solve(def); if (!cozum) return null;
+  const best = cozum.t;
   const moving = def.filter(r => !r.preLocked).length;
   const want = limitFor(n, moving);
   // Tasarım limiti kural; çözücü sığmıyorsa aday zaten elenir (bkz. tune), ama son çare olarak
@@ -238,7 +218,8 @@ function verify(): number {
 
   for (const l of data.levels) {
     const ad = `${l.n}${l.boss ? "*" : ""}`;
-    const best = solve(l.rings);
+    const cozum = solve(l.rings);
+    const best = cozum ? cozum.t : null;
     const ev = evaluate({ def: l.rings, limit: l.limit }, 50);
     const hedef = l.boss ? target(l.n) - 0.12 : target(l.n);
     const sapma = ev.win - hedef;

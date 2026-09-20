@@ -5,3 +5,4 @@ export * from "./rings.ts";
 export * from "./opening.ts";
 export * from "./stars.ts";
 export * from "./levels.ts";
+export * from "./solver.ts";

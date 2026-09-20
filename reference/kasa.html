@@ -96,6 +96,8 @@ var KasaCore = (() => {
     OPEN_ALL: () => OPEN_ALL,
     RATIO: () => RATIO,
     REACT: () => REACT,
+    SOLVER_ADIM: () => SOLVER_ADIM,
+    SOLVER_HEDEF: () => SOLVER_HEDEF,
     SOLVER_MARGIN: () => SOLVER_MARGIN,
     STAR_LABEL: () => STAR_LABEL,
     TAU: () => TAU,
@@ -114,6 +116,7 @@ var KasaCore = (() => {
     newMask: () => newMask,
     norm: () => norm,
     peekOpen: () => peekOpen,
+    solve: () => solve,
     starCount: () => starCount,
     starRatio: () => starRatio,
     stepRings: () => stepRings,
@@ -335,9 +338,49 @@ var KasaCore = (() => {
     }
     return out;
   }
+
+  // src/core/solver.ts
+  var SOLVER_ADIM = 1 / 120;
+  var SOLVER_HEDEF = NEED_PASS + SOLVER_MARGIN;
+  function solve(def) {
+    const rs = liveRings(def);
+    const dt = SOLVER_ADIM;
+    let open = initialOpen(rs);
+    let t = 0, last = 0;
+    const kilitler = [];
+    for (let i = 0; i < rs.length; i++) {
+      const r = rs[i];
+      if (r.locked) continue;
+      const rem = rs.filter((x, k) => k > i && !x.locked).length;
+      const until = t + 30;
+      let done = false;
+      while (t < until) {
+        if (t >= last + REACT) {
+          if (open === OPEN_ALL) done = true;
+          else {
+            const cur = largestOpen(open).w;
+            const allow = (cur - SOLVER_HEDEF) / (rem + 1);
+            const p = peekOpen(open, r);
+            if (p.w >= SOLVER_HEDEF && cur - p.w <= allow) done = true;
+          }
+          if (done) {
+            open = lockOpen(open, r);
+            r.locked = true;
+            last = t;
+            kilitler.push({ halka: i, t });
+            break;
+          }
+        }
+        t += dt;
+        stepRings(rs, dt, t);
+      }
+      if (!done) return null;
+    }
+    return { t, kilitler, w: largestOpen(open).w };
+  }
   return __toCommonJS(index_exports);
 })();
-const { BIN, BINS, BOSS_LEVELS, DEG, GAP_MAX_DEG, LEVEL_COUNT, LINE_WIDTH_MAX, LINE_WIDTH_MIN, NEED, NEED_BINS, NEED_PASS, OPEN_ALL, RATIO, REACT, SOLVER_MARGIN, STAR_LABEL, TAU, applyMask, canPass, firstSeen, gapCenters, initialOpen, isBetter, largestOpen, layout, liveRings, lockOpen, maskLargest, maskRuns, newMask, norm, peekOpen, starCount, starRatio, stepRings, validateTable, wrap } = KasaCore;
+const { BIN, BINS, BOSS_LEVELS, DEG, GAP_MAX_DEG, LEVEL_COUNT, LINE_WIDTH_MAX, LINE_WIDTH_MIN, NEED, NEED_BINS, NEED_PASS, OPEN_ALL, RATIO, REACT, SOLVER_ADIM, SOLVER_HEDEF, SOLVER_MARGIN, STAR_LABEL, TAU, applyMask, canPass, firstSeen, gapCenters, initialOpen, isBetter, largestOpen, layout, liveRings, lockOpen, maskLargest, maskRuns, newMask, norm, peekOpen, solve, starCount, starRatio, stepRings, validateTable, wrap } = KasaCore;
 // <<< core.js
 </script>
 <script>

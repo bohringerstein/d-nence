@@ -67,6 +67,10 @@ kilitli değilse:
 
 **Sabit zaman adımı (zorunlu).** Referans sürüm değişken `dt` kullanır; yeni sürüm fizik güncellemesini sabit `1/120 sn` adımla yapmalıdır (biriktirici döngü, "fixed timestep accumulator"). Level süreleri bu adımla hesaplanmıştır ve yön değiştiren halkalar adım büyüklüğüne duyarlıdır. Çizim ekran yenileme hızında kalabilir.
 
+**Girdi zamanlaması.** Dokunuşlar kuyruğa alınır ve her karede fizik adımlarından ÖNCE işlenir; böylece dokunuş anı en fazla bir adım (8,3 ms) kayar. Prototipte dokunuş kare hızına bağlıydı: 60 fps'te 16 ms, yani zorluk modelinin varsaydığı 60 ms insan sapmasının dörtte biri kadar sistematik hata.
+
+**Duraklatma.** Biriktiricinin üst sınırı 0,25 sn'dir ve sekme arkaplana alınınca oyun durur. Sınır olmazsa arkaplandan dönüşte biriken süre tek karede yüzlerce fizik adımı olarak çalışır (ya donma, ya anında kayıp). Oyuncu yokken geçen süre levele yazılmaz.
+
 Halka yalnızca oyun "bekleme" (idle) durumundayken hareket eder. Kilitlendikten sonra açısı donar.
 
 ## 4. Açıklık hesabı
@@ -218,9 +222,9 @@ Kayıt okunamazsa oyun hata vermeden Level 1'den başlar. "Baştan başla" düğ
 Bir sürüm ancak aşağıdakilerin hepsi sağlanınca tamam sayılır:
 
 - [ ] `npm run check` başarılı (tip denetimi, birim testleri, tablo denetimi, prototip güncelliği).
-- [ ] Otomatik test: her level için referans çözücü, oyunun kendi güncelleme döngüsü üzerinden (sabit adımla) leveli süre sınırından önce bitiriyor.
-- [ ] Birim testleri: açı normalleştirme, maske uygulama, çembersel en büyük açıklık (başa sarma dahil), yıldız hesabı.
-- [ ] Kayıp sonrası kazanma, süre dolması ve art arda hızlı dokunuş senaryolarında oyun takılmıyor.
+- [x] Otomatik test: her level için referans çözücü, oyunun kendi güncelleme döngüsü üzerinden (sabit adımla) leveli süre sınırından önce bitiriyor.
+- [x] Birim testleri: açı normalleştirme, maske uygulama, çembersel en büyük açıklık (başa sarma dahil), yıldız hesabı.
+- [x] Kayıp sonrası kazanma, süre dolması ve art arda hızlı dokunuş senaryolarında oyun takılmıyor.
 - [ ] 360×640 ve 1440×900 ekranlarda halkalar ekrana sığıyor, düzen bozulmuyor.
 - [ ] Orta seviye bir telefonda 60 fps.
 - [ ] Açık ve koyu temada tüm öğeler okunabilir.
