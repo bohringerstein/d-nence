@@ -263,3 +263,59 @@ Daha dar bir bant ölçüm gürültüsünü hata sanardı.
 | Yıldız dağılımı (usta) | %25 / %35 / %40 |
 | Süre sınırı | 6,2–25,1 sn, ortalama 11,4 sn |
 | Doğrulama | **0 sorun** |
+
+---
+
+## 10. Kare hızı 60 fps yeterli mi?
+
+Üç ayrı soru ve cevapları farklı.
+
+### Görsel akıcılık — evet
+
+En hızlı halka 4,86 rad/sn (wobble tepe hızı dahil), yani 279°/sn. Dış halkanın
+kenarındaki teğetsel hız:
+
+| ekran | 60 fps | 120 fps |
+|---|---|---|
+| S = 360 (telefon) | 12,8 px/kare | 6,4 px/kare |
+| S = 800 (masaüstü) | 28,5 px/kare | 14,3 px/kare |
+
+Dönen bir yayda bu kadarlık adım görünmez; hareket sürekli algılanır. 60 fps görsel
+olarak yeterlidir.
+
+### Fizik — kare hızıyla ilgisi yok
+
+Fizik sabit **1/120 sn** adımla ilerler ve biriktirici (accumulator) kullanır. 60 fps'te
+kare başına 2 adım, 120 fps'te 1 adım çalışır; simülasyon her iki durumda aynıdır.
+Bu, şartnamenin 3. bölümündeki zorunluluktur ve level süreleri bu adımla hesaplanmıştır.
+
+### Girdi zamanlaması — asıl mesele buydu
+
+Tarayıcı dokunuş olayını **anında** üretir, ama oyun onu ancak bir sonraki animasyon
+karesinde okuyabilir. Dokunuş o karenin başına yuvarlanırsa:
+
+| fps | kare süresi | yuvarlanma | en zor bölümün payına oranı (τ = 25 ms) |
+|---|---|---|---|
+| 30 | 33,3 ms | ±16,7 ms | **%67** |
+| 60 | 16,7 ms | ±8,3 ms | **%33** |
+| 90 | 11,1 ms | ±5,6 ms | %22 |
+| 120 | 8,3 ms | ±4,2 ms | %17 |
+
+60 fps'te motorun eklediği hata, en zor bölümlerde oyuncunun **tüm hata payının üçte
+biridir** — ve oyuncunun kendi hatası değildir. Daha kötüsü, bu sapma ekran hızına
+bağlıdır: 120 Hz telefonda oyun 60 Hz telefondan kolay olur. Aynı bölüm, aynı oyuncu,
+farklı sonuç.
+
+**Çözüm kare hızını artırmak değildir.** Dokunuş olayı kendi zaman damgasını taşır
+(`PointerEvent.timeStamp`, `performance.now()` ile aynı ölçekte). Damga kuyruğa alınır
+ve dokunuş, **fizik saati o ana ulaştığında** işlenir. Sapma böylece en fazla bir fizik
+adımı (8,3 ms) olur ve **ekran hızından bağımsızdır**.
+
+`src/game/input.test.ts` bunu doğrudan sınar: aynı gerçek dokunuş anı 30, 60, 90 ve
+120 fps'te aynı fizik adımında işlenmelidir.
+
+### Sonuç
+
+> 60 fps bu oyun için **yeterlidir** — ama ancak girdi kare hızından bağımsız olduğu
+> için. Düzeltmeden önce cevap "yeterli ama 120 Hz'de oyun ölçülebilir biçimde kolaydı"
+> olurdu ve bu, zorluk kalibrasyonunu cihaza bağlı hale getirirdi.

@@ -87,8 +87,8 @@ function cizVeYaz(): void {
 }
 
 // ---- Dokunuş ---------------------------------------------------------------
-function dokunusIsle(): void {
-  const n = girdi.al();
+function dokunusIsle(gercekZaman: number): void {
+  const n = girdi.al(gercekZaman);
   for (let i = 0; i < n; i++) {
     const sonuc = tap(durum, tablo.q3, tablo.q2);
     if (sonuc.tip === "kilit") titret(ayarlar, "kilit");
@@ -108,9 +108,9 @@ function dokunusIsle(): void {
 
 // ---- Döngü -----------------------------------------------------------------
 const oyun = dongu({
-  adim(dt) {
+  adim(dt, gercekZaman) {
     if (bitti || panelAcik) { girdi.temizle(); return false; }
-    dokunusIsle();
+    dokunusIsle(gercekZaman);
     const s = step(durum, dt);
     if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); yaz("Süre doldu"); return true; }
     if (s.tip === "bitti") {

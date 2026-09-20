@@ -15,8 +15,14 @@ export const ADIM = 1 / 120;
 export const EN_COK_BIRIKME = 0.25;
 
 export interface DonguGeriCagirmalari {
-  /** Bir fizik adımı. false dönerse döngü o kare için adım atmayı bırakır (level değişti). */
-  adim: (dt: number) => boolean;
+  /**
+   * Bir fizik adımı. false dönerse döngü o kare için adım atmayı bırakır (level değişti).
+   *
+   * `gercekZaman`, bu adımın SONUNUN karşılık geldiği gerçek dünya anıdır
+   * (performance.now() ölçeğinde, ms). Girdi bu sayede kare sınırına yuvarlanmadan,
+   * kendi zaman damgasının düştüğü adımda işlenir (bkz. game/input.ts).
+   */
+  adim: (dt: number, gercekZaman: number) => boolean;
   /** Görsel sönümleme ve çizim; gerçek geçen süreyi alır. */
   cizim: (dt: number) => void;
 }
@@ -42,10 +48,13 @@ export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
     if (gizli) return;
 
     birikim += gercek;
-    // Girdi, adımlardan önce işlenir (bkz. input.ts): dokunuş anı en fazla bir adım kayar.
+    // Fizik saati gerçek zamanın `birikim` kadar gerisindedir; her adım onu ADIM kadar
+    // ileri taşır. Girdi kendi zaman damgasının düştüğü adımda işlenir (bkz. input.ts).
+    let fizikGercek = now - birikim * 1000;
     while (birikim >= ADIM) {
       birikim -= ADIM;
-      if (!adim(ADIM)) { birikim = 0; break; }
+      fizikGercek += ADIM * 1000;
+      if (!adim(ADIM, fizikGercek)) { birikim = 0; break; }
     }
     cizim(gercek);
   };

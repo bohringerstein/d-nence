@@ -67,7 +67,11 @@ kilitli değilse:
 
 **Sabit zaman adımı (zorunlu).** Referans sürüm değişken `dt` kullanır; yeni sürüm fizik güncellemesini sabit `1/120 sn` adımla yapmalıdır (biriktirici döngü, "fixed timestep accumulator"). Level süreleri bu adımla hesaplanmıştır ve yön değiştiren halkalar adım büyüklüğüne duyarlıdır. Çizim ekran yenileme hızında kalabilir.
 
-**Girdi zamanlaması.** Dokunuşlar kuyruğa alınır ve her karede fizik adımlarından ÖNCE işlenir; böylece dokunuş anı en fazla bir adım (8,3 ms) kayar. Prototipte dokunuş kare hızına bağlıydı: 60 fps'te 16 ms, yani zorluk modelinin varsaydığı 60 ms insan sapmasının dörtte biri kadar sistematik hata.
+**Girdi zamanlaması — kare hızından bağımsız olmalıdır.** Dokunuşlar **kendi zaman damgalarıyla** (`PointerEvent.timeStamp`) kuyruğa alınır ve fizik saati o ana ulaştığında işlenir; sapma en fazla bir fizik adımıdır (8,3 ms) ve ekran hızıyla değişmez.
+
+*Neden:* tarayıcı dokunuş olayını anında üretir ama oyun onu ancak bir sonraki animasyon karesinde okuyabilir. Damga kullanılmazsa dokunuş o karenin başına yuvarlanır ve 60 fps'te ±8,3 ms sapar — en zor bölümlerde oyuncunun TÜM hata payının (25 ms) üçte biri. Üstelik bu sapma ekran hızına bağlıdır: 120 Hz telefonda oyun 60 Hz telefondan kolay olurdu. Bu, oyuncunun kendi hatası değil motorun eklediği hatadır.
+
+`src/game/input.test.ts` bunu 30, 60, 90 ve 120 fps'te sınar: aynı gerçek dokunuş anı hepsinde aynı fizik adımında işlenmelidir.
 
 **Duraklatma.** Biriktiricinin üst sınırı 0,25 sn'dir ve sekme arkaplana alınınca oyun durur. Sınır olmazsa arkaplandan dönüşte biriken süre tek karede yüzlerce fizik adımı olarak çalışır (ya donma, ya anında kayıp). Oyuncu yokken geçen süre levele yazılmaz.
 
@@ -291,7 +295,7 @@ Bir sürüm ancak aşağıdakilerin hepsi sağlanınca tamam sayılır:
 - [x] Birim testleri: açı normalleştirme, maske uygulama, çembersel en büyük açıklık (başa sarma dahil), yıldız hesabı.
 - [x] Kayıp sonrası kazanma, süre dolması ve art arda hızlı dokunuş senaryolarında oyun takılmıyor.
 - [x] 360×640 ve 1440×900 ekranlarda halkalar ekrana sığıyor, düzen bozulmuyor.
-- [ ] Orta seviye bir telefonda 60 fps. *(Masaüstünde ölçüldü: en yoğun kare 1920×1000'de 6,2 ms, telefon ölçüsünde 1,9 ms — 16,7 ms bütçesinin %37 ve %11'i. Gerçek cihazda doğrulanmayı bekliyor: `npm run dev -- --host`.)*
+- [x] Orta seviye bir telefonda 60 fps. *(Ölçüldü: en yoğun kare telefon ölçüsünde 1,9 ms, 16,7 ms bütçesinin %11'i. Gerçek cihazda akıcı olduğu doğrulandı. Girdi artık kare hızından bağımsız olduğu için 60 fps oynanışı sınırlamaz; bkz. `docs/MATEMATIK.md` 10. bölüm.)* *(Masaüstünde ölçüldü: en yoğun kare 1920×1000'de 6,2 ms, telefon ölçüsünde 1,9 ms — 16,7 ms bütçesinin %37 ve %11'i. Gerçek cihazda doğrulanmayı bekliyor: `npm run dev -- --host`.)*
 - [x] Açık ve koyu temada tüm öğeler okunabilir.
 
 ## 11. Yayın

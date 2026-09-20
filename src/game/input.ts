@@ -1,12 +1,19 @@
 // Tek kontrol: dokunuş, boşluk ya da Enter. İkinci bir kontrol yoktur.
 //
-// Dokunuşlar kuyruğa alınır ve fizik adımlarından önce işlenir; böylece dokunuş anı
-// en fazla bir adım (8,3 ms) kayar. Prototipte kare hızına bağlıydı: 60 fps'te 16 ms,
-// yani zorluk modelinin varsaydığı 60 ms insan sapmasının dörtte biri kadar hata.
+// Dokunuşlar ZAMAN DAMGASIYLA kuyruğa alınır ve fizik saati o ana ulaştığında işlenir.
+//
+// Neden: tarayıcı dokunuş olayını anında üretir ama oyun onu ancak bir sonraki animasyon
+// karesinde okuyabilir. Damga kullanılmazsa dokunuş o karenin başına yuvarlanır ve
+// 60 fps'te ±8,3 ms sapar — en zor bölümlerde oyuncunun TÜM hata payının (25 ms) üçte biri.
+// Bu, oyuncunun kendi hatası değil motorun eklediği hatadır ve ekran hızına göre değişir.
+// Damgayla oyun, girdi açısından kare hızından bağımsız olur.
 
 export interface Girdi {
-  /** Bekleyen dokunuş sayısını alır ve kuyruğu boşaltır. */
-  al: () => number;
+  /**
+   * Fizik saati `gercekZaman`'a (performance.now() ölçeğinde, ms) ulaştığında
+   * işlenmesi gereken dokunuş sayısını alır ve onları kuyruktan çıkarır.
+   */
+  al: (gercekZaman: number) => number;
   /** Bekleyenleri atar (level değişiminde: eski levele basılan tuş yenisine geçmesin). */
   temizle: () => void;
   birak: () => void;
@@ -18,14 +25,21 @@ function etkilesimliMi(hedef: EventTarget | null): boolean {
   return !!hedef.closest("button, a, input, select, textarea, [contenteditable='true']");
 }
 
+/**
+ * Olayın zaman damgası. Modern tarayıcılarda `performance.now()` ile aynı ölçektedir;
+ * olmadığı ya da sıfır geldiği durumda şimdiki zamana düşeriz.
+ */
+const damga = (e: Event): number =>
+  typeof e.timeStamp === "number" && e.timeStamp > 0 ? e.timeStamp : performance.now();
+
 export function girdiBagla(canvas: HTMLCanvasElement): Girdi {
-  let bekleyen = 0;
+  let kuyruk: number[] = [];
 
   const dokun = (e: PointerEvent): void => {
     // Çoklu dokunuş tek harekette iki halka kilitlemesin: yalnızca birincil işaretçi.
     if (!e.isPrimary) return;
     e.preventDefault();
-    bekleyen++;
+    kuyruk.push(damga(e));
   };
 
   const tus = (e: KeyboardEvent): void => {
@@ -33,7 +47,7 @@ export function girdiBagla(canvas: HTMLCanvasElement): Girdi {
     if (e.repeat) return;              // basılı tutmak seri kilit üretmesin
     if (etkilesimliMi(e.target)) return;
     e.preventDefault();
-    bekleyen++;
+    kuyruk.push(damga(e));
   };
 
   // Çift dokunuşla yakınlaştırmayı ve kaydırmayı canvas üzerinde tamamen kapat.
@@ -46,8 +60,12 @@ export function girdiBagla(canvas: HTMLCanvasElement): Girdi {
   canvas.addEventListener("dblclick", jest);
 
   return {
-    al() { const n = bekleyen; bekleyen = 0; return n; },
-    temizle() { bekleyen = 0; },
+    al(gercekZaman: number) {
+      let n = 0;
+      while (kuyruk.length && kuyruk[0] <= gercekZaman) { kuyruk.shift(); n++; }
+      return n;
+    },
+    temizle() { kuyruk = []; },
     birak() {
       canvas.removeEventListener("pointerdown", dokun);
       window.removeEventListener("keydown", tus);
