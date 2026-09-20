@@ -187,3 +187,31 @@ button:focus-visible { outline: 2px solid var(--ball); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .bar i { transition: none; }
 }
+
+/* "Nasıl oynanır" ekranı (src/ui/nasil.ts). Uzun olabilir: kutu kendi içinde kayar. */
+.nasilKutu {
+  max-width: 26rem;
+  text-align: left;
+  max-height: min(80vh, 40rem);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.nasilKutu h2 { text-align: center; }
+.nasilKutu .giris { font-size: 0.95rem; line-height: 1.55; margin: 0 0 1rem; }
+.nasilKutu .uyari { margin-top: 1rem; }
+.nasilKutu button { display: block; margin: 1rem auto 0; }
+
+.gosterge { list-style: none; margin: 0 0 1rem; padding: 0; }
+.gosterge li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--track);
+}
+.gosterge i { flex: 0 0 40px; margin-top: 0.15rem; }
+.gosterge svg { width: 40px; height: 24px; display: block; }
+/* Yalnızca satır başlığı bloktur; açıklama metnindeki <b> satır içinde kalmalı. */
+.gosterge .ad { display: block; font-weight: 600; color: var(--ink); }
+.gosterge span b { font-weight: 600; color: var(--ink); }
+.gosterge span { font-size: 0.9rem; line-height: 1.45; color: var(--muted); }

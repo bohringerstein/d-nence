@@ -12,8 +12,9 @@ import { tuvalKur, ciz } from "./game/render.ts";
 import { renkleriOku, renklerHazir, hareketAzalt, tercihleriIzle } from "./game/theme.ts";
 import { ogreticiTablosu, ipucu, yildizYazisi, sureYazisi } from "./game/hints.ts";
 import { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel } from "./game/storage.ts";
-import { ayarlariOku, ayarlariYaz, halkaOpakligi, titret, titresimVarMi, UYARI_METIN } from "./game/ayarlar.ts";
+import { ayarlariOku, ayarlariYaz, halkaOpakligi, titret, titresimVarMi } from "./game/ayarlar.ts";
 import { kabukKur } from "./ui/shell.ts";
+import { NASIL_HTML } from "./ui/nasil.ts";
 
 const tablo = tabloHam as LevelTable;
 
@@ -29,7 +30,7 @@ if (semaHatalari.length) {
   throw new Error("level tablosu geçersiz: " + semaHatalari.length + " sorun");
 }
 
-const ui = kabukKur(hedef);
+const ui = kabukKur(hedef, NASIL_HTML);
 const kayit = oku();
 const ogretici = ogreticiTablosu(tablo.levels);
 
@@ -170,15 +171,14 @@ if (!renklerHazir()) {
 }
 
 // ---- Ayarlar paneli --------------------------------------------------------
-function ayarPaneliAc(ilkAcilis = false): void {
+function ayarPaneliAc(): void {
   panelAcik = true;
   ui.desenKutu.checked = ayarlar.desenYumusat;
   ui.hareketKutu.checked = ayarlar.hareketAzalt;
   ui.titresimKutu.checked = ayarlar.titresim;
   // Cihaz titreşimi desteklemiyorsa (iOS Safari) seçeneği hiç gösterme.
   ui.titresimSatir.hidden = !titresimVarMi();
-  // Uyarı yalnızca ilk açılışta; sonrasında panel sade kalır.
-  ui.uyari.textContent = ilkAcilis ? UYARI_METIN : "";
+  ui.uyari.textContent = "";
   ui.ayarPanel.hidden = false;
   ui.ayarKapat.focus();
 }
@@ -193,6 +193,25 @@ function ayarlariUygula(): void {
 }
 
 ui.ayarAc.addEventListener("click", e => { e.stopPropagation(); if (!bitti) ayarPaneliAc(); ui.ayarAc.blur(); });
+
+// ---- Nasıl oynanır ---------------------------------------------------------
+function nasilAc(): void {
+  panelAcik = true;
+  ui.ayarPanel.hidden = true;
+  ui.nasil.hidden = false;
+  ui.nasilIcerik.scrollTop = 0;
+  ui.nasilKapat.focus();
+}
+
+ui.nasilAc.addEventListener("click", () => { ayarlariUygula(); nasilAc(); });
+ui.nasilKapat.addEventListener("click", () => {
+  ui.nasil.hidden = true;
+  ui.nasilKapat.blur();
+  ayarlar.uyariGoruldu = true;
+  ayarlariYaz(ayarlar);
+  panelAcik = false;
+  levelYukle(durum.level.n);
+});
 ui.desenKutu.addEventListener("change", ayarlariUygula);
 ui.hareketKutu.addEventListener("change", ayarlariUygula);
 ui.titresimKutu.addEventListener("change", () => { ayarlariUygula(); titret(ayarlar, "kilit"); });
@@ -211,8 +230,8 @@ levelYukle(kayit.level);
 tuval.boyutla();
 oyun.basla();
 
-// Işığa duyarlılık uyarısı ilk açılışta bir kez (bkz. game/ayarlar.ts).
-if (!ayarlar.uyariGoruldu) ayarPaneliAc(true);
+// İlk açılışta kuralları ve ışığa duyarlılık notunu bir kez göster (bkz. ui/nasil.ts).
+if (!ayarlar.uyariGoruldu) nasilAc();
 
 // Geliştirme sırasında elle sınamak için; oyun bunu kullanmaz ve üretim derlemesine girmez.
 if (import.meta.env.DEV) {

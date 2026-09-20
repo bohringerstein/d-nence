@@ -1,5 +1,5 @@
 // Canvas çizimi (şartname 7. bölüm).
-import { TAU, DEG, canPass, gapCenters, layout, wrap } from "../core/index.ts";
+import { TAU, DEG, canPass, gapCenters, isaretAcisi, layout, wrap } from "../core/index.ts";
 import type { Layout, Ring } from "../core/index.ts";
 import { aciklikBolgeleri, sonrakiHalka, HEPSI } from "./state.ts";
 import type { LevelState } from "./state.ts";
@@ -190,8 +190,9 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
     halkaCiz(ctx, r, R);
     ctx.globalAlpha = 1;
 
-    // 4) İşaretler: boşluğun tam karşısında
-    const a = r.angle + Math.PI;
+    // 4) İşaretler: en geniş çizili yayın ortasında (bkz. core/rings.ts isaretAcisi).
+    //    Sabit bir açı kullanmak iki kapılı halkalarda işareti boşluğun içine düşürüyordu.
+    const a = isaretAcisi(r);
     if (r.preLocked) {
       ctx.fillStyle = renk.ink;
       ctx.fillRect(Math.cos(a) * R - 4, Math.sin(a) * R - 4, 8, 8);

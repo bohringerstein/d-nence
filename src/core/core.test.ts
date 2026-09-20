@@ -171,3 +171,48 @@ test("yıldız hesabı", () => {
   assert.equal(C.starCount(0.4, 0.4, 0.2), 3, "esikte 3 yildiz");
   assert.equal(C.starCount(0.2, 0.4, 0.2), 2, "esikte 2 yildiz");
 });
+
+// ---- İşaret konumu ----
+// Regresyon: işaret `angle + π`'ye konuyordu; iki kapılı halkada gapOffset 180°'ye
+// yakınsa bu, ikinci boşluğun tam ortasıydı ve nokta boşlukta havada duruyordu.
+const bosluktaMi = (r: Ring, aci: number): boolean => {
+  const yarim = r.gap * DEG / 2;
+  return C.gapCenters(r).some(c => Math.abs(C.norm(aci - c)) <= yarim);
+};
+
+test("işaret tek kapılı halkada çizginin üstünde", () => {
+  for (const gap of [25, 45, 85]) {
+    const r = live({ gap, gaps: 1, start: 0.7 });
+    assert.ok(!bosluktaMi(r, C.isaretAcisi(r)), `gap ${gap}: işaret boşlukta`);
+  }
+});
+
+test("işaret iki kapılı halkada da çizginin üstünde", () => {
+  // gapOffset 180'e yakınken eski davranış boşluğun tam ortasına düşüyordu.
+  for (const gapOffset of [130, 145, 160, 175, 179.8, 180]) {
+    for (const gap of [30, 50, 76.8]) {
+      const r = live({ gap, gaps: 2, gapOffset, start: 1.3 });
+      const a = C.isaretAcisi(r);
+      assert.ok(!bosluktaMi(r, a),
+        `gapOffset ${gapOffset}, gap ${gap}: işaret boşlukta (${deg(C.norm(a - r.angle)).toFixed(1)}°)`);
+    }
+  }
+});
+
+test("işaret en geniş yayın ortasına düşüyor", () => {
+  const r = live({ gap: 40, gaps: 2, gapOffset: 140, start: 0 });
+  const a = C.isaretAcisi(r);
+  // İki yay var: 20..120 (100°) ve 160..340 (180°). Geniş olanın ortası 250°.
+  yakin(deg(C.wrap(a)), 250, 1, "en geniş yayın ortası");
+});
+
+test("işaret boşluk kenarlarından uzak duruyor", () => {
+  let seed = 7; const R = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  let enYakin = Infinity;
+  for (let i = 0; i < 300; i++) {
+    const r = live({ gap: 25 + R() * 60, gaps: R() < 0.5 ? 2 : 1, gapOffset: 130 + R() * 50, start: R() * TAU });
+    const a = C.isaretAcisi(r), yarim = r.gap * DEG / 2;
+    for (const c of C.gapCenters(r)) enYakin = Math.min(enYakin, Math.abs(C.norm(a - c)) - yarim);
+  }
+  assert.ok(enYakin > 2 * DEG, `işaret bir boşluk kenarına ${deg(enYakin).toFixed(2)}° kadar yaklaştı`);
+});

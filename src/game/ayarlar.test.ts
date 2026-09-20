@@ -19,7 +19,7 @@ class SahteDepo {
 const depo = new SahteDepo();
 Object.defineProperty(globalThis, "localStorage", { value: depo, configurable: true });
 
-const { ayarlariOku, ayarlariYaz, halkaOpakligi, UYARI_METIN } = await import("./ayarlar.ts");
+const { ayarlariOku, ayarlariYaz, halkaOpakligi } = await import("./ayarlar.ts");
 const KEY = "kasa:ayarlar:v1";
 
 test("kayıt yokken her şey kapalı ve uyarı henüz görülmemiş", () => {
@@ -73,11 +73,6 @@ test("deseni yumuşat kilitsiz halkaların opaklığını düşürür", () => {
   assert.equal(halkaOpakligi(kapali), 0.4);
   assert.ok(halkaOpakligi(acik) < halkaOpakligi(kapali), "yumuşatma opaklığı düşürmeli");
   assert.ok(halkaOpakligi(acik) > 0.15, "halkalar tamamen kaybolmamalı");
-});
-
-test("uyarı metni epilepsiden ve çözümden söz ediyor", () => {
-  assert.ok(UYARI_METIN.includes("epilepsi"), "uyarı ne hakkında olduğunu söylemeli");
-  assert.ok(UYARI_METIN.includes("Deseni yumuşat"), "uyarı ne yapılabileceğini söylemeli");
 });
 
 // ---- Telefon titreşimi -------------------------------------------------------

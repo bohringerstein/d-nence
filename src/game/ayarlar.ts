@@ -58,9 +58,3 @@ export function titret(a: Ayarlar, tur: "kilit" | "kayip" | "acildi"): void {
   const desen = tur === "kilit" ? 12 : tur === "acildi" ? [18, 40, 18] : 45;
   try { navigator.vibrate(desen); } catch { /* titreşim olmadan da oynanır */ }
 }
-
-export const UYARI_BASLIK = "Başlamadan önce";
-export const UYARI_METIN =
-  "Kasa'da iç içe dönen halkalar var. Işığa duyarlı epilepsi ya da desenlerden " +
-  "rahatsız olma geçmişin varsa, aşağıdaki \"Deseni yumuşat\" seçeneğini açabilir " +
-  "ve ara vererek oynayabilirsin.";

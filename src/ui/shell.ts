@@ -20,6 +20,10 @@ export interface Kabuk {
   titresimKutu: HTMLInputElement;
   titresimSatir: HTMLElement;
   uyari: HTMLElement;
+  nasil: HTMLElement;
+  nasilIcerik: HTMLElement;
+  nasilKapat: HTMLButtonElement;
+  nasilAc: HTMLButtonElement;
 }
 
 const HTML = `
@@ -56,8 +60,13 @@ const HTML = `
         <input type="checkbox" id="titresimKutu">
         <span><b>Titreşim</b><small>Kilitte ve kayıpta telefon titreşir.</small></span>
       </label>
+      <button id="nasilAc" type="button">Nasıl oynanır</button>
       <button id="ayarKapat" type="button">Tamam</button>
     </div>
+  </div>
+
+  <div class="ortu" id="nasil" hidden role="dialog" aria-modal="true" aria-labelledby="nasilBaslik">
+    <div class="kutu nasilKutu" id="nasilIcerik"></div>
   </div>
   <div class="ortu" id="bitis" hidden role="dialog" aria-modal="true" aria-labelledby="bitisBaslik">
     <div class="kutu">
@@ -74,8 +83,12 @@ const bul = <T extends HTMLElement>(kok: ParentNode, id: string): T => {
   return el;
 };
 
-export function kabukKur(hedef: HTMLElement): Kabuk {
+export function kabukKur(hedef: HTMLElement, nasilHtml: string): Kabuk {
   hedef.innerHTML = HTML;
+  // "Nasıl oynanır" içeriği ayrı bir modülden gelir (ui/nasil.ts) ve kapatma
+  // düğmesi burada eklenir ki bul() onu bulabilsin.
+  const ic = hedef.querySelector("#nasilIcerik");
+  if (ic) ic.innerHTML = nasilHtml + '<button id="nasilKapat" type="button">Anladım</button>';
   return {
     kok: hedef,
     clock: bul(hedef, "clock"),
@@ -96,6 +109,10 @@ export function kabukKur(hedef: HTMLElement): Kabuk {
     hareketKutu: bul<HTMLInputElement>(hedef, "hareketKutu"),
     titresimKutu: bul<HTMLInputElement>(hedef, "titresimKutu"),
     titresimSatir: bul(hedef, "titresimSatir"),
-    uyari: bul(hedef, "uyari")
+    uyari: bul(hedef, "uyari"),
+    nasil: bul(hedef, "nasil"),
+    nasilIcerik: bul(hedef, "nasilIcerik"),
+    nasilKapat: bul<HTMLButtonElement>(hedef, "nasilKapat"),
+    nasilAc: bul<HTMLButtonElement>(hedef, "nasilAc")
   };
 }

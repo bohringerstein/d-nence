@@ -59,3 +59,25 @@ export const liveRings = (def: readonly RingDef[]): Ring[] =>
   def.map(r => ({ ...r, angle: r.start, dir: 1 as const, t: 0, locked: !!r.preLocked }));
 
 export { TAU };
+
+/**
+ * Halkanın işaretinin (baştan kilitli karesi, yön değiştiren kırmızı noktası) konacağı açı:
+ * en geniş çizili yayın ortası.
+ *
+ * Eskiden işaret körlemesine `angle + π`'ye, yani birinci boşluğun tam karşısına konuyordu.
+ * Tek kapılı halkada bu hep çizginin üstüne düşer, ama iki kapılı halkada ikinci boşluk
+ * `angle + gapOffset`'tedir ve gapOffset 180°'ye yakınsa işaret boşluğun tam ortasına
+ * düşüyordu — oyuncu boşlukta havada duran bir nokta görüyordu.
+ */
+export function isaretAcisi(r: Ring): number {
+  const yarim = r.gap * DEG / 2;
+  const merkezler = gapCenters(r).map(c => ((c % TAU) + TAU) % TAU).sort((a, b) => a - b);
+  let enIyi = merkezler[0] + Math.PI;   // tek kapılı halkada zaten doğru cevap
+  let enGenis = -1;
+  for (let i = 0; i < merkezler.length; i++) {
+    const a0 = merkezler[i] + yarim;
+    const a1 = (i + 1 < merkezler.length ? merkezler[i + 1] : merkezler[0] + TAU) - yarim;
+    if (a1 - a0 > enGenis) { enGenis = a1 - a0; enIyi = (a0 + a1) / 2; }
+  }
+  return enIyi;
+}
