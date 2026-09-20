@@ -68,8 +68,8 @@ test("localStorage erişilemezse oyun düşmez", () => {
 });
 
 test("deseni yumuşat kilitsiz halkaların opaklığını düşürür", () => {
-  const kapali = { desenYumusat: false, hareketAzalt: false, uyariGoruldu: true };
-  const acik = { desenYumusat: true, hareketAzalt: false, uyariGoruldu: true };
+  const kapali = { desenYumusat: false, hareketAzalt: false, titresim: true, uyariGoruldu: true };
+  const acik = { desenYumusat: true, hareketAzalt: false, titresim: true, uyariGoruldu: true };
   assert.equal(halkaOpakligi(kapali), 0.4);
   assert.ok(halkaOpakligi(acik) < halkaOpakligi(kapali), "yumuşatma opaklığı düşürmeli");
   assert.ok(halkaOpakligi(acik) > 0.15, "halkalar tamamen kaybolmamalı");
@@ -78,4 +78,63 @@ test("deseni yumuşat kilitsiz halkaların opaklığını düşürür", () => {
 test("uyarı metni epilepsiden ve çözümden söz ediyor", () => {
   assert.ok(UYARI_METIN.includes("epilepsi"), "uyarı ne hakkında olduğunu söylemeli");
   assert.ok(UYARI_METIN.includes("Deseni yumuşat"), "uyarı ne yapılabileceğini söylemeli");
+});
+
+// ---- Telefon titreşimi -------------------------------------------------------
+// Şartnamenin 12. bölümünde kapsam dışıydı; Kader telefonda eksik olduğunu bildirince
+// kapsama alındı. iOS Safari navigator.vibrate sağlamaz, orada seçenek gizlenir.
+const { titret, titresimVarMi } = await import("./ayarlar.ts");
+
+function vibrateKur(destek: boolean): number[][] {
+  const cagrilar: number[][] = [];
+  Object.defineProperty(globalThis, "navigator", {
+    value: destek
+      ? { vibrate: (d: number | number[]) => { cagrilar.push(Array.isArray(d) ? d : [d]); return true; } }
+      : {},
+    configurable: true
+  });
+  return cagrilar;
+}
+
+const ayar = (titresim: boolean) => ({ desenYumusat: false, hareketAzalt: false, titresim, uyariGoruldu: true });
+
+test("titreşim desteği doğru algılanıyor", () => {
+  vibrateKur(true);
+  assert.equal(titresimVarMi(), true);
+  vibrateKur(false);
+  assert.equal(titresimVarMi(), false, "iOS Safari gibi desteklemeyen cihazda false olmalı");
+});
+
+test("kilit, kayıp ve açılış farklı titreşim veriyor", () => {
+  const c = vibrateKur(true);
+  titret(ayar(true), "kilit");
+  titret(ayar(true), "kayip");
+  titret(ayar(true), "acildi");
+  assert.equal(c.length, 3);
+  assert.ok(c[1][0] > c[0][0], "kayıp kilitten daha belirgin olmalı");
+  assert.ok(c[2].length > 1, "açılış çok darbeli bir desen olmalı");
+});
+
+test("ayar kapalıyken titreşim yok", () => {
+  const c = vibrateKur(true);
+  titret(ayar(false), "kayip");
+  assert.equal(c.length, 0);
+});
+
+test("cihaz desteklemiyorsa sessizce geçilir", () => {
+  vibrateKur(false);
+  assert.doesNotThrow(() => titret(ayar(true), "kayip"));
+});
+
+test("vibrate hata fırlatırsa oyun düşmez", () => {
+  Object.defineProperty(globalThis, "navigator", {
+    value: { vibrate: () => { throw new Error("izin yok"); } },
+    configurable: true
+  });
+  assert.doesNotThrow(() => titret(ayar(true), "kayip"));
+});
+
+test("varsayılan olarak titreşim açık", () => {
+  depo.temizle();
+  assert.equal(ayarlariOku().titresim, true);
 });

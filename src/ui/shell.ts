@@ -17,6 +17,8 @@ export interface Kabuk {
   ayarKapat: HTMLButtonElement;
   desenKutu: HTMLInputElement;
   hareketKutu: HTMLInputElement;
+  titresimKutu: HTMLInputElement;
+  titresimSatir: HTMLElement;
   uyari: HTMLElement;
 }
 
@@ -49,6 +51,10 @@ const HTML = `
       <label class="secenek">
         <input type="checkbox" id="hareketKutu">
         <span><b>Hareketi azalt</b><small>Kayıptaki sarsıntı ve ekran flaşı kapanır.</small></span>
+      </label>
+      <label class="secenek" id="titresimSatir">
+        <input type="checkbox" id="titresimKutu">
+        <span><b>Titreşim</b><small>Kilitte ve kayıpta telefon titreşir.</small></span>
       </label>
       <button id="ayarKapat" type="button">Tamam</button>
     </div>
@@ -88,6 +94,8 @@ export function kabukKur(hedef: HTMLElement): Kabuk {
     ayarKapat: bul<HTMLButtonElement>(hedef, "ayarKapat"),
     desenKutu: bul<HTMLInputElement>(hedef, "desenKutu"),
     hareketKutu: bul<HTMLInputElement>(hedef, "hareketKutu"),
+    titresimKutu: bul<HTMLInputElement>(hedef, "titresimKutu"),
+    titresimSatir: bul(hedef, "titresimSatir"),
     uyari: bul(hedef, "uyari")
   };
 }

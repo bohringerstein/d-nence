@@ -9,10 +9,10 @@ import type { LevelState } from "./game/state.ts";
 import { dongu, ADIM } from "./game/loop.ts";
 import { girdiBagla } from "./game/input.ts";
 import { tuvalKur, ciz } from "./game/render.ts";
-import { renkleriOku, hareketAzalt, tercihleriIzle } from "./game/theme.ts";
+import { renkleriOku, renklerHazir, hareketAzalt, tercihleriIzle } from "./game/theme.ts";
 import { ogreticiTablosu, ipucu, yildizYazisi, sureYazisi } from "./game/hints.ts";
 import { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel } from "./game/storage.ts";
-import { ayarlariOku, ayarlariYaz, halkaOpakligi, UYARI_METIN } from "./game/ayarlar.ts";
+import { ayarlariOku, ayarlariYaz, halkaOpakligi, titret, titresimVarMi, UYARI_METIN } from "./game/ayarlar.ts";
 import { kabukKur } from "./ui/shell.ts";
 
 const tablo = tabloHam as LevelTable;
@@ -86,10 +86,12 @@ function dokunusIsle(): void {
   const n = girdi.al();
   for (let i = 0; i < n; i++) {
     const sonuc = tap(durum, tablo.q3, tablo.q2);
-    if (sonuc.tip === "kayip") { yaz("Açıklık kapandı"); return; }
+    if (sonuc.tip === "kilit") titret(ayarlar, "kilit");
+    if (sonuc.tip === "kayip") { titret(ayarlar, "kayip"); yaz("Açıklık kapandı"); return; }
     if (sonuc.tip === "acildi") {
       const yeni: Best = { s: sonuc.yildiz, t: +sonuc.sure.toFixed(2) };
       const oncekiVardi = kayit.bests[durum.level.n] !== undefined;
+      titret(ayarlar, "acildi");
       const rekor = rekorKaydet(kayit, durum.level.n, yeni);
       yaz(`${STAR_LABEL[sonuc.yildiz]} ${yildizYazisi(sonuc.yildiz)} ${sureYazisi(sonuc.sure)} sn` +
           (rekor && oncekiVardi ? ", rekor" : ""));
@@ -105,7 +107,7 @@ const oyun = dongu({
     if (bitti || panelAcik) { girdi.temizle(); return false; }
     dokunusIsle();
     const s = step(durum, dt);
-    if (s.tip === "sureDoldu") { yaz("Süre doldu"); return true; }
+    if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); yaz("Süre doldu"); return true; }
     if (s.tip === "bitti") {
       if (durum.asama === "crash") levelYukle(durum.level.n, true);
       else if (durum.level.n >= LEVEL_COUNT) { bitisGoster(); return false; }
@@ -154,11 +156,27 @@ ui.reset.addEventListener("click", e => {
 
 tercihleriIzle(() => { renk = renkleriOku(); azalt = hareketAzalt() || ayarlar.hareketAzalt; });
 
+// CSS geliştirme sunucusunda ayrı bir istekle gelir ve yavaş bağlantıda ilk okumaya
+// yetişmeyebilir. O durumda yedek palet devreye girer (theme.ts), ama gerçek değerler
+// hazır olur olmaz bir kez daha okunur ki tema değişkenleri esas kaynak kalsın.
+if (!renklerHazir()) {
+  let deneme = 0;
+  const tekrarOku = (): void => {
+    if (renklerHazir()) { renk = renkleriOku(); return; }
+    if (++deneme < 120) requestAnimationFrame(tekrarOku);
+  };
+  requestAnimationFrame(tekrarOku);
+  window.addEventListener("load", () => { if (renklerHazir()) renk = renkleriOku(); }, { once: true });
+}
+
 // ---- Ayarlar paneli --------------------------------------------------------
 function ayarPaneliAc(ilkAcilis = false): void {
   panelAcik = true;
   ui.desenKutu.checked = ayarlar.desenYumusat;
   ui.hareketKutu.checked = ayarlar.hareketAzalt;
+  ui.titresimKutu.checked = ayarlar.titresim;
+  // Cihaz titreşimi desteklemiyorsa (iOS Safari) seçeneği hiç gösterme.
+  ui.titresimSatir.hidden = !titresimVarMi();
   // Uyarı yalnızca ilk açılışta; sonrasında panel sade kalır.
   ui.uyari.textContent = ilkAcilis ? UYARI_METIN : "";
   ui.ayarPanel.hidden = false;
@@ -168,6 +186,7 @@ function ayarPaneliAc(ilkAcilis = false): void {
 function ayarlariUygula(): void {
   ayarlar.desenYumusat = ui.desenKutu.checked;
   ayarlar.hareketAzalt = ui.hareketKutu.checked;
+  ayarlar.titresim = ui.titresimKutu.checked;
   azalt = hareketAzalt() || ayarlar.hareketAzalt;
   ayarlariYaz(ayarlar);
   sonFlas = -1;   // flaş katmanı yeni ayara göre tazelensin
@@ -176,6 +195,7 @@ function ayarlariUygula(): void {
 ui.ayarAc.addEventListener("click", e => { e.stopPropagation(); if (!bitti) ayarPaneliAc(); ui.ayarAc.blur(); });
 ui.desenKutu.addEventListener("change", ayarlariUygula);
 ui.hareketKutu.addEventListener("change", ayarlariUygula);
+ui.titresimKutu.addEventListener("change", () => { ayarlariUygula(); titret(ayarlar, "kilit"); });
 ui.ayarKapat.addEventListener("click", () => {
   ayarlariUygula();
   ayarlar.uyariGoruldu = true;

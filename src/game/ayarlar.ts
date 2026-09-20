@@ -14,11 +14,13 @@ export interface Ayarlar {
   desenYumusat: boolean;
   /** Sistem tercihinden bağımsız olarak sarsıntı ve flaşı kapatır. */
   hareketAzalt: boolean;
+  /** Kilitte ve kayıpta telefon titreşimi. */
+  titresim: boolean;
   /** İlk açılış uyarısı gösterildi mi. */
   uyariGoruldu: boolean;
 }
 
-const varsayilan = (): Ayarlar => ({ desenYumusat: false, hareketAzalt: false, uyariGoruldu: false });
+const varsayilan = (): Ayarlar => ({ desenYumusat: false, hareketAzalt: false, titresim: true, uyariGoruldu: false });
 
 export function ayarlariOku(): Ayarlar {
   try {
@@ -28,6 +30,7 @@ export function ayarlariOku(): Ayarlar {
     const a = varsayilan();
     if (typeof o.desenYumusat === "boolean") a.desenYumusat = o.desenYumusat;
     if (typeof o.hareketAzalt === "boolean") a.hareketAzalt = o.hareketAzalt;
+    if (typeof o.titresim === "boolean") a.titresim = o.titresim;
     if (typeof o.uyariGoruldu === "boolean") a.uyariGoruldu = o.uyariGoruldu;
     return a;
   } catch {
@@ -41,6 +44,20 @@ export function ayarlariYaz(a: Ayarlar): void {
 
 /** Kilitsiz halkaların çizim opaklığı. */
 export const halkaOpakligi = (a: Ayarlar): number => a.desenYumusat ? 0.25 : 0.4;
+
+/**
+ * Telefon titreşimi destekleniyor mu? iOS Safari `navigator.vibrate` sağlamaz;
+ * orada ayarı göstermenin anlamı yok.
+ */
+export const titresimVarMi = (): boolean =>
+  typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+
+/** Kilitte kısa, kayıpta belirgin. Ayar kapalıysa ya da cihaz desteklemiyorsa sessiz. */
+export function titret(a: Ayarlar, tur: "kilit" | "kayip" | "acildi"): void {
+  if (!a.titresim || !titresimVarMi()) return;
+  const desen = tur === "kilit" ? 12 : tur === "acildi" ? [18, 40, 18] : 45;
+  try { navigator.vibrate(desen); } catch { /* titreşim olmadan da oynanır */ }
+}
 
 export const UYARI_BASLIK = "Başlamadan önce";
 export const UYARI_METIN =

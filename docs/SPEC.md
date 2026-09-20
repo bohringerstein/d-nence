@@ -136,6 +136,8 @@ Oyun alanında çizim sırası:
 4. İşaretler: baştan kilitli halkada küçük kare, yön değiştiren halkada kırmızı nokta (boşluğun tam karşısında).
 5. Top.
 
+**Renklerin tek kaynağı CSS'tir**, canvas onları hesaplanmış değerlerden okur. Ancak okuma **her zaman yedeğe düşebilmelidir**: canvas'ta `ctx.fillStyle = ""` hata vermez, sessizce yok sayılır ve önceki değer (varsayılan siyah) kalır. CSS henüz uygulanmamışken renkler okunursa tüm oyun siyah beyaz çizilir — telefonda tam olarak bu oldu, çünkü geliştirme sunucusunda CSS ayrı bir istekle geliyor ve yavaş bağlantıda ilk okumaya yetişmiyordu. Bu yüzden `src/game/theme.ts` aynı paletin bir kopyasını yedek olarak taşır (bir test ikisinin aynı kaldığını denetler) ve CSS hazır olur olmaz renkler bir kez daha okunur.
+
 **Renkler** (açık ve koyu tema, sistem ayarına göre):
 
 | Belirteç | Açık | Koyu |
@@ -186,6 +188,8 @@ Bunun üzerine iki şey zorunludur:
 2. **"Deseni yumuşat" ayarı** kilitsiz halkaların opaklığını 0,40'tan 0,25'e indirir. Ölçülen etki: açık temada halka/zemin kontrastı 0,40 → **0,24** (eşiğin altına iner), koyu temada 0,82 → 0,69. Koyu temada eşiğin altına inmek halkaları oynanamayacak kadar görünmez yapardı; açık-üstüne-koyu çizim doğası gereği yüksek kontrastlıdır ve bu dürüstçe kabul edilir.
 
 Ayrıca **"Hareketi azalt"** ayarı, sistem tercihinden bağımsız olarak sarsıntıyı ve flaşı kapatır (ikisinden biri açıksa kapalıdır).
+
+**Titreşim.** Kilitte kısa (12 ms), kayıpta belirgin (45 ms), kasa açıldığında çok darbeli bir desen. Varsayılan açık, ayarlardan kapatılabilir. Hareket azaltmadan bağımsızdır: biri görsel hareket, diğeri dokunsal geri bildirimdir. `navigator.vibrate` desteklenmiyorsa (iOS Safari) seçenek hiç gösterilmez ve çağrı sessizce geçilir.
 
 ## 8. Level sistemi
 
@@ -284,7 +288,7 @@ Mağaza sürümü istenirse ileride Capacitor ile paketlenir; çekirdek kurallar
 
 Bunlar ilk sürümde yapılmaz, ancak mimari bunlara engel olmamalıdır:
 - Level seçim ekranı ve yıldız özeti.
-- Ses efektleri ve titreşim (kilit, kayıp, açılış).
+- Ses efektleri. *(Titreşim 7. bölümde uygulandı.)*
 - Uygulama mağazası paketi (Capacitor).
 - Günlük meydan okuma leveli.
 - Oynanış istatistikleri (hangi levelde kaç deneme). Bu veri, simülasyondaki insan modelinin gerçek oyuncularla kalibre edilmesine yarar.
