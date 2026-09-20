@@ -29,7 +29,7 @@ Claude Code, `CLAUDE.md` dosyasını her oturumda kendiliğinden okur. Bu yüzde
 | `tools/sync-prototype.ts` | Çekirdeği ve level tablosunu prototipe gömer. |
 | `tools/make-icons.ts` | Uygulama simgelerini üretir (oyunun kendi geometrisinden). |
 | `public/` | Simgeler. `npm run icons` ile üretilir, elle düzenlenmez. |
-| `data/levels.json` | Hazır 60 level. |
+| `data/levels.json` | Hazır 1000 bölüm. |
 
 ## Oyunu nasıl oynarsın
 
@@ -86,7 +86,7 @@ içinde mi, yıldız dağılımı makul mü. Sorun varsa hangi levelde ne olduğ
 ```
 npm test
 ```
-Çekirdek kuralların birim testleri (açı hesabı, açıklık, yıldız) ve 60 levelin tablo testi.
+Çekirdek kuralların birim testleri (açı hesabı, açıklık, yıldız, girdi zamanlaması) ve 1000 bölümün tablo testi.
 
 ```
 npm run gen
