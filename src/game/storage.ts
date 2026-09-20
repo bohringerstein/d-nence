@@ -5,7 +5,9 @@
 import { LEVEL_COUNT, isBetter } from "../core/index.ts";
 import type { Best, Stars } from "../core/index.ts";
 
-const KEY = "kasa:v1";
+const KEY = "donence:v1";
+/** Oyunun eski adıyla yazılmış kayıt. Bulunursa okunur ve yeni anahtara taşınır. */
+const ESKI_KEY = "kasa:v1";
 const SURUM = 1;
 
 export interface Kayit {
@@ -45,9 +47,12 @@ function ayikla(ham: unknown): Kayit {
 
 export function oku(): Kayit {
   try {
-    const ham = localStorage.getItem(KEY);
+    // Oyun "Kasa" adıyla oynanmışsa kayıt eski anahtardadır; taşınır, ilerleme kaybolmaz.
+    const ham = localStorage.getItem(KEY) ?? localStorage.getItem(ESKI_KEY);
     if (!ham) return bos();
-    return ayikla(JSON.parse(ham));
+    const k = ayikla(JSON.parse(ham));
+    if (!localStorage.getItem(KEY)) yaz(k);
+    return k;
   } catch {
     // Gizli sekmede, site verisi engelliyken ya da bozuk JSON'da buraya düşer.
     return bos();

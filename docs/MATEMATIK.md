@@ -1,4 +1,4 @@
-# Kasa: oyunun matematiği
+# Dönence: oyunun matematiği
 
 Bu belge oyunun sayısal temelini türetir ve hangi sınırların nereden geldiğini gösterir.
 Şartname (`SPEC.md`) *ne olacağını* söyler; burası *neden öyle olduğunu* söyler.

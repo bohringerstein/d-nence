@@ -1,4 +1,4 @@
-// reference/kasa.html tek dosya olmak zorunda (çift tıklayıp açılabilsin diye), ama içindeki
+// reference/donence.html tek dosya olmak zorunda (çift tıklayıp açılabilsin diye), ama içindeki
 // çekirdek kod ve level tablosu kopya olmamalı. Bu betik ikisini de kaynaklarından enjekte eder:
 // çekirdek src/core/ dizininden esbuild ile paketlenir, tablo data/levels.json'dan okunur.
 //
@@ -10,7 +10,7 @@ import { build } from "esbuild";
 import * as core from "../src/core/index.ts";
 
 const kok = path.join(import.meta.dirname, "..");
-const HTML = path.join(kok, "reference", "kasa.html");
+const HTML = path.join(kok, "reference", "donence.html");
 const CORE_BAS = "// >>> core.js (tools/sync-prototype.ts ile gömülür, elle düzenleme)";
 const CORE_SON = "// <<< core.js";
 
@@ -25,7 +25,7 @@ async function bundleCore(): Promise<string> {
     entryPoints: [path.join(kok, "src", "core", "index.ts")],
     bundle: true,
     format: "iife",
-    globalName: "KasaCore",
+    globalName: "DonenceCore",
     target: "es2022",
     charset: "utf8",
     write: false,
@@ -35,7 +35,7 @@ async function bundleCore(): Promise<string> {
   // Prototipin oyun kodu çıplak isimler kullanır (TAU, newMask, ...): paketin dışa açtıklarını
   // aynı isimlerle tanımla. Liste modülün kendisinden okunur, elle tutulmaz.
   const isimler = Object.keys(core).sort();
-  const dagit = "const { " + isimler.join(", ") + " } = KasaCore;";
+  const dagit = "const { " + isimler.join(", ") + " } = DonenceCore;";
   return js + "\n" + dagit;
 }
 
@@ -47,12 +47,12 @@ const yeni = blok(
 
 if (process.argv.includes("--check")) {
   if (yeni !== html) {
-    console.error("reference/kasa.html güncel değil. Çalıştır: npm run sync");
+    console.error("reference/donence.html güncel değil. Çalıştır: npm run sync");
     process.exit(1);
   }
-  console.log("reference/kasa.html güncel");
+  console.log("reference/donence.html güncel");
 } else {
   fs.writeFileSync(HTML, yeni);
   const n = (JSON.parse(levels) as { levels: unknown[] }).levels.length;
-  console.log("reference/kasa.html güncellendi (çekirdek + " + n + " level)");
+  console.log("reference/donence.html güncellendi (çekirdek + " + n + " level)");
 }

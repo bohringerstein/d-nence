@@ -7,7 +7,9 @@
 // kontrast (riskli >0,4). Deseni küçük tutan şey görüş açısı: telefonda sadece 11°.
 // Yine de bir uyarı ve bir yumuşatma seçeneği sunuyoruz.
 
-const KEY = "kasa:ayarlar:v1";
+const KEY = "donence:ayarlar:v1";
+/** Oyunun eski adıyla yazılmış ayarlar. Bulunursa okunur ve yeni anahtara taşınır. */
+const ESKI_KEY = "kasa:ayarlar:v1";
 
 export interface Ayarlar {
   /** Kilitsiz halkaların opaklığı düşürülür; en yüksek kontrastlı durumu hedefler. */
@@ -24,7 +26,7 @@ const varsayilan = (): Ayarlar => ({ desenYumusat: false, hareketAzalt: false, t
 
 export function ayarlariOku(): Ayarlar {
   try {
-    const ham = localStorage.getItem(KEY);
+    const ham = localStorage.getItem(KEY) ?? localStorage.getItem(ESKI_KEY);
     if (!ham) return varsayilan();
     const o = JSON.parse(ham) as Record<string, unknown>;
     const a = varsayilan();
@@ -32,6 +34,7 @@ export function ayarlariOku(): Ayarlar {
     if (typeof o.hareketAzalt === "boolean") a.hareketAzalt = o.hareketAzalt;
     if (typeof o.titresim === "boolean") a.titresim = o.titresim;
     if (typeof o.uyariGoruldu === "boolean") a.uyariGoruldu = o.uyariGoruldu;
+    if (!localStorage.getItem(KEY)) ayarlariYaz(a);
     return a;
   } catch {
     return varsayilan();

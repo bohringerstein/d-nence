@@ -146,7 +146,7 @@ function simgeSvg(): string {
   const yollar = HALKALAR
     .map(h => `<path d="${yay(S * h.yaricap, h.bosluk, h.genislik)}" fill="none" stroke="#DCE6EA" stroke-width="${(S * 0.075).toFixed(2)}" stroke-linecap="round"/>`)
     .join("\n  ");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${S} ${S}" role="img" aria-label="Kasa">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${S} ${S}" role="img" aria-label="Dönence">
   <rect width="${S}" height="${S}" rx="${S * 0.22}" fill="#13232B"/>
   ${yollar}
   <circle cx="${m}" cy="${m}" r="${(S * 0.115 * 0.44).toFixed(2)}" fill="#FFC93C"/>

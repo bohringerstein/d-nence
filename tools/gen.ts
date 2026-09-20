@@ -1,4 +1,4 @@
-// Kasa level üretici. Kullanım:
+// Dönence level üretici. Kullanım:
 //   npm run gen           -> data/levels.json dosyasını yeniden üretir (sabit tohum, her seferinde aynı sonuç)
 //   npm run verify        -> mevcut tabloyu denetler
 //   npm run verify:full   -> üstüne determinizmi de sınar

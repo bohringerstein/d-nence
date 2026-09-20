@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-// Kasa, telefonda "ana ekrana ekle" ile kurulabilen bir web uygulaması olarak yayınlanır.
+// Dönence, telefonda "ana ekrana ekle" ile kurulabilen bir web uygulaması olarak yayınlanır.
 // Mağaza sürümü istenirse ileride Capacitor ile paketlenir; bu yüzden oyun kodu DOM'a
 // bağımlı katmanlarla (src/game) çekirdek kurallardan (src/core) ayrı tutulur.
 export default defineConfig({
@@ -25,8 +25,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["apple-touch-icon.png", "icon.svg"],
       manifest: {
-        name: "Kasa",
-        short_name: "Kasa",
+        name: "Dönence",
+        short_name: "Dönence",
         description: "Tek dokunuşla oynanan, level tabanlı bir kasa açma oyunu.",
         lang: "tr",
         dir: "ltr",

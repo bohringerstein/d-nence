@@ -1,10 +1,10 @@
-# Kasa: Teknik Şartname
+# Dönence: Teknik Şartname
 
-Bu belge oyunun nasıl çalışması gerektiğini tanımlar. Çalışan bir referans sürüm `reference/kasa.html` içinde bulunur. Belge ile referans çelişirse bu belge geçerlidir; belirsiz kalan her konuda referans sürümün davranışı esas alınır.
+Bu belge oyunun nasıl çalışması gerektiğini tanımlar. Çalışan bir referans sürüm `reference/donence.html` içinde bulunur. Belge ile referans çelişirse bu belge geçerlidir; belirsiz kalan her konuda referans sürümün davranışı esas alınır.
 
 ## 1. Oyunun özeti
 
-Kasa, tek dokunuşla oynanan, level tabanlı, 2 boyutlu bir mobil oyundur. Ekranın ortasında bir top ve etrafında iç içe dönen 2 ila 6 halka vardır. Her halkada bir (bazen iki) boşluk bulunur.
+Dönence, tek dokunuşla oynanan, level tabanlı, 2 boyutlu bir mobil oyundur. Ekranın ortasında bir top ve etrafında iç içe dönen 2 ila 6 halka vardır. Her halkada bir (bazen iki) boşluk bulunur.
 
 Oyuncu ekrana her dokunduğunda, dıştan içe doğru sıradaki dönen halka olduğu yerde kilitlenir. Kilitli halkaların boşluklarının ortak kesişimi, ekranda sarı bir kama olarak görünen **açıklığı** oluşturur. Her yeni kilit bu açıklığı ancak daraltabilir. Açıklık topun geçemeyeceği kadar daralırsa oyuncu kaybeder. Tüm halkalar kilitlenince top açıklığın ortasından dışarı fırlar ve level tamamlanır.
 
@@ -128,7 +128,7 @@ Durumlar: `idle` (oynanıyor), `fire` (top fırlıyor), `crash` (kayıp).
 
 Dikey düzen, yukarıdan aşağıya:
 
-1. **Üst çubuk:** solda "Kasa", ortada kalan süre (0,1 sn hassasiyet, virgülle), sağda "Level N" (patron levelinde "N, patron").
+1. **Üst çubuk:** solda "Dönence", ortada kalan süre (0,1 sn hassasiyet, virgülle), sağda "Level N" (patron levelinde "N, patron").
 2. **Süre çubuğu:** kalan süre oranında dolu ince çubuk. Son %25'te çubuk ve sayaç kırmızıya döner.
 3. **Oyun alanı:** kalan tüm alan.
 4. **Alt çubuk:** solda ipucu/durum metni, sağda "Baştan başla" düğmesi.
@@ -174,7 +174,7 @@ Yazı tipi: Fredoka (400 ve 600), yedek olarak sistem sans-serif. Tüm metinler 
 
 **Işığa duyarlılık.** Oyunun görsel uyaranı uluslararası rehberlerdeki eşiklerle karşılaştırıldı (telefon: 7 cm ekran, 32 cm mesafe).
 
-| Ölçüt | Rehber eşiği | Kasa | Sonuç |
+| Ölçüt | Rehber eşiği | Dönence | Sonuç |
 |---|---|---|---|
 | Yanıp sönme sıklığı | saniyede 3'ten fazla | en kötü hâlde 1,1 | eşiğin çok altında |
 | Flaş şiddeti | %10 parlaklık sıçraması | %18 opaklık, 0,5 sn'de sönüyor | sınırda, sıklık düşük |
@@ -264,7 +264,7 @@ npm run gen          # data/levels.json'u yeniden üretir
 npm run verify       # mevcut tabloyu denetler; sorun varsa 1 koduyla çıkar
 npm run verify:full  # üstüne determinizmi de sınar (yeniden üretim birebir aynı dosyayı vermeli)
 npm test             # çekirdek birim testleri + level tablosu testleri
-npm run sync         # çekirdeği ve tabloyu reference/kasa.html içine gömer
+npm run sync         # çekirdeği ve tabloyu reference/donence.html içine gömer
 npm run check        # hepsi bir arada
 ```
 
@@ -276,7 +276,7 @@ halkaların dönüşlerinin görülebilmesi, ve ustalık referansının leveller
 
 **Kural:** oyunun hareket, geometri veya açıklık kurallarında yapılan her değişiklikten sonra `src/core/` güncellenmeli, tablo yeniden üretilmeli ve `npm run check` geçmelidir. Oyun kodu çekirdek mantığı kendi içinde kopyalamamalıdır: açıklık maskesi, en büyük açıklık, geçiş eşiği (`NEED_PASS`) ve yıldız kuralı yalnızca `src/core/` içinde yaşar. `src/core/` DOM'a, dosya sistemine ya da herhangi bir ortama bağımlı değildir; bu yüzden hem tarayıcıda hem Node'da aynı kodu çalıştırır.
 
-`reference/kasa.html` tek dosya olmak zorunda olduğu için çekirdeği ve tabloyu içine gömer, ama gömme işini `tools/sync-prototype.ts` yapar (esbuild ile paketler); o blok elle düzenlenmez ve `npm run check` güncelliğini denetler.
+`reference/donence.html` tek dosya olmak zorunda olduğu için çekirdeği ve tabloyu içine gömer, ama gömme işini `tools/sync-prototype.ts` yapar (esbuild ile paketler); o blok elle düzenlenmez ve `npm run check` güncelliğini denetler.
 
 ## 9. Kayıt
 
@@ -302,7 +302,7 @@ Bir sürüm ancak aşağıdakilerin hepsi sağlanınca tamam sayılır:
 
 Oyun, telefona "ana ekrana ekle" ile kurulabilen bir web uygulaması (PWA) olarak dağıtılır.
 
-- **Manifest:** `name` "Kasa", `display` `standalone`, `orientation` `portrait`, `start_url` ve `scope` göreli (`.`) — oyun bir alan adının kökünde de alt klasörde de çalışır. Açılış ekranı `#13232B`, simgenin zeminiyle aynı.
+- **Manifest:** `name` "Dönence", `display` `standalone`, `orientation` `portrait`, `start_url` ve `scope` göreli (`.`) — oyun bir alan adının kökünde de alt klasörde de çalışır. Açılış ekranı `#13232B`, simgenin zeminiyle aynı.
 - **Simgeler:** 192 ve 512 piksel, ayrıca Android'in kendi şekline kırptığı `maskable` 512 ve iOS için `apple-touch-icon`. `tools/make-icons.ts` bunları oyunun kendi geometrisinden (`src/core` oranları) üretir ve PNG'yi doğrudan kodlar; çizim kütüphanesi bağımlılığı yoktur. `public/` elle düzenlenmez.
 - **Çevrimdışı:** tüm derleme çıktısı servis çalışanıyla önbelleğe alınır. Fredoka yazı tipi Google Fonts'tan geldiği için ayrıca çalışma zamanı önbelleğine alınır, böylece çevrimdışıyken de doğru yazı tipi görünür.
 - **Güncelleme:** `autoUpdate`; yeni sürüm sessizce kurulur, oyuncuya sorulmaz.

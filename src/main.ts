@@ -1,4 +1,4 @@
-// Kasa: uygulamanın giriş noktası. Parçaları birbirine bağlar, kural içermez.
+// Dönence: uygulamanın giriş noktası. Parçaları birbirine bağlar, kural içermez.
 import "./styles.css";
 import { LEVEL_COUNT, validateTable, STAR_LABEL } from "./core/index.ts";
 import type { LevelTable, Best } from "./core/index.ts";
@@ -28,7 +28,7 @@ if (!hedef) throw new Error("#app bulunamadı");
 // Tablo bozuksa sessizce garip bir oyun açmak yerine durumu söyle.
 const semaHatalari = validateTable(tablo);
 if (semaHatalari.length) {
-  hedef.innerHTML = `<main style="padding:24px"><h1>Kasa</h1>
+  hedef.innerHTML = `<main style="padding:24px"><h1>Dönence</h1>
     <p>Level tablosu okunamadı. <code>npm run verify</code> çalıştırın.</p>
     <ul>${semaHatalari.slice(0, 10).map(h => `<li>${h}</li>`).join("")}</ul></main>`;
   throw new Error("level tablosu geçersiz: " + semaHatalari.length + " sorun");
@@ -140,7 +140,7 @@ function bitisGoster(): void {
     `${LEVEL_COUNT} kasanın hepsini açtın. ${b} levelde toplam ${y} yıldız topladın` +
     (y < b * 3 ? `; ${b * 3} yıldızın tamamı için levelleri daha temiz açman gerek.` : ". Hepsi temiz.");
   ui.bitis.hidden = false;
-  ui.bitisDugme.focus();
+  ui.bitisDugme.focus({ preventScroll: true });
 }
 
 ui.bitisDugme.addEventListener("click", () => {
@@ -184,7 +184,9 @@ function ayarPaneliAc(): void {
   ui.titresimSatir.hidden = !titresimVarMi();
   ui.uyari.textContent = "";
   ui.ayarPanel.hidden = false;
-  ui.ayarKapat.focus();
+  // preventScroll şart: odaklanan düğme kutunun ALTINDA olduğu için tarayıcı onu
+  // görünür kılmak adına kutuyu en aşağı kaydırıyor ve panel sondan açılıyordu.
+  ui.ayarKapat.focus({ preventScroll: true });
 }
 
 function ayarlariUygula(): void {
@@ -203,8 +205,9 @@ function nasilAc(): void {
   panelAcik = true;
   ui.ayarPanel.hidden = true;
   ui.nasil.hidden = false;
+  // Önce odak (kaydırmadan), sonra başa sar: ters sırada tarayıcı kutuyu aşağı kaydırıyor.
+  ui.nasilKapat.focus({ preventScroll: true });
   ui.nasilIcerik.scrollTop = 0;
-  ui.nasilKapat.focus();
 }
 
 ui.nasilAc.addEventListener("click", () => { ayarlariUygula(); nasilAc(); });

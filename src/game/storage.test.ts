@@ -114,3 +114,36 @@ test("toplam yıldız ve bitirilen level sayısı", () => {
   assert.equal(toplamYildiz(k), 6);
   assert.equal(bitirilenLevel(k), 3);
 });
+
+// ---- Eski ada ait kayıt taşınıyor mu ----------------------------------------
+// Oyun "Kasa" adıyla yayındayken oynayanların ilerlemesi, ad "Dönence" olunca
+// kaybolmamalı. Eski anahtar okunur ve içerik yeni anahtara yazılır.
+const ESKI_KEY = "kasa:v1";
+
+test("eski addan kalan kayıt okunuyor ve yeni anahtara taşınıyor", () => {
+  depo.temizle();
+  depo.setItem(ESKI_KEY, JSON.stringify({ surum: 1, level: 37, bests: { 5: { s: 3, t: 4.1 } } }));
+
+  const k = oku();
+  assert.equal(k.level, 37, "eski kayıttaki level okunmalı");
+  assert.deepEqual(k.bests[5], { s: 3, t: 4.1 }, "eski rekorlar korunmalı");
+
+  const yeni = depo.getItem("donence:v1");
+  assert.ok(yeni, "kayıt yeni anahtara yazılmalı");
+  assert.equal(JSON.parse(yeni!).level, 37);
+});
+
+test("yeni anahtar varsa eski yok sayılır", () => {
+  depo.temizle();
+  depo.setItem(ESKI_KEY, JSON.stringify({ surum: 1, level: 5, bests: {} }));
+  depo.setItem("donence:v1", JSON.stringify({ surum: 1, level: 200, bests: {} }));
+  assert.equal(oku().level, 200, "güncel kayıt kazanmalı");
+});
+
+test("eski kayıt da doğrulamadan geçiyor", () => {
+  depo.temizle();
+  depo.setItem(ESKI_KEY, JSON.stringify({ surum: 1, level: 99999, bests: { 1: { s: 7, t: -1 } } }));
+  const k = oku();
+  assert.equal(k.level, 1, "aralık dışı level eski kayıtta da yok sayılmalı");
+  assert.deepEqual(k.bests, {}, "geçersiz rekor eski kayıtta da elenmeli");
+});

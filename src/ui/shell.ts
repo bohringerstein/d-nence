@@ -29,7 +29,7 @@ export interface Kabuk {
 const HTML = `
 <div class="app">
   <header>
-    <h1>Kasa</h1>
+    <h1>Dönence</h1>
     <span class="clock" id="clock" aria-label="Kalan süre">0,0</span>
     <div class="lvl">Level <b id="lvl">1</b></div>
   </header>

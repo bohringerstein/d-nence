@@ -1,8 +1,8 @@
 {
-  "name": "kasa",
+  "name": "donence",
   "version": "0.1.0",
   "private": true,
-  "description": "Kasa: tek dokunusla oynanan, level tabanli 2B mobil oyun",
+  "description": "Donence: tek dokunusla oynanan, level tabanli 2B mobil oyun",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -17,7 +17,7 @@
     "icons": "node tools/make-icons.ts"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.6"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",

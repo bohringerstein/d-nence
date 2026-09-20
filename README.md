@@ -1,6 +1,6 @@
-# Kasa: proje klasörü
+# Dönence: proje klasörü
 
-Bu klasör, Kasa oyununu Claude Code ile geliştirmek için hazırlandı.
+Bu klasör, Dönence oyununu Claude Code ile geliştirmek için hazırlandı.
 
 ## Nasıl başlarsın
 
@@ -19,7 +19,7 @@ Claude Code, `CLAUDE.md` dosyasını her oturumda kendiliğinden okur. Bu yüzde
 | `CLAUDE.md` | Claude Code'un proje yönergesi: kurallar, çalışma planı, seninle nasıl iletişim kuracağı. |
 | `docs/SPEC.md` | Oyunun tam teknik şartnamesi. |
 | `docs/MATEMATIK.md` | Oyunun sayısal temeli: formüllerin türetilmesi ve sınırların nereden geldiği. |
-| `reference/kasa.html` | Çalışan prototip. Çift tıklayıp tarayıcıda oynayabilirsin. |
+| `reference/donence.html` | Çalışan prototip. Çift tıklayıp tarayıcıda oynayabilirsin. |
 | `src/core/` | Oyunun kuralları: geometri, halka hareketi, açıklık, yıldız (TypeScript). Tek kaynak budur. |
 | `src/game/` | Oyun katmanı: durum, döngü, girdi, çizim, kayıt, ipuçları, tema. |
 | `src/ui/` | Ekran düzeni. |
@@ -44,11 +44,11 @@ Ardından tarayıcıda `http://localhost:5173` adresini aç. Telefonundan deneme
 `npm run dev -- --host` yaz; verdiği `Network` adresini telefonun tarayıcısına gir
 (bilgisayarla aynı Wi-Fi ağında olman gerek).
 
-`reference/kasa.html` eski prototiptir; yan yana karşılaştırmak için duruyor, çift tıklayıp açabilirsin.
+`reference/donence.html` eski prototiptir; yan yana karşılaştırmak için duruyor, çift tıklayıp açabilirsin.
 
 ## Telefona uygulama gibi kurmak
 
-Kasa bir PWA'dır: mağazaya gerek kalmadan telefona kurulur ve **çevrimdışı çalışır**.
+Dönence bir PWA'dır: mağazaya gerek kalmadan telefona kurulur ve **çevrimdışı çalışır**.
 
 ```
 npm run build
@@ -98,3 +98,15 @@ Bunu çalıştırdıktan sonra `npm run sync` ile prototipi de güncelle.
 npm run build
 ```
 Yayına hazır sürümü `dist` klasörüne üretir (servis çalışanı ve simgeler dahil).
+
+## Yayın (Vercel)
+
+`vercel.json` depoda: Vercel derlemeden önce **`npm run check`** çalıştırır. Testler,
+tip denetimi ya da 1000 bölümün doğrulaması geçmezse **yayına çıkmaz**.
+
+```
+NODE_OPTIONS=--experimental-strip-types npm run check && npm run build
+```
+
+`NODE_OPTIONS` gerekli çünkü araçlar TypeScript dosyalarını doğrudan çalıştırıyor;
+Node 22.18 ve sonrasında bu zaten varsayılan, bayrak eski sürümler için güvence.

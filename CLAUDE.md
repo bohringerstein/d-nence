@@ -1,12 +1,12 @@
-# Kasa oyunu: Claude Code için proje yönergesi
+# Dönence oyunu: Claude Code için proje yönergesi
 
-Bu projede tek dokunuşla oynanan, level tabanlı, 2 boyutlu bir mobil oyun olan **Kasa**'yı üretime hazır hale getiriyoruz. Oyunun çalışan bir prototipi var; görevin onu temiz, test edilmiş ve bakımı kolay bir projeye dönüştürmek.
+Bu projede tek dokunuşla oynanan, level tabanlı, 2 boyutlu bir mobil oyun olan **Dönence**'yi üretime hazır hale getiriyoruz. Oyunun çalışan bir prototipi var; görevin onu temiz, test edilmiş ve bakımı kolay bir projeye dönüştürmek.
 
 ## Önce oku
 
 1. `docs/SPEC.md`: oyunun tüm kuralları, formülleri ve kabul ölçütleri. Tek doğru kaynak budur.
 2. `docs/MATEMATIK.md`: formüllerin türetilmesi. Zorluk, boşluk genişliği ya da geometriye dokunmadan önce oku.
-3. `reference/kasa.html`: çalışan prototip. Tarayıcıda açılabilir. Şartnamede açıkça yazmayan davranışlarda bunu örnek al.
+3. `reference/donence.html`: çalışan prototip. Tarayıcıda açılabilir. Şartnamede açıkça yazmayan davranışlarda bunu örnek al.
 4. `src/core/`: halka hareketi, geometri, açıklık hesabı ve yıldız kuralı (TypeScript). **Tek kaynak budur.** Oyun da level üretici de buradan beslenir.
 5. `tools/gen.ts`: level üretici ve doğrulayıcı.
 6. `src/core/*.test.ts`: çekirdek ve tablo testleri.
@@ -31,7 +31,7 @@ Hedef platformu Kader'e sor. Cevap yoksa varsayılan: **web + PWA** (telefona "a
 - Fizik güncellemesi sabit 1/120 sn adımla yapılır.
 - Oyun içinde rastgele level üretme; `data/levels.json`'u oku.
 - Çekirdek kurallarda her değişiklikten sonra tabloyu yeniden üret (`npm run gen`) ve **`npm run check`** çalıştır (tip denetimi + testler + tablo denetimi + prototip güncelliği). Geçmezse işi bitmiş sayma.
-- `reference/kasa.html` içindeki çekirdek ve level blokları elle düzenlenmez; `npm run sync` çekirdeği `src/core/` dizininden esbuild ile paketleyip gömer.
+- `reference/donence.html` içindeki çekirdek ve level blokları elle düzenlenmez; `npm run sync` çekirdeği `src/core/` dizininden esbuild ile paketleyip gömer.
 - Açıklık maskesi, en büyük açıklık, geçiş eşiği (`NEED_PASS`) ve yıldız kuralının ikinci bir kopyası hiçbir yerde olmayacak.
 - Bir level yüklenirken tüm zamanlayıcıları ve durum değerlerini sıfırla (prototipteki donma hatası buradan çıkmıştı).
 

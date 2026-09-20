@@ -41,7 +41,7 @@ Tüm halkalar kilitlenince kasa açılır.</p>
 genişse o kadar yıldız alırsın. Hızlı bitirmek tek başına yıldız kazandırmaz; süre yalnızca
 eşit yıldızda rekoru belirler.</p>
 
-<p class="uyari">Kasa'da iç içe dönen halkalar var. Işığa duyarlı epilepsi ya da desenlerden
+<p class="uyari">Dönence'de iç içe dönen halkalar var. Işığa duyarlı epilepsi ya da desenlerden
 rahatsız olma geçmişin varsa, <b>Ayarlar</b>'dan &ldquo;Deseni yumuşat&rdquo; seçeneğini açabilir
 ve ara vererek oynayabilirsin.</p>
 `;
