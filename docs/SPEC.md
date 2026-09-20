@@ -231,11 +231,23 @@ Bir sürüm ancak aşağıdakilerin hepsi sağlanınca tamam sayılır:
 - [ ] Orta seviye bir telefonda 60 fps. *(Masaüstünde ölçüldü: en yoğun kare 1920×1000'de 6,2 ms, telefon ölçüsünde 1,9 ms — 16,7 ms bütçesinin %37 ve %11'i. Gerçek cihazda doğrulanmayı bekliyor: `npm run dev -- --host`.)*
 - [x] Açık ve koyu temada tüm öğeler okunabilir.
 
-## 11. Kapsam dışı (sonraki sürümler için fikirler)
+## 11. Yayın
+
+Oyun, telefona "ana ekrana ekle" ile kurulabilen bir web uygulaması (PWA) olarak dağıtılır.
+
+- **Manifest:** `name` "Kasa", `display` `standalone`, `orientation` `portrait`, `start_url` ve `scope` göreli (`.`) — oyun bir alan adının kökünde de alt klasörde de çalışır. Açılış ekranı `#13232B`, simgenin zeminiyle aynı.
+- **Simgeler:** 192 ve 512 piksel, ayrıca Android'in kendi şekline kırptığı `maskable` 512 ve iOS için `apple-touch-icon`. `tools/make-icons.ts` bunları oyunun kendi geometrisinden (`src/core` oranları) üretir ve PNG'yi doğrudan kodlar; çizim kütüphanesi bağımlılığı yoktur. `public/` elle düzenlenmez.
+- **Çevrimdışı:** tüm derleme çıktısı servis çalışanıyla önbelleğe alınır. Fredoka yazı tipi Google Fonts'tan geldiği için ayrıca çalışma zamanı önbelleğine alınır, böylece çevrimdışıyken de doğru yazı tipi görünür.
+- **Güncelleme:** `autoUpdate`; yeni sürüm sessizce kurulur, oyuncuya sorulmaz.
+- **Doğrulama:** `npm run build` sonrası `npm run preview`, ardından sunucu kapatılıp sayfa yeniden yüklenir. Oyun açılmalı ve hiçbir varlık ağdan gelmemelidir.
+
+Mağaza sürümü istenirse ileride Capacitor ile paketlenir; çekirdek kurallar (`src/core`) ortamdan bağımsız olduğu için bu mimariyi değiştirmez.
+
+## 12. Kapsam dışı (sonraki sürümler için fikirler)
 
 Bunlar ilk sürümde yapılmaz, ancak mimari bunlara engel olmamalıdır:
 - Level seçim ekranı ve yıldız özeti.
 - Ses efektleri ve titreşim (kilit, kayıp, açılış).
-- Uygulama mağazası paketi.
+- Uygulama mağazası paketi (Capacitor).
 - Günlük meydan okuma leveli.
 - Oynanış istatistikleri (hangi levelde kaç deneme). Bu veri, simülasyondaki insan modelinin gerçek oyuncularla kalibre edilmesine yarar.

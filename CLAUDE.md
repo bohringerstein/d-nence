@@ -45,4 +45,6 @@ Her aşamanın sonunda dur, Kader'e ne yaptığını ve nasıl deneyeceğini anl
 3. **Otomatik oynanış testi:** her levelin referans çözücüyle oyunun kendi döngüsü üzerinden bitirilebildiğini gösteren test.
    *Durum:* tamamlandı (`src/game/state.test.ts`). Referans çözücü `src/core/solver.ts` içinde tek kopya; üretici de testler de onu kullanır.
 4. **Cila:** tema, güvenli alanlar, hareket azaltma, performans, şartnamedeki kabul ölçütlerinin hepsi.
+   *Durum:* tamamlandı. Çizim maliyeti 11,0 → 6,2 ms; kontrast WCAG'a göre ölçülüp düzeltildi; düzen yedi ekran ölçüsünde sınandı. Geriye yalnızca gerçek telefonda 60 fps doğrulaması kaldı.
 5. **Yayın:** PWA ayarları (simge, çevrimdışı çalışma) ya da seçilen platformun paketi.
+   *Durum:* tamamlandı. Manifest, servis çalışanı ve simgeler yerinde; çevrimdışı çalıştığı sunucu kapatılarak doğrulandı. Simgeler `npm run icons` ile oyunun geometrisinden üretilir, `public/` elle düzenlenmez.

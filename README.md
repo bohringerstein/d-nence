@@ -26,6 +26,8 @@ Claude Code, `CLAUDE.md` dosyasını her oturumda kendiliğinden okur. Bu yüzde
 | `src/core/*.test.ts` | Çekirdek ve level tablosu testleri. |
 | `tools/gen.ts` | Level üretici ve doğrulayıcı. |
 | `tools/sync-prototype.ts` | Çekirdeği ve level tablosunu prototipe gömer. |
+| `tools/make-icons.ts` | Uygulama simgelerini üretir (oyunun kendi geometrisinden). |
+| `public/` | Simgeler. `npm run icons` ile üretilir, elle düzenlenmez. |
 | `data/levels.json` | Hazır 60 level. |
 
 ## Oyunu nasıl oynarsın
@@ -42,6 +44,28 @@ Ardından tarayıcıda `http://localhost:5173` adresini aç. Telefonundan deneme
 (bilgisayarla aynı Wi-Fi ağında olman gerek).
 
 `reference/kasa.html` eski prototiptir; yan yana karşılaştırmak için duruyor, çift tıklayıp açabilirsin.
+
+## Telefona uygulama gibi kurmak
+
+Kasa bir PWA'dır: mağazaya gerek kalmadan telefona kurulur ve **çevrimdışı çalışır**.
+
+```
+npm run build
+npm run preview -- --host
+```
+
+Verdiği `Network` adresini telefonun tarayıcısına gir (bilgisayarla aynı Wi-Fi ağında ol).
+Sonra:
+
+- **Android / Chrome:** menüden "Uygulamayı yükle" ya da "Ana ekrana ekle".
+- **iPhone / Safari:** paylaş düğmesi → "Ana Ekrana Ekle".
+
+Kurduktan sonra oyun tarayıcı çubuğu olmadan, kendi simgesiyle açılır ve internet
+olmadan da oynanır. Rekorların telefonda saklanır.
+
+> Not: `npm run preview` yalnızca senin ağında çalışır. Oyunu başkalarına açmak için
+> `dist` klasörünü herhangi bir statik site servisine (Netlify, Vercel, GitHub Pages)
+> yüklemen yeterli; başka bir kuruluma gerek yok.
 
 ## İşine yarayacak komutlar
 
@@ -68,3 +92,8 @@ npm run gen
 ```
 Level tablosunu yeniden üretir. Sabit tohumla çalışır: aynı kod her zaman aynı tabloyu verir.
 Bunu çalıştırdıktan sonra `npm run sync` ile prototipi de güncelle.
+
+```
+npm run build
+```
+Yayına hazır sürümü `dist` klasörüne üretir (servis çalışanı ve simgeler dahil).
