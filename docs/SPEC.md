@@ -12,6 +12,7 @@ Oyunun temel fikri şudur: her dokunuş öncekilerin sonucunu taşır. İlk kili
 
 Tasarım ilkeleri:
 - Tek kontrol (dokunma, boşluk ya da Enter tuşu). İkinci bir kontrol eklenmez.
+- **Dokunma alanı ekranın tamamıdır**, yalnızca oyun alanı değil. Üst çubuk, süre çubuğu ve alt çubuk da kilitler; dışarıda kalan tek şey düğmeler ve açık bir örtüdür. Bir dönem dinleyici yalnızca canvas'taydı ve çubuklar ölü bölgeydi: alt çubuk büyüyünce ölü bölge ekranın %29'una çıktı, üstelik tamamı telefonu tutan başparmağın durduğu yerdeydi — oyuncu kilitlemek için basıyor, hiçbir şey olmuyordu. Oyunun kendi açıklaması da ("Ekrana her dokunduğunda…") bunu vaat eder.
 - Zorluk yeni mekaniklerle değil, parametrelerle artar.
 - Kaybetmek hızlı ve adildir: 1 saniyeden kısa sürede level yeniden başlar.
 - Her level simülasyonla çözülebilirliği kanıtlanmış olarak gelir.
@@ -132,8 +133,9 @@ Dikey düzen, yukarıdan aşağıya:
    Ağırlık **sayaçtadır**: başlık künye tonunda ve küçük punto, sayaç en büyük öğe. Dördü de aynı puntodayken (başlık 24, sayaç 24, level 22,4 px) hiyerarşi okunmuyordu; oysa başlık hiç değişmez, sayaç oyunun tek dinamik sayısıdır.
 2. **Süre çubuğu:** kalan süre oranında dolu ince çubuk. Son %25'te çubuk ve sayaç kırmızıya döner.
 3. **Oyun alanı:** kalan tüm alan.
-4. **Alt çubuk:** ipucu/durum metni **tam genişlikte kendi satırında**, altında "Ayarlar" ve "Baştan başla" düğmeleri.
-   İpucu düğmelerle aynı satırı paylaştığında 360 piksellik telefonda kendisine 112 piksel kalıyordu ve metnin yarısı kırpılıyordu — oyunun kuralı öğrettiği tek yer bu satır, üstelik 100 patron levelinde de aynı şey oluyordu. İpucuna **iki satırlık yer sabit ayrılır**: tek/iki satır arasında gidip gelmek alt çubuğun yüksekliğini oynatıyor ve halkaları dikeyde zıplatıyordu. Dikey ekranda halka çapını genişlik sınırladığı için alt çubuğun büyümesi oyun alanından bir şey götürmez.
+4. **Alt çubuk:** ipucu/durum metni ve sağında yalnızca "Ayarlar" düğmesi. "Baştan başla" **ayarlar panelindedir**.
+   Üç şeyin birlikte durduğu bir alt çubuk işe yaramıyor. Önce ipucu iki düğmeyle aynı satırı paylaşıyordu ve 360 piksellik telefonda kendisine 112 piksel kalıyordu: metnin yarısı kırpılıyordu — oyunun kuralı öğrettiği tek yer burası, üstelik 100 patron levelinde de aynı şey oluyordu. İpucu kendi satırına alınınca kırpılma bitti ama çubuk 65 pikselden 121 piksele çıktı ve telefonda oyuncunun kilitlemek için bastığı yeri yuttu. Çözüm, çubuktan bir düğme çıkarmak oldu: "Baştan başla" Level 1'e döndüren **seyrek ve geri alınamaz** bir eylemdir, başparmağın durduğu sağ alt köşede durmamalıdır. Kalan tek düğmeyle ipucu aynı satıra rahatça sığar ve çubuk 64 piksele döner.
+   İpucuna **satır sayısı sabit** yer ayrılır (360 piksel ve üstünde iki, altında üç satır): satır sayısı oynarsa çubuğun yüksekliği de oynar ve halkalar dikeyde zıplar.
 
 Oyun alanında çizim sırası:
 1. Arka planda levelin numarası, büyük ve çok soluk (patron levelinde sarı). Punto `S × 0,5`'tir, ama metnin yarı genişliği en dış halkayı aşarsa oranla küçültülür — dört hanede ("1000") rakam hem halkaları hem temizlenen kutuyu taşıyordu. Rakam çizildikten hemen sonra merkezde yumuşak kenarlı bir delik silinir: gövdesi tam topun altından geçiyordu (1, 4, 7 gibi merkezden geçen rakamlarda, yani Level 1'de).

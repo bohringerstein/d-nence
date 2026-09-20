@@ -48,7 +48,8 @@ let bitti = false;
 let panelAcik = false;
 
 const tuval = tuvalKur(ui.canvas, () => { if (durum) cizVeYaz(); });
-const girdi = girdiBagla(ui.canvas);
+// Ekranın tamamı dokunma alanı: canvas'a bağlansaydı üst ve alt çubuk ölü bölge olurdu.
+const girdi = girdiBagla(ui.kok);
 
 // ---- Level yükleme: tek nesne toptan değişir, alan alan sıfırlama yok -------
 function levelYukle(n: number, denemeyiKoru = false): void {
@@ -152,11 +153,17 @@ ui.bitisDugme.addEventListener("click", () => {
   levelYukle(1);
 });
 
-ui.reset.addEventListener("click", e => {
-  e.stopPropagation();
+// "Baştan başla" artık ayarlar panelinde (bkz. ui/shell.ts): Level 1'e döndüren seyrek
+// bir eylem, alt çubukta başparmağın durduğu köşede durmamalı.
+ui.reset.addEventListener("click", () => {
+  ayarlariUygula();
+  ayarlar.uyariGoruldu = true;
+  ayarlariYaz(ayarlar);
+  ui.ayarPanel.hidden = true;
+  arkaKilit(false);
+  panelAcik = false;
   bitti = false;
   ui.bitis.hidden = true;
-  arkaKilit(false);
   bastanBasla(kayit);
   levelYukle(1);
   ui.reset.blur();   // sonraki Enter oyuna gitsin, düğmeye değil

@@ -78,6 +78,10 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+  /* Dokunuş artık ekranın tamamından alınıyor (game/input.ts), bu yüzden çift dokunuşla
+     yakınlaştırma yalnızca canvas'ta değil her yerde kapalı olmalı. "manipulation"
+     kaydırmayı bırakır: "Nasıl oynanır" kutusu kendi içinde kayabilmeli. */
+  touch-action: manipulation;
   /* Çentik ve ana ekran çubuğu (şartname 7. bölüm) */
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -161,22 +165,24 @@ canvas {
   .flas { display: none; }
 }
 
-/* İpucu kendi satırında, düğmeler altında. Eskiden üçü tek satırı paylaşıyordu ve
-   düğmeler sabit genişlikte olduğu için 360px'lik telefonda ipucuna 112px kalıyordu:
-   metnin yarısı kırpılıyordu. Oyunun kuralı öğrettiği tek yer bu satır ve 100 patron
-   levelinde de ("Çatal: Her halkada iki kapı var...") aynı şey oluyordu.
-   Maliyeti yok: halka çapı dikey ekranda genişlikle sınırlı, alt çubuk büyüyünce
-   küçülmüyor (kırılma noktası oyun alanı 367px'in altına inince). */
+/* Alt çubuk: ipucu + tek düğme, tek satır.
+   Eskiden ipucu İKİ düğmeyle aynı satırı paylaşıyordu ve onlar sabit genişlikte olduğu
+   için 360px'lik telefonda ipucuna 112px kalıyordu; metnin yarısı kırpılıyordu. Oyunun
+   kuralı öğrettiği tek yer bu satır ve 100 patron levelinde de aynı şey oluyordu.
+   Sonra ipucu kendi satırına alındı ama bu sefer alt çubuk 65 pikselden 121 piksele
+   çıktı — telefonda oyuncu halkayı kilitlemek için oraya basıyor, dokunuş boşa
+   gidiyordu. "Baştan başla" ayarlara taşınınca ipucu tek düğmeyle rahatça sığdı ve
+   çubuk eski yüksekliğine döndü. Ekranın tamamı dokunma alanı (game/input.ts). */
 footer {
   font-size: 0.95rem;
   color: var(--muted);
-  flex-wrap: wrap;
-  row-gap: 10px;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 #hint {
   min-width: 0;
-  flex: 1 0 100%;
+  flex: 1 1 auto;
   /* İki satırlık yer her zaman ayrılır: ipucu 1 ve 2 satır arasında gidip gelince
      alt çubuğun yüksekliği değişiyor ve halkalar dikeyde zıplıyordu. Ölçülen en uzun
      metin (patron "Çatal", 442px) tam genişlikte iki satıra sığıyor, yani bu aynı
@@ -302,4 +308,7 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .clock { font-size: 1.6rem; }
   .lvl { font-size: 1rem; }
   .lvl b { font-size: 1.2rem; }
+  /* Bu genişlikte en uzun patron ipucu üç satıra çıkıyor. İki satırlık yer ayırmak
+     yetmez: çubuk 64 ile 81 piksel arasında oynar ve halkalar dikeyde zıplar. */
+  #hint { min-height: 4.05em; }
 }

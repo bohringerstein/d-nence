@@ -43,7 +43,6 @@ const HTML = `
   <footer>
     <span id="hint" role="status" aria-live="polite"></span>
     <button id="ayarAc" type="button" class="ikon" aria-label="Ayarlar">Ayarlar</button>
-    <button id="reset" type="button">Baştan başla</button>
   </footer>
 
   <div class="ortu" id="ayarPanel" hidden role="dialog" aria-modal="true" aria-labelledby="ayarBaslik">
@@ -63,6 +62,11 @@ const HTML = `
         <span><b>Titreşim</b><small>Kilitte ve kayıpta telefon titreşir.</small></span>
       </label>
       <button id="nasilAc" type="button">Nasıl oynanır</button>
+      <!-- "Baştan başla" alt çubuktaydı: Level 1'e döndüren bir eylem, hızlı hızlı
+           dokunulan bir oyunda başparmağın durduğu sağ alt köşede duruyordu. Ekranın
+           tamamı dokunma alanı olunca oraya kazara basma riski arttı; seyrek ve geri
+           alınamaz bir eylem olduğu için ayarlara taşındı. -->
+      <button id="reset" type="button">Baştan başla</button>
       <button id="ayarKapat" type="button">Tamam</button>
     </div>
   </div>

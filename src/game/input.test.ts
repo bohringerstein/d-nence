@@ -132,3 +132,51 @@ test("damgası olmayan olay şimdiki zamana düşer", () => {
   for (const f of dinleyiciler.get("pointerdown") ?? []) f({ isPrimary: true, timeStamp: 0, target: null, preventDefault: () => {} });
   assert.equal(girdi.al(0), 1, "damga yoksa dokunuş kaybolmamalı");
 });
+
+// --- Dokunma alanı: ekranın tamamı, düğmeler ve örtüler hariç -----------------
+//
+// Regresyon: dinleyici yalnızca canvas'taydı, üst ve alt çubuk ölü bölgeydi. Alt çubuk
+// ipucu için büyüyünce ölü bölge ekranın %29'una çıktı ve tam da başparmağın durduğu
+// yere denk geldi: oyuncu kilitlemek için basıyor, hiçbir şey olmuyordu.
+
+/** `closest` yanıtı sahte olan bir hedef; girdi.ts yalnızca bunu kullanır. */
+const hedef = (eslesen: string | null) =>
+  Object.assign(Object.create(Element.prototype as object), {
+    closest: (secici: string) => (eslesen !== null && secici.includes(eslesen) ? {} : null)
+  });
+
+const dokunHedefli = (t: number, hedefi: unknown): void => {
+  for (const f of dinleyiciler.get("pointerdown") ?? []) {
+    f({ isPrimary: true, timeStamp: t, target: hedefi, preventDefault: () => {} });
+  }
+};
+
+test("çubuklara dokunmak da halkayı kilitler", () => {
+  girdi.temizle();
+  // Üst/alt çubuk: Element ama düğme değil, örtüde de değil.
+  dokunHedefli(10, hedef(null));
+  assert.equal(girdi.al(100), 1, "canvas dışına dokunmak da sayılmalı");
+});
+
+test("düğmeye dokunmak kilit üretmez", () => {
+  girdi.temizle();
+  dokunHedefli(10, hedef("button"));
+  assert.equal(girdi.al(100), 0, "Ayarlar düğmesine basmak aynı anda halka kilitlememeli");
+});
+
+test("örtü açıkken örtüye dokunmak kilit üretmez", () => {
+  girdi.temizle();
+  dokunHedefli(10, hedef(".ortu"));
+  assert.equal(girdi.al(100), 0, "ayarlar/nasıl oynanır ekranına dokunmak oyuna gitmemeli");
+});
+
+test("oyun dokunuşunda preventDefault çağrılır, düğmede çağrılmaz", () => {
+  girdi.temizle();
+  let oyunda = false, dugmede = false;
+  for (const f of dinleyiciler.get("pointerdown") ?? []) {
+    f({ isPrimary: true, timeStamp: 10, target: hedef(null), preventDefault: () => { oyunda = true; } });
+    f({ isPrimary: true, timeStamp: 20, target: hedef("button"), preventDefault: () => { dugmede = true; } });
+  }
+  assert.ok(oyunda, "oyun dokunuşunda çift dokunuş yakınlaştırması engellenmeli");
+  assert.ok(!dugmede, "düğmede preventDefault tıklamayı ve kaydırmayı bozar");
+});

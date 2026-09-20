@@ -19,10 +19,16 @@ export interface Girdi {
   birak: () => void;
 }
 
-/** Odaktaki öğe düğme/bağlantı/form ise Enter ve boşluk oraya aittir, oyuna değil. */
+/** Odaktaki öğe düğme/bağlantı/form ise Enter, boşluk ve dokunuş oraya aittir, oyuna değil. */
 function etkilesimliMi(hedef: EventTarget | null): boolean {
   if (!(hedef instanceof Element)) return false;
-  return !!hedef.closest("button, a, input, select, textarea, [contenteditable='true']");
+  return !!hedef.closest("button, a, input, select, textarea, label, [contenteditable='true']");
+}
+
+/** Örtü (ayarlar, nasıl oynanır, bitiş) açıkken oyun alanı orası değildir. */
+function ortudeMi(hedef: EventTarget | null): boolean {
+  if (!(hedef instanceof Element)) return false;
+  return !!hedef.closest(".ortu");
 }
 
 /**
@@ -32,12 +38,28 @@ function etkilesimliMi(hedef: EventTarget | null): boolean {
 const damga = (e: Event): number =>
   typeof e.timeStamp === "number" && e.timeStamp > 0 ? e.timeStamp : performance.now();
 
-export function girdiBagla(canvas: HTMLCanvasElement): Girdi {
+/**
+ * Dokunuş dinleyicisi `kok` üzerine kurulur — canvas'a DEĞİL.
+ *
+ * Eskiden yalnızca canvas dinleniyordu; üst çubuk, süre çubuğu ve alt çubuk ölü
+ * bölgeydi. Alt çubuk ipucuna tam satır verilince 65 pikselden 121 piksele çıktı ve
+ * ölü bölge ekranın %19'undan %29'una yükseldi — üstelik tamamı, telefonu tutan
+ * başparmağın doğal olarak durduğu yerde. Oyuncu halkayı kilitlemek için basıyor,
+ * dokunuş hiçbir şey yapmıyordu.
+ *
+ * Oyunun kendi açıklaması da zaten "ekrana her dokunduğunda" diyor (ui/nasil.ts):
+ * artık bu doğru. Düğmeler ve örtüler dışarıda tutulur.
+ */
+export function girdiBagla(kok: HTMLElement): Girdi {
   let kuyruk: number[] = [];
 
   const dokun = (e: PointerEvent): void => {
     // Çoklu dokunuş tek harekette iki halka kilitlemesin: yalnızca birincil işaretçi.
     if (!e.isPrimary) return;
+    // Düğmeye basmak kilit değildir; örtü açıkken de ekran oyunun değildir.
+    // preventDefault da yalnızca gerçek oyun dokunuşuna uygulanır, yoksa örtünün
+    // içindeki kaydırma ve düğme tıklaması bozulur.
+    if (etkilesimliMi(e.target) || ortudeMi(e.target)) return;
     e.preventDefault();
     kuyruk.push(damga(e));
   };
@@ -54,10 +76,10 @@ export function girdiBagla(canvas: HTMLCanvasElement): Girdi {
   // user-scalable=no iOS Safari'de yok sayılır, touch-action ise sayılmaz.
   const jest = (e: Event): void => e.preventDefault();
 
-  canvas.addEventListener("pointerdown", dokun);
+  kok.addEventListener("pointerdown", dokun);
   window.addEventListener("keydown", tus);
-  canvas.addEventListener("gesturestart", jest);
-  canvas.addEventListener("dblclick", jest);
+  kok.addEventListener("gesturestart", jest);
+  kok.addEventListener("dblclick", jest);
 
   return {
     al(gercekZaman: number) {
@@ -67,10 +89,10 @@ export function girdiBagla(canvas: HTMLCanvasElement): Girdi {
     },
     temizle() { kuyruk = []; },
     birak() {
-      canvas.removeEventListener("pointerdown", dokun);
+      kok.removeEventListener("pointerdown", dokun);
       window.removeEventListener("keydown", tus);
-      canvas.removeEventListener("gesturestart", jest);
-      canvas.removeEventListener("dblclick", jest);
+      kok.removeEventListener("gesturestart", jest);
+      kok.removeEventListener("dblclick", jest);
     }
   };
 }
