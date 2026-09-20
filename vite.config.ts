@@ -47,7 +47,7 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,png,svg,json,webmanifest}"],
+        globPatterns: ["**/*.{js,css,html,png,svg,json,webmanifest,woff2}"],
         // 1000 bölümlük tablo 643 KB; varsayılan 2 MB sınırı yeter ama açıkça yazalım.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // Oyun tamamen statik: her şey önbelleğe alınır, çevrimdışı tam çalışır.

@@ -159,7 +159,13 @@ Oyun alanında çizim sırası:
 
 "Top/vurgu" (`--ball`) **yalnızca canvas'ta** kullanılır: top, sıradaki halka ve geçer kama. Arayüz öğeleri (örtü başlıkları, odak halkası, onay kutusu) "arayüz vurgusu"nu (`--ui-accent`) kullanır — aradaki fark açık temada okunabilirliktir, aşağıya bakınız.
 
-Yazı tipi: Fredoka (400 ve 600), yedek olarak sistem sans-serif. Tüm metinler Türkçedir.
+**Yazı tipi:** Fredoka (400, 500 ve 600 ağırlıkları), yedek olarak `"Trebuchet MS", system-ui, sans-serif`. Tüm metinler Türkçedir.
+
+Yazı tipi **projeye gömülüdür**, Google Fonts CDN'inden çekilmez. Üç gerekçe: (1) oyun bir PWA ve çevrimdışı da aynı görünmeli — CDN'den gelen bir dosya servis çalışanının önbelleğine giremiyordu; (2) CDN, ziyaretçinin IP adresini üçüncü bir tarafa iletir ve bu Avrupa'da KVKK/GDPR açısından tartışmalıdır; (3) üçüncü bir alan adına DNS + TLS el sıkışması yok. **Uygulama hiçbir dış alan adına bağlanmaz**; bunu bir test denetler.
+
+Fredoka değişken bir yazı tipidir, bu yüzden alt küme başına tek dosya 300–600 arası bütün ağırlıkları taşır. İki alt küme gerekir: `latin` (ö, ü, ç dahil) ve `latin-ext` (Türkçe'ye özgü ğ, ı, ş ve büyükleri). Yıldız işaretleri (★ ☆) Fredoka'da yoktur — Google'ın alt kümelerinde de yoktu — ve yedek yığından çizilirler; bu yüzden yığında Fredoka'dan sonra gerçek bir aile bulunmak zorundadır.
+
+Lisans: SIL Open Font License 1.1 (`licenses/Fredoka-OFL.txt`), ticari kullanıma ve uygulamaya gömmeye izin verir. Oyunun başka hiçbir üçüncü taraf varlığı yoktur: simgeler `npm run icons` ile oyunun kendi geometrisinden üretilir ve **çalışma zamanı bağımlılığı sıfırdır**.
 
 **Kontrast.** Metin renkleri arka planda en az 4,5:1 olmalıdır (WCAG AA); metin dışı öğeler (odak halkası, onay kutusu durumu) en az 3:1. Açık temadaki soluk metin bu yüzden `#6B8390`'dan `#5A6E79`'a koyultuldu (3,40:1 → 4,56:1).
 

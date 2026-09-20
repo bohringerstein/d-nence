@@ -2,6 +2,7 @@
   "name": "donence",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Donence: tek dokunusla oynanan, level tabanli 2B mobil oyun",
   "scripts": {
     "dev": "vite",
