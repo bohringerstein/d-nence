@@ -147,7 +147,8 @@ function birDeneme(level: Level, p: Profil, sapma: number, R: () => number): Den
       if (hata > 0) {
         for (let i = 0; i < adimSayisi && s.asama === "idle"; i++) step(s, ADIM);
       } else {
-        for (let i = 0; i < adimSayisi; i++) {
+        // Geri sarma leveli baslangictan oncesine goturemez; yoksa negatif sure raporlanir.
+        for (let i = 0; i < adimSayisi && s.levelTime > ADIM; i++) {
           stepRings(s.rings, -ADIM, s.levelTime);
           s.levelTime -= ADIM;
         }
