@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  TAU, DEG, NEED, NEED_PASS, SOLVER_MARGIN, REACT, GAP_MAX_DEG,
+  TAU, DEG, NEED, NEED_PASS, SOLVER_MARGIN, REACT, GAP_MAX_DEG, LEVEL_COUNT, BOSS_ARALIGI, bossMu,
   canPass, stepRings, liveRings, validateTable, solve,
   OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio
 } from "../src/core/index.ts";
@@ -77,19 +77,28 @@ function sizeGaps(rings: RawRing[], tolSec: number): void {
 
 const GAP_MAX = GAP_MAX_DEG;
 /**
- * Baştan kilitli halkalardan sonra kalan her halkaya düşmesi gereken en az hata payı.
+ * Baştan kilitli halkalardan sonra kalması gereken en az hata payı.
+ *
  * Tipik bir oyuncunun 60 ms'lik zamanlama sapması ~1,5 rad/sn hızda 5°'ye denk gelir;
- * bunun altında ilk dokunuş kaçınılmaz ölüme dönüşür. Test oyuncuları tam olarak bundan
- * şikâyet etti: L60'ta halka başına 3,7°, L57'de 4,1°, L46'da 4,4° kalıyordu.
+ * bunun altında ilk dokunuş kaçınılmaz ölüme dönüşür. Test oyuncuları tam bundan
+ * şikâyet etti: eski tabloda halka başına 3,7-4,4° kalan bölümler vardı.
+ *
+ * Pay halka başına DOĞRUSAL değildir. İlk halkaya tam pay, sonrakilere yarısı düşer:
+ * korunmak istenen şey "hiç tepki veremeden ölmek"tir ve bu birinci dokunuşta olur.
+ * Doğrusal kural (kalan × 6°) 5 halkalı bir bölümde 30° pay şart koşuyordu ve boşluğu
+ * zorunlu olarak geniş bırakıyordu; baştan kilitli halkası olan patronlar bu yüzden
+ * hedeflerinin 30-44 puan üstünde, yani kolay kalıyordu.
  */
 const EN_AZ_PAY = 6 * DEG;
+const gerekenPay = (kalan: number): number => EN_AZ_PAY * (1 + (kalan - 1) * 0.5);
 // 17. levelden sonra halka sayısı 6'da sabitleniyordu; 60 levelin 41'i aynı yapıdaydı.
 // Bu ritim araya daha az halkalı ama daha dar boşluklu (hassasiyet isteyen) leveller serpiştirir.
 const RHYTHM = [6, 6, 5, 6, 4, 6, 5, 6];
 const ringCount = (n: number): number => { const grow = Math.min(2 + Math.floor((n - 1) / 4), 6); return grow < 6 ? grow : RHYTHM[(n - 1) % RHYTHM.length]; };
 // Süre limiti artık tasarım girdisi: hareketli halka sayısından gelir ve geç levellerde kademeli sıkılaşır.
 // Çözücü süresi limiti belirlemez, yalnızca "bu limit yeterli mi" diye denetlenir.
-const limitFor = (n: number, moving: number): number => +((4 + 2 * moving) * (1 - 0.22 * ((n - 1) / 59))).toFixed(1);
+const limitFor = (n: number, moving: number): number =>
+  +((4 + 2 * moving) * (1 - 0.22 * Math.min(1, (n - 1) / (TABAN_BOLUM - 1)))).toFixed(1);
 
 /**
  * Bir halkanın kilitlenme anının kabaca tahmini: oyuncu dıştan içe gider ve her kilit
@@ -120,6 +129,11 @@ function gorunurFlip(rings: RawRing[]): void {
 
 function candidate(n: number): RawRing[] {
   const count = ringCount(n);
+  // Hız ARTIRILMAZ. Bu tasarımda hız ve boşluk genişliği birbirine bağlıdır:
+  // sizeGaps boşluğu 'tolerans süresi x hız toplamı' ile hesaplar, yani hızlı halka
+  // aynı hata payı için daha geniş boşluk ister. Hızı artırmak zorluğu artırmaz,
+  // yalnızca her şeyi büyütüp 85 derece tavanına dayar ve ayarlamayı imkansizlastirir.
+  // Zorluğun gerçek kolu tolerans süresidir ve onu tune() ayarlar.
   const base = Math.min(0.8 + n * 0.03, 2.2);
   const rings: RawRing[] = [];
   for (let i = 0; i < count; i++) {
@@ -145,6 +159,18 @@ const A = -Math.PI / 2;
 // speed ve start varsayilanlari hicbir cagrida kullanilmaz; yalnizca tip tamligi icin.
 const mk = (o: Partial<RawRing>): RawRing =>
   ({ speed: 0, start: 0, gap: 0, gaps: 1, gapOffset: 150, flip: 0, wobble: false, preLocked: false, ...o });
+/**
+ * Altı patron tasarımı sırayla tekrar eder: 10, 20, ... bölümlerinde sırasıyla
+ * Ayna, Merkez, Metronom, Çatal, Tavşan ile kaplumbağa, Büyük kasa, sonra baştan.
+ * Tekrar eden tasarım her turda daha zor ayarlanır, çünkü hedef eğri aşağıdadır.
+ */
+const BOSS_SIRASI = [10, 20, 30, 40, 50, 60];
+const bossTasarimi = (n: number): Boss | undefined => {
+  if (!bossMu(n)) return undefined;
+  const tur = Math.floor(n / BOSS_ARALIGI) - 1;          // 0, 1, 2, ...
+  return BOSSES[BOSS_SIRASI[tur % BOSS_SIRASI.length]];
+};
+
 const BOSSES: Record<number, Boss | undefined> = {
   10: { name: 'Ayna', hint: 'Hepsi aynı anda hizalanıyor, o anı bekle ve hızlı dokun', tol: 0.2,
     // Hizlar birbirinden farkli olmali: esit hiz + esit start = birebir ayni halka, o kilit acikligi hic daraltmaz.
@@ -171,7 +197,7 @@ function finalize(rings: RawRing[], n: number): Finalized | null {
   if (baslangic !== OPEN_ALL) {
     const kalan = canli.filter(r => !r.locked).length;
     const pay = largestOpen(baslangic).w - NEED_PASS;
-    if (pay < kalan * EN_AZ_PAY) return null;
+    if (pay < gerekenPay(kalan)) return null;
   }
   const cozum = solve(def); if (!cozum) return null;
   const best = cozum.t;
@@ -230,7 +256,32 @@ function evaluate(L: { def: RingDef[]; limit: number }, trials = 50): Evaluated 
   return { win: w / trials, qs };
 }
 
-const egri = (n: number): number => 0.97 - 0.57 * Math.pow((n - 1) / 59, 1.1);
+/**
+ * Zorluk eğrisi. Üç parça:
+ *
+ *   taban  — %94'ten %25'e iner ve 150. bölümde tabana oturur. Üs 0,45 olduğu için
+ *            iniş BAŞTA diktir: oyuncu 11. bölümde %80'in, 39'da %60'ın altına düşer.
+ *            Eski 60 bölümlük eğri %80'e ancak 21. bölümde iniyordu ve "zorluk çok
+ *            yavaş artıyor" şikâyetinin sebebi buydu.
+ *   dalga  — ±9 puanlık, 24 bölümlük salınım. 150'den sonra eğri düz kalsaydı geri
+ *            kalan 350 bölüm tek bir duvar olurdu; dalga oraya ritim veriyor.
+ *   nefes  — her 4. bölüm +12 puan (bkz. nefesMi).
+ */
+const TABAN_BOLUM = 150;
+const DALGA_GENLIK = 0.08;
+const DALGA_PERIYOT = 24;
+/**
+ * Zorluk tabanı. Daha aşağısı (%15 denendi) ayarlamayı kararsızlaştırıyor: o hedefte
+ * boşluğun bir derece değişmesi kazanma oranını onlarca puan oynatıyor ve üretici
+ * bölümlerin bir kısmını hiç çözülemez bırakıyor. %35 taban + dalga, %27-43 bandı verir.
+ */
+const EN_ZOR = 0.35;
+const TABAN_KLAMP = 0.25;
+
+const egriTaban = (n: number): number =>
+  0.94 - (0.94 - EN_ZOR) * Math.pow(Math.min(1, (n - 1) / (TABAN_BOLUM - 1)), 0.45);
+const egriDalga = (n: number): number => DALGA_GENLIK * Math.sin(2 * Math.PI * n / DALGA_PERIYOT);
+const egri = (n: number): number => egriTaban(n) + egriDalga(n);
 
 /**
  * Nefes levelleri: her 4. level (patronlar hariç) hedef eğrinin belirgin üstünde tutulur.
@@ -240,10 +291,24 @@ const egri = (n: number): number => 0.97 - 0.57 * Math.pow((n - 1) / 59, 1.1);
  */
 const NEFES_ARALIGI = 4;
 const NEFES_BONUS = 0.12;
-const nefesMi = (n: number): boolean => !BOSSES[n] && n % NEFES_ARALIGI === 0;
-const target = (n: number): number => Math.min(0.95, egri(n) + (nefesMi(n) ? NEFES_BONUS : 0));
+const nefesMi = (n: number): boolean => !bossMu(n) && n % NEFES_ARALIGI === 0;
+/**
+ * Patron bölümlerinin hedefi.
+ *
+ * Patronlar elle tasarlandığı için halka sayıları ve hızları sabittir; ayarlayıcının
+ * elinde yalnızca boşluk genişliği vardır. Eğrinin en dibinde (%27-35) bu yapılar
+ * hedefi tutturamıyor, en fazla ~%40'a inebiliyorlardı. Bu yüzden patron cezası sabit
+ * puan değil ORAN: hedefin %75'i. Eğri yüksekken belirgin bir sıçrama, dibe yakınken
+ * yapının fiziksel sınırına uygun.
+ */
+const BOSS_ORAN = 0.75;
+const bossHedefi = (n: number, boss: boolean): number =>
+  boss ? Math.max(0.22, target(n) * BOSS_ORAN) : target(n);
+
+const target = (n: number): number =>
+  Math.max(TABAN_KLAMP, Math.min(0.95, egri(n) + (nefesMi(n) ? NEFES_BONUS : 0)));
 // Yapıyı sabit tutup tolerans süresini ayarlayarak kazanma oranını hedefe oturt
-function tune(rawRings: RawRing[], want: number, n: number, lo = 0.03, hi = 0.45): Candidate | null {
+function tune(rawRings: RawRing[], want: number, n: number, lo = 0.012, hi = 0.45): Candidate | null {
   let best: Candidate | null = null;
   for (let it = 0; it < 8; it++) {
     const tol = (lo + hi) / 2;
@@ -261,13 +326,12 @@ function tune(rawRings: RawRing[], want: number, n: number, lo = 0.03, hi = 0.45
 // Sabit tohumla çalışır: aynı kod her çalıştırmada birebir aynı tabloyu verir.
 function generate(log: Log = () => {}): LevelTable {
   seed = 12345; es = 1;
-  const levels: Candidate[] = []; const allQ: number[] = []; let prev = 1;
-  for (let n = 1; n <= 60; n++) {
-    const boss = BOSSES[n];
-    // Nefes levelleri monotonluk kısıtından muaf: eğrinin üstüne çıkmaları gerekiyor.
-    const want = boss ? target(n) - 0.12
-      : nefesMi(n) ? target(n)
-      : Math.min(target(n), prev);
+  const levels: Candidate[] = []; const allQ: number[] = [];
+  for (let n = 1; n <= LEVEL_COUNT; n++) {
+    const boss = bossTasarimi(n);
+    // Eğri artık dalgalı: katı monotonluk yerine eğrinin kendisi izleniyor.
+    // (Eğilimin düştüğünü --verify hareketli ortalamayla denetler.)
+    const want = bossHedefi(n, !!boss);
     let pick: Candidate | null = null;
     for (let k = 0; k < (boss ? 6 : 8); k++) {
       const raw = boss ? boss.rings() : candidate(n);
@@ -284,9 +348,7 @@ function generate(log: Log = () => {}): LevelTable {
       if (pick && pick.roomy && Math.abs(pick.win - want) < 0.03) break;
     }
     if (!pick) { console.error('level', n, 'bulunamadı'); process.exit(1); }
-    // Nefes leveli ilerleyen zorluk çizgisini yukarı çekmemeli: prev'i o güncellemez.
     if (boss) Object.assign(pick, { boss: boss.name, hint: boss.hint });
-    else if (!nefesMi(n)) prev = Math.min(prev, pick.win + 0.03);
     // Yıldız eşikleri için ustalık referansı her levelde 25 kez oynatılır (bkz. playUsta).
     es = 4242;
     for (let k = 0; k < 25; k++) {
@@ -311,7 +373,10 @@ const serialize = (o: LevelTable): string => '{"q3":' + o.q3 + ',"q2":' + o.q2 +
 // ===== Doğrulama =====
 // Eski --verify yalnızca "kazanma oranı %20'nin üstünde mi" diye bakıyordu; oysa üretim
 // hedefi %97'den %28'e inen bir eğri. Bir level hedefinin 25 puan altına düşse bile geçiyordu.
-const BAND = 0.15;          // hedef eğriden izin verilen sapma
+// Hedef eğriden izin verilen sapma. Patronlarda daha geniş: yapıları elle tasarlandığı
+// için halka sayısı ve hızları sabittir, ayarlayıcının elinde yalnızca boşluk genişliği var.
+const BAND = 0.15;
+const BAND_BOSS = 0.20;
 const SOLVER_HEADROOM = 0.9; // çözücü, süre sınırının en fazla %90'ını kullanabilir
 
 function verify(): number {
@@ -324,27 +389,43 @@ function verify(): number {
     return 1;
   }
   const rows: string[] = []; const sorunlar: string[] = [];
-  let oncekiNormal: number | null = null;
+  const oranlar: number[] = [];
 
   for (const l of data.levels) {
     const ad = `${l.n}${l.boss ? "*" : ""}`;
     const cozum = solve(l.rings);
     const best = cozum ? cozum.t : null;
     const ev = evaluate({ def: l.rings, limit: l.limit }, 50);
-    const hedef = l.boss ? target(l.n) - 0.12 : target(l.n);
+    const hedef = bossHedefi(l.n, !!l.boss);
     const sapma = ev.win - hedef;
     const moving = l.rings.filter(r => !r.preLocked).length;
 
     if (best == null) sorunlar.push(`${ad}: referans çözücü bitiremiyor`);
     else if (best > l.limit * SOLVER_HEADROOM) sorunlar.push(`${ad}: çözücü ${best.toFixed(1)} sn, limit ${l.limit} sn — pay yok`);
-    if (Math.abs(sapma) > BAND) sorunlar.push(`${ad}: kazanma %${Math.round(ev.win * 100)}, hedef %${Math.round(hedef * 100)} (${sapma > 0 ? "+" : ""}${Math.round(sapma * 100)} puan)`);
+    if (Math.abs(sapma) > (l.boss ? BAND_BOSS : BAND)) sorunlar.push(`${ad}: kazanma %${Math.round(ev.win * 100)}, hedef %${Math.round(hedef * 100)} (${sapma > 0 ? "+" : ""}${Math.round(sapma * 100)} puan)`);
     if (l.limit < limitFor(l.n, moving) - 0.05) sorunlar.push(`${ad}: limit tasarım değerinin altında`);
-    // Nefes levelleri (bkz. nefesMi) kasten eğrinin üstündedir; monotonluk onları kapsamaz.
-    if (!l.boss && !nefesMi(l.n)) {
-      if (oncekiNormal != null && ev.win > oncekiNormal + 0.06) sorunlar.push(`${ad}: bir önceki normal levelden belirgin kolay`);
-      oncekiNormal = ev.win;
-    }
+    oranlar.push(ev.win);
     rows.push(`${ad}:${Math.round(ev.win * 100)}%`);
+  }
+
+  // Zorluk EĞİLİMİ düşüyor mu? Eğri dalgalı olduğu için tek tek leveller birbirinden
+  // kolay olabilir; anlamlı olan 20 bölümlük hareketli ortalamanın inmesi.
+  const pencere = 20;
+  const ortalama = (i: number): number => {
+    const a = Math.max(0, i - pencere / 2), b = Math.min(oranlar.length, i + pencere / 2);
+    let t = 0; for (let k = a; k < b; k++) t += oranlar[k];
+    return t / (b - a);
+  };
+  const bas = ortalama(pencere), son = ortalama(oranlar.length - pencere);
+  if (son > bas - 0.25) {
+    sorunlar.push(`zorluk eğilimi yetersiz: başta %${Math.round(bas * 100)}, sonda %${Math.round(son * 100)} (en az 25 puan düşmeli)`);
+  }
+  // Eğilim hiçbir yerde belirgin şekilde geri gitmemeli.
+  for (let i = pencere; i + pencere < oranlar.length; i += pencere) {
+    const su = ortalama(i), sonraki = ortalama(i + pencere);
+    if (sonraki > su + 0.10) {
+      sorunlar.push(`${i}-${i + pencere} arası zorluk eğilimi geri gidiyor: %${Math.round(su * 100)} -> %${Math.round(sonraki * 100)}`);
+    }
   }
 
   // Yıldız dağılımı USTALIK REFERANSINA göre ölçülür (bkz. playUsta): eşikler
@@ -370,8 +451,8 @@ function verify(): number {
     if (b === OPEN_ALL) continue;
     const kalan = canli.filter(r => !r.locked).length;
     const p = largestOpen(b).w - NEED_PASS;
-    if (p < kalan * EN_AZ_PAY) {
-      sorunlar.push(`${l.n}: baştan kilitli halkalardan sonra halka başına ${(p / kalan / DEG).toFixed(1)}° pay kalıyor (en az ${(EN_AZ_PAY / DEG).toFixed(0)}° gerek)`);
+    if (p < gerekenPay(kalan)) {
+      sorunlar.push(`${l.n}: baştan kilitli halkalardan sonra ${(p / DEG).toFixed(1)}° pay kalıyor, ${(gerekenPay(kalan) / DEG).toFixed(1)}° gerek (${kalan} halka)`);
     }
   }
 

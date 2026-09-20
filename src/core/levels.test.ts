@@ -37,8 +37,8 @@ function replayWithMask(def: RingDef[], kilitler: Kilit[]): Replay {
   return { win: true, t, w: C.maskLargest(mask).w };
 }
 
-test("tablo dosyası okunabilir ve 60 level içeriyor", () => {
-  assert.equal(data.levels.length, 60);
+test("tablo dosyası okunabilir ve LEVEL_COUNT kadar level içeriyor", () => {
+  assert.equal(data.levels.length, C.LEVEL_COUNT);
   assert.ok(data.q3 > data.q2 && data.q2 > 0);
 });
 
@@ -79,8 +79,11 @@ test("her levelde en az bir hareketli halka ve makul geometri var", () => {
 
 test("patron levelleri işaretli ve isimli", () => {
   const patronlar = data.levels.filter(l => l.boss);
-  assert.deepEqual(patronlar.map(l => l.n), [10, 20, 30, 40, 50, 60]);
+  // Her BOSS_ARALIGI bölümde bir patron; altı tasarım sırayla tekrar eder.
+  assert.deepEqual(patronlar.map(l => l.n), C.BOSS_LEVELS);
   patronlar.forEach(l => { assert.ok(l.hint && l.hint.length > 10, `level ${l.n}: ipucu eksik`); });
+  const adlar = new Set(patronlar.map(l => l.boss));
+  assert.equal(adlar.size, 6, "altı farklı patron tasarımı olmalı");
 });
 
 test("aynı leveldeki hiçbir iki halka birebir aynı değil", () => {

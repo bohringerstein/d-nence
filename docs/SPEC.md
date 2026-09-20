@@ -193,7 +193,9 @@ Ayrıca **"Hareketi azalt"** ayarı, sistem tercihinden bağımsız olarak sars�
 
 ## 8. Level sistemi
 
-60 level `data/levels.json` içinde hazırdır. Oyun bu dosyayı olduğu gibi okur; **oyun içinde rastgele level üretilmez.**
+**500 bölüm** `data/levels.json` içinde hazırdır. Oyun bu dosyayı olduğu gibi okur; **oyun içinde rastgele level üretilmez.**
+
+Bölüm sayısı `src/core/levels.ts` içindeki `LEVEL_COUNT` sabitiyle belirlenir: değiştirip `npm run gen` çalıştırmak yeterlidir. Oyun "aa" gibi uzun soluklu olmalıdır; 60 bölüm bir saatte bitiyordu. Bu türde yapı tekrarı rahatsız edici değildir, çünkü bölümler arasındaki fark hız ve boşluk genişliğiyle taşınır ve oyuncu iki bölümü yan yana görmez. Patronlar her 10 bölümde bir gelir (50 patron); altı tasarım sırayla tekrar eder ve her turda hedef eğri aşağıda olduğu için daha zor ayarlanır.
 
 ```json
 { "q3": 0.46, "q2": 0.25, "levels": [
@@ -221,14 +223,32 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
 6. **Yön değiştiren halkanın dönüşü görülebilmeli.** Oyuncu dıştan içe gider ve her kilit kabaca 0,6 saniye alır; bir halkanın kilitlenme anı `0,3 + 0,6 × (önündeki hareketli halka sayısı)` olarak tahmin edilir. `flip` yalnızca kilitlenmesi 1,2 saniyeden geç olan halkalara verilir ve periyodu o sürenin %70'ine sığdırılır. Erken kilitlenen halkanın `flip`'i kaldırılır.
    *Neden:* eski tabloda 68 flip halkasının 55'i (%81) hiç dönmeden kilitleniyordu. İpucu 13. levelde çıkıyor ama dönüş ilk kez 30. levelde, Metronom patronunda görülebiliyordu — oyuncu mekaniği bir patronda, cezayla öğreniyordu. Yeni tabloda bu oran %7 (kalanlar elle tasarlanan patronlar).
 
-7. **Baştan kilitli halkalar için taban pay.** Baştan kilitli halkalar uygulandıktan sonra kalan her hareketli halkaya en az **6°** hata payı düşmelidir: `(başlangıç açıklığı − NEED_PASS) ≥ kalan halka × 6°`. Sağlamayan aday elenir.
-   *Neden:* tipik bir oyuncunun 60 ms'lik zamanlama sapması yaklaşık 1,5 rad/sn hızda 5°'ye denk gelir. Eski tabloda L60'ta halka başına 3,7°, L57'de 4,1°, L46'da 4,4° kalıyordu; bu levellerde ilk dokunuş oyuncu ne olduğunu göremeden kaybettiriyordu.
+7. **Baştan kilitli halkalar için taban pay.** Baştan kilitli halkalar uygulandıktan sonra kalması gereken en az hata payı `6° × (1 + (kalan halka − 1) × 0,5)`'tir. Sağlamayan aday elenir.
+   *Neden:* tipik bir oyuncunun 60 ms'lik zamanlama sapması yaklaşık 1,5 rad/sn hızda 5°'ye denk gelir. Eski tabloda halka başına 3,7-4,4° kalan bölümler vardı; oralarda ilk dokunuş oyuncu ne olduğunu göremeden kaybettiriyordu.
+   *Neden doğrusal değil:* korunmak istenen şey "hiç tepki veremeden ölmek"tir ve bu birinci dokunuşta olur; ilk halkaya tam pay, sonrakilere yarısı yeter. Doğrusal kural (kalan × 6°) 5 halkalı bir bölümde 30° pay şart koşuyor, boşluğu zorunlu olarak geniş bırakıyordu ve baştan kilitli halkası olan patronlar bu yüzden hedeflerinin 30-44 puan üstünde kalıyordu.
 
 8. **Zorluk ritmi: nefes levelleri.** Patron olmayan her 4. level hedef eğrinin **12 puan üstünde** tutulur ve monotonluk kısıtından muaftır (kendisi de sonraki levellerin tavanını yükseltmez).
    *Neden:* sıradan oyuncuyu kaçıran şey tek bir zor level değil, zor levellerin arka arkaya gelmesidir. Test oyuncuları 44-57 arasında 12 levelin 9'unu "duvar" olarak işaretledi ve art arda 20-29 kayıp serileri yaşadı.
 
-9. **Ayarlama ve sıralama.** Her level için tolerans süresi ikili aramayla ayarlanır, böylece kazanma oranı hedef eğriye oturur: `hedef(n) = 0,97 − 0,57 × ((n−1)/59)^1,1`. Bu eğri %97'den %40'a iner. Nefes levelleri (8. madde) bu eğrinin 12 puan üstüne alınır. Normal leveller bir öncekinden kolay olamaz (en fazla 3 puan tolerans); nefes levelleri bu kısıttan muaftır.
-10. **Patron levelleri** (10, 20, 30, 40, 50, 60) elle tasarlanmıştır ve hedef eğrinin 12 puan altına ayarlanır: Ayna, Merkez, Metronom, Çatal, Tavşan ile kaplumbağa, Büyük kasa. Tasarımları `gen.js` içindeki `BOSSES` nesnesindedir.
+9. **Ayarlama ve zorluk eğrisi.** Her bölüm için tolerans süresi ikili aramayla ayarlanır, böylece kazanma oranı hedef eğriye oturur. Eğri üç parçadan oluşur:
+
+   ```
+   taban(n) = 0,94 − 0,59 × min(1, (n−1)/149)^0,45      // %94'ten %35'e, 150. bölümde tabanda
+   dalga(n) = 0,08 × sin(2π n / 24)                      // ±8 puan, 24 bölümlük salınım
+   hedef(n) = taban(n) + dalga(n) + (nefes ? 0,12 : 0)   // %25 ile %95 arasına sıkıştırılır
+   ```
+
+   **Üs 0,45**: iniş başta diktir. Oyuncu 11. bölümde %80'in, 39'da %60'ın altına düşer. Eski 60 bölümlük eğri %80'e ancak 21. bölümde iniyordu ve "zorluk çok yavaş artıyor" şikâyetinin sebebi buydu.
+
+   **Dalga**: 150. bölümden sonra eğri düz kalsaydı geriye kalan 350 bölüm tek bir duvar olurdu.
+
+   **Taban %35'in altına inmez.** Daha aşağısı (%15 denendi) ayarlamayı kararsızlaştırıyor: o hedefte boşluğun bir derece değişmesi kazanma oranını onlarca puan oynatıyor ve bölümlerin bir kısmı hiç çözülemez kalıyor.
+
+   **Katı monotonluk yoktur.** Eğri dalgalı olduğu için tek tek bölümler birbirinden kolay olabilir; `npm run verify` bunun yerine 20 bölümlük hareketli ortalamanın düştüğünü ve hiçbir yerde belirgin geri gitmediğini denetler.
+
+   **Hız artırılmaz.** Bu tasarımda hız ve boşluk genişliği birbirine bağlıdır: `sizeGaps` boşluğu "tolerans süresi × hız toplamı" ile hesaplar, yani hızlı halka aynı hata payı için daha geniş boşluk ister. Hızı artırmak zorluğu artırmaz, yalnızca her şeyi büyütüp 85° tavanına dayar. Zorluğun gerçek kolu tolerans süresidir.
+10. **Patron bölümleri** (her 10 bölümde bir) elle tasarlanmıştır: Ayna, Merkez, Metronom, Çatal, Tavşan ile kaplumbağa, Büyük kasa. Altı tasarım sırayla tekrar eder. Tasarımları `tools/gen.ts` içindeki `BOSSES` nesnesindedir.
+    Hedefleri **hedef eğrinin %75'idir** (sabit puan farkı değil, oran), en az %22. Sebep: patronların halka sayıları ve hızları sabittir, ayarlayıcının elinde yalnızca boşluk genişliği vardır. Eğrinin dibinde bu yapılar sabit puanlı bir hedefi tutturamıyor, en fazla `%40'a inebiliyorlardı. Doğrulamada da patronlara daha geniş bant tanınır (±20 puan, normalde ±15).
 
 Üretici sabit bir tohumla çalışır, her çalıştırmada birebir aynı tabloyu verir.
 

@@ -23,6 +23,7 @@ Object.defineProperty(globalThis, "localStorage", { value: depo, configurable: t
 
 const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel } =
   await import("./storage.ts");
+const { LEVEL_COUNT } = await import("../core/index.ts");
 
 const KEY = "kasa:v1";
 const yaz = (v: unknown): void => { depo.temizle(); depo.setItem(KEY, JSON.stringify(v)); };
@@ -51,7 +52,7 @@ test("localStorage erişilemezse (gizli sekme) sessizce varsayılana döner", ()
 });
 
 test("geçersiz level numarası yok sayılır", () => {
-  for (const kotu of [0, -3, 61, 2.5, "7", null]) {
+  for (const kotu of [0, -3, LEVEL_COUNT + 1, 2.5, "7", null]) {
     yaz({ surum: 1, level: kotu, bests: {} });
     assert.equal(oku().level, 1, "level " + JSON.stringify(kotu) + " kabul edilmemeli");
   }

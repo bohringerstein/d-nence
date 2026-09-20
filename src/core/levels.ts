@@ -24,8 +24,21 @@ export interface LevelTable {
 }
 
 export const GAP_MAX_DEG = 85;
-export const LEVEL_COUNT = 60;
-export const BOSS_LEVELS = [10, 20, 30, 40, 50, 60];
+
+/**
+ * Bölüm sayısı. Tek sabit: değiştirip `npm run gen` çalıştırmak yeterli.
+ *
+ * Oyun "aa" gibi uzun soluklu olmalı; 60 bölüm bir saatte bitiyordu. Bu tür bir oyunda
+ * yapı tekrarı rahatsız edici değildir, çünkü bölümler arasındaki fark hız ve boşluk
+ * genişliğiyle taşınır ve oyuncu iki bölümü yan yana görmez.
+ */
+export const LEVEL_COUNT = 500;
+
+/** Her 10 bölümde bir patron. */
+export const BOSS_ARALIGI = 10;
+export const BOSS_LEVELS: number[] =
+  Array.from({ length: Math.floor(LEVEL_COUNT / BOSS_ARALIGI) }, (_, i) => (i + 1) * BOSS_ARALIGI);
+export const bossMu = (n: number): boolean => n % BOSS_ARALIGI === 0;
 
 const RING_FIELDS: Array<[keyof RingDef, string]> = [
   ["speed", "number"], ["gap", "number"], ["gaps", "number"], ["gapOffset", "number"],
