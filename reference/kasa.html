@@ -107,6 +107,7 @@ var KasaCore = (() => {
     gapCenters: () => gapCenters,
     initialOpen: () => initialOpen,
     isBetter: () => isBetter,
+    isaretAcisi: () => isaretAcisi,
     largestOpen: () => largestOpen,
     layout: () => layout,
     liveRings: () => liveRings,
@@ -187,6 +188,21 @@ var KasaCore = (() => {
     return c;
   }
   var liveRings = (def) => def.map((r) => ({ ...r, angle: r.start, dir: 1, t: 0, locked: !!r.preLocked }));
+  function isaretAcisi(r) {
+    const yarim = r.gap * DEG / 2;
+    const merkezler = gapCenters(r).map((c) => (c % TAU + TAU) % TAU).sort((a, b) => a - b);
+    let enIyi = merkezler[0] + Math.PI;
+    let enGenis = -1;
+    for (let i = 0; i < merkezler.length; i++) {
+      const a0 = merkezler[i] + yarim;
+      const a1 = (i + 1 < merkezler.length ? merkezler[i + 1] : merkezler[0] + TAU) - yarim;
+      if (a1 - a0 > enGenis) {
+        enGenis = a1 - a0;
+        enIyi = (a0 + a1) / 2;
+      }
+    }
+    return enIyi;
+  }
 
   // src/core/opening.ts
   var OPEN_ALL = null;
@@ -380,7 +396,7 @@ var KasaCore = (() => {
   }
   return __toCommonJS(index_exports);
 })();
-const { BIN, BINS, BOSS_LEVELS, DEG, GAP_MAX_DEG, LEVEL_COUNT, LINE_WIDTH_MAX, LINE_WIDTH_MIN, NEED, NEED_BINS, NEED_PASS, OPEN_ALL, RATIO, REACT, SOLVER_ADIM, SOLVER_HEDEF, SOLVER_MARGIN, STAR_LABEL, TAU, applyMask, canPass, firstSeen, gapCenters, initialOpen, isBetter, largestOpen, layout, liveRings, lockOpen, maskLargest, maskRuns, newMask, norm, peekOpen, solve, starCount, starRatio, stepRings, validateTable, wrap } = KasaCore;
+const { BIN, BINS, BOSS_LEVELS, DEG, GAP_MAX_DEG, LEVEL_COUNT, LINE_WIDTH_MAX, LINE_WIDTH_MIN, NEED, NEED_BINS, NEED_PASS, OPEN_ALL, RATIO, REACT, SOLVER_ADIM, SOLVER_HEDEF, SOLVER_MARGIN, STAR_LABEL, TAU, applyMask, canPass, firstSeen, gapCenters, initialOpen, isBetter, isaretAcisi, largestOpen, layout, liveRings, lockOpen, maskLargest, maskRuns, newMask, norm, peekOpen, solve, starCount, starRatio, stepRings, validateTable, wrap } = KasaCore;
 // <<< core.js
 </script>
 <script>
