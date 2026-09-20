@@ -11,6 +11,7 @@ export interface Kabuk {
   bitis: HTMLElement;
   bitisMetin: HTMLElement;
   bitisDugme: HTMLButtonElement;
+  flas: HTMLElement;
 }
 
 const HTML = `
@@ -21,7 +22,10 @@ const HTML = `
     <div class="lvl">Level <b id="lvl">1</b></div>
   </header>
   <div class="bar" id="bar"><i id="barFill"></i></div>
-  <canvas id="c" aria-label="Oyun alanı. Dokunarak sıradaki halkayı kilitle."></canvas>
+  <div class="alan">
+    <canvas id="c" aria-label="Oyun alanı. Dokunarak sıradaki halkayı kilitle."></canvas>
+    <div class="flas" id="flas" aria-hidden="true"></div>
+  </div>
   <footer>
     <span id="hint" role="status" aria-live="polite"></span>
     <button id="reset" type="button">Baştan başla</button>
@@ -54,6 +58,7 @@ export function kabukKur(hedef: HTMLElement): Kabuk {
     reset: bul<HTMLButtonElement>(hedef, "reset"),
     bitis: bul(hedef, "bitis"),
     bitisMetin: bul(hedef, "bitisMetin"),
-    bitisDugme: bul<HTMLButtonElement>(hedef, "bitisDugme")
+    bitisDugme: bul<HTMLButtonElement>(hedef, "bitisDugme"),
+    flas: bul(hedef, "flas")
   };
 }

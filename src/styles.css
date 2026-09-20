@@ -87,14 +87,31 @@ header h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
 }
 .bar.low i { background: var(--fail); }
 
+.alan { flex: 1 1 auto; min-height: 0; position: relative; }
+
 canvas {
-  flex: 1 1 auto;
   width: 100%;
-  min-height: 0;
+  height: 100%;
   display: block;
   cursor: pointer;
   /* Çift dokunuşla yakınlaştırma ve kaydırma oyun alanında kapalı */
   touch-action: none;
+}
+
+/* Flaş canvas yerine ayrı bir katman: tam ekran dolgu canvas'ta 1920×1000'de
+   tek başına 4 ms tutuyordu, burada işi birleştirici (compositor) yapıyor. */
+.flas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--win);
+  will-change: opacity;
+}
+.flas.kayip { background: var(--fail); }
+
+@media (prefers-reduced-motion: reduce) {
+  .flas { display: none; }
 }
 
 footer { font-size: 0.95rem; color: var(--muted); }

@@ -64,8 +64,16 @@ function saatiGuncelle(): void {
   ui.barFill.style.transform = `scaleX(${kalan / durum.level.limit})`;
 }
 
+let sonFlas = -1;
 function cizVeYaz(): void {
   ciz(tuval, durum, renk, { hareketAzalt: azalt });
+  // Flaş canvas yerine ayrı bir katmanda: tam ekran dolgu geniş ekranda 4 ms tutuyordu.
+  const f = azalt ? 0 : durum.flash * 0.18;
+  if (f !== sonFlas) {
+    ui.flas.style.opacity = String(f);
+    ui.flas.classList.toggle("kayip", durum.asama === "crash");
+    sonFlas = f;
+  }
 }
 
 // ---- Dokunuş ---------------------------------------------------------------
@@ -144,5 +152,7 @@ levelYukle(kayit.level);
 tuval.boyutla();
 oyun.basla();
 
-// Geliştirme sırasında elle sınamak için; oyun bunu kullanmaz.
-Object.assign(window, { KASA: { durum: () => durum, kayit, tablo, ADIM } });
+// Geliştirme sırasında elle sınamak için; oyun bunu kullanmaz ve üretim derlemesine girmez.
+if (import.meta.env.DEV) {
+  Object.assign(window, { KASA: { durum: () => durum, kayit, tablo, ADIM } });
+}

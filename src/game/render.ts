@@ -5,6 +5,9 @@ import { aciklikBolgeleri, sonrakiHalka, HEPSI } from "./state.ts";
 import type { LevelState } from "./state.ts";
 import type { Renkler } from "./theme.ts";
 
+/** Kamalar halkalarin disina S x bu kadar tasar. */
+export const KAMA_TASMA = 0.05;
+
 export interface Tuval {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
@@ -14,11 +17,19 @@ export interface Tuval {
   yerlesim: (halkaSayisi: number) => Layout;
   boyutla: () => void;
   birak: () => void;
+  /**
+   * Bir önceki karede temizlenen kutunun yarı genişliği. Temizleme alanı daralırsa
+   * (top merkeze dönünce, level değişince) önceki karenin izi kalırdı; bu yüzden
+   * her kare önceki ve şimdiki kutunun birleşimi temizlenir.
+   */
+  sonYari: number;
 }
 
 export function tuvalKur(canvas: HTMLCanvasElement, degisti: () => void): Tuval {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas 2d bağlamı alınamadı");
+
+  let kendi: Tuval | null = null;
 
   let W = 0, H = 0;
   let onbellekSayi = -1;
@@ -33,6 +44,8 @@ export function tuvalKur(canvas: HTMLCanvasElement, degisti: () => void): Tuval 
     canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     onbellekSayi = -1;
+    // Arka tamponu yeniden boyutlandırmak tuvali zaten tamamen siler.
+    if (kendi) kendi.sonYari = 0;
     degisti();
   };
 
@@ -47,8 +60,9 @@ export function tuvalKur(canvas: HTMLCanvasElement, degisti: () => void): Tuval 
   const gorunurlukte = (): void => { if (!document.hidden) boyutla(); };
   document.addEventListener("visibilitychange", gorunurlukte);
 
-  return {
+  kendi = {
     canvas, ctx,
+    sonYari: 0,
     get W() { return W; },
     get H() { return H; },
     yerlesim(halkaSayisi: number) {
@@ -65,6 +79,7 @@ export function tuvalKur(canvas: HTMLCanvasElement, degisti: () => void): Tuval 
       document.removeEventListener("visibilitychange", gorunurlukte);
     }
   };
+  return kendi;
 }
 
 /** Halkanın çizgili kısımları: boşlukların arasında kalan yaylar. */
@@ -87,11 +102,25 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt }: Ci
   if (W === 0 || H === 0) return;
   const g = t.yerlesim(s.rings.length);
 
-  ctx.clearRect(0, 0, W, H);
-
   const sarsinti = hareketAzalt ? 0 : s.shake;
   const sx = sarsinti ? (Math.random() - 0.5) * 12 * sarsinti : 0;
   const sy = sarsinti ? (Math.random() - 0.5) * 12 * sarsinti : 0;
+
+  // Yalnızca çizimin gerçekten dokunduğu kareyi temizle. Geniş ekranda tüm tuvali
+  // temizlemek 1920×1000'de tek başına 2,4 ms tutuyordu; çizim ortalanmış bir kare
+  // alana sığdığı için gerisi zaten hep boş.
+  // Top "fire" aşamasında halkaların dışına uçar; kutu onu da kapsamalı, yoksa iz bırakır.
+  const buYari = Math.max(
+    g.outer + g.S * KAMA_TASMA + g.lineWidth,
+    s.asama === "fire" ? s.ballDist + g.ballR : 0
+  ) + Math.abs(sx) + Math.abs(sy) + 2;
+  // Kutu daralıyorsa (top merkeze döndü, level değişti) önceki karenin izi kalırdı:
+  // her kare önceki ve şimdiki kutunun birleşimi temizlenir.
+  const yariAlan = Math.max(buYari, t.sonYari);
+  t.sonYari = buYari;
+  const kx = Math.max(0, W / 2 - yariAlan);
+  const ky = Math.max(0, H / 2 - yariAlan);
+  ctx.clearRect(kx, ky, Math.min(W, W / 2 + yariAlan) - kx, Math.min(H, H / 2 + yariAlan) - ky);
   ctx.save();
   ctx.translate(W / 2 + sx, H / 2 + sy);
 
@@ -106,7 +135,7 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt }: Ci
 
   // 2) Açıklık kamaları
   if (s.anyLocked && s.asama !== "crash") {
-    const dis = g.outer + g.S * 0.05;
+    const dis = g.outer + g.S * KAMA_TASMA;
     for (const bolge of aciklikBolgeleri(s)) {
       const genis = canPass(bolge.w);
       ctx.fillStyle = genis ? renk.ball : renk.fail;
@@ -171,11 +200,4 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt }: Ci
   ctx.fill();
 
   ctx.restore();
-
-  if (s.flash > 0 && !hareketAzalt) {
-    ctx.globalAlpha = s.flash * 0.18;
-    ctx.fillStyle = s.asama === "crash" ? renk.fail : renk.win;
-    ctx.fillRect(0, 0, W, H);
-    ctx.globalAlpha = 1;
-  }
 }

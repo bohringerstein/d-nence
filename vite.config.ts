@@ -12,6 +12,9 @@ export default defineConfig({
   },
   server: {
     // Telefondan aynı ağ üzerinden denemek için: npm run dev -- --host
-    port: 5173
+    port: 5173,
+    // Port doluysa Vite sessizce başka bir porta kayar ve elindeki adres tutmaz.
+    // Tarayıcıyı kendisi açsın ki doğru adres her zaman açılan sekmede olsun.
+    open: true
   }
 });
