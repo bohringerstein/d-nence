@@ -5,8 +5,11 @@
   --ball: #E89B00;
   --fail: #E5484D;
   --win: #2E9E6A;
-  --muted: #6B8390;
-  --track: #D3DDE1;
+  /* Açık temada --muted küçük punto metin taşır; #6B8390 arka planda 3,40:1 kalıyordu,
+     WCAG AA 4,5:1 istiyor. #5A6E79 ile 4,56:1. Koyu temada zaten yeterliydi. */
+  --muted: #5A6E79;
+  /* Oluk #D3DDE1 ile arka plandan ayrılmıyordu (1,18:1); #BCCBD3 ile 1,42:1. */
+  --track: #BCCBD3;
   box-sizing: border-box;
 }
 

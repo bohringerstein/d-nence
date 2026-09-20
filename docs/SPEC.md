@@ -141,9 +141,11 @@ Oyun alanında çizim sırası:
 | Top/vurgu | `#E89B00` | `#FFC93C` |
 | Hata | `#E5484D` | `#FF6369` |
 | Başarı | `#2E9E6A` | `#4CC38A` |
-| Soluk metin | `#6B8390` | `#7F98A4` |
+| Soluk metin | `#5A6E79` | `#7F98A4` |
 
 Yazı tipi: Fredoka (400 ve 600), yedek olarak sistem sans-serif. Tüm metinler Türkçedir.
+
+**Kontrast.** Metin renkleri arka planda en az 4,5:1 olmalıdır (WCAG AA). Açık temadaki soluk metin bu yüzden `#6B8390`'dan `#5A6E79`'a koyultuldu (3,40:1 → 4,56:1). Top ve sıradaki halkanın amber rengi korundu, ama ikisi de ince koyu bir kenarla çizilir: açık zeminde amber tek başına 1,97:1 verir ve şekil renkten bağımsız okunmalıdır. Yetersiz açıklık kaması ayrıca kesik konturla işaretlenir, böylece "geçer mi" bilgisi kırmızı/sarı ayrımına bağlı kalmaz. Ölçümler `src/ui/contrast.test.ts` içinde sınanır.
 
 **İpuçları.** Alt çubuktaki metin şu önceliğe göre seçilir:
 1. Patron leveli, ilk deneme: `"<ad>: <açıklama>"`.
@@ -221,13 +223,13 @@ Kayıt okunamazsa oyun hata vermeden Level 1'den başlar. "Baştan başla" düğ
 
 Bir sürüm ancak aşağıdakilerin hepsi sağlanınca tamam sayılır:
 
-- [ ] `npm run check` başarılı (tip denetimi, birim testleri, tablo denetimi, prototip güncelliği).
+- [x] `npm run check` başarılı (tip denetimi, birim testleri, tablo denetimi, prototip güncelliği).
 - [x] Otomatik test: her level için referans çözücü, oyunun kendi güncelleme döngüsü üzerinden (sabit adımla) leveli süre sınırından önce bitiriyor.
 - [x] Birim testleri: açı normalleştirme, maske uygulama, çembersel en büyük açıklık (başa sarma dahil), yıldız hesabı.
 - [x] Kayıp sonrası kazanma, süre dolması ve art arda hızlı dokunuş senaryolarında oyun takılmıyor.
-- [ ] 360×640 ve 1440×900 ekranlarda halkalar ekrana sığıyor, düzen bozulmuyor.
-- [ ] Orta seviye bir telefonda 60 fps.
-- [ ] Açık ve koyu temada tüm öğeler okunabilir.
+- [x] 360×640 ve 1440×900 ekranlarda halkalar ekrana sığıyor, düzen bozulmuyor.
+- [ ] Orta seviye bir telefonda 60 fps. *(Masaüstünde ölçüldü: en yoğun kare 1920×1000'de 6,2 ms, telefon ölçüsünde 1,9 ms — 16,7 ms bütçesinin %37 ve %11'i. Gerçek cihazda doğrulanmayı bekliyor: `npm run dev -- --host`.)*
+- [x] Açık ve koyu temada tüm öğeler okunabilir.
 
 ## 11. Kapsam dışı (sonraki sürümler için fikirler)
 

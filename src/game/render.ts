@@ -168,9 +168,19 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt }: Ci
     let alpha = r.locked ? 1 : 0.4;
     let kalinlik = g.lineWidth;
     if (i === sonraki) alpha = 0.75;
-    if (i === s.active && s.asama === "idle") { renkli = renk.ball; alpha = 1; kalinlik = g.lineWidth * 1.25; }
+    const aktif = i === s.active && s.asama === "idle";
+    if (aktif) { renkli = renk.ball; alpha = 1; kalinlik = g.lineWidth * 1.25; }
     if (i === s.crashRing || s.crashRing === HEPSI) { renkli = renk.fail; alpha = 1; }
     if (i === s.lastLocked && s.lockPulse > 0) kalinlik = g.lineWidth * (1 + s.lockPulse * 0.8);
+
+    // Amber, açık temada arka planla 1,97:1 kontrast veriyor; tek başına zayıf.
+    // Altına ince koyu bir kenar çizip şeklin renkten bağımsız okunmasını sağlıyoruz.
+    if (aktif) {
+      ctx.strokeStyle = renk.ink;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = kalinlik + 3;
+      halkaCiz(ctx, r, R);
+    }
 
     ctx.strokeStyle = renkli;
     ctx.globalAlpha = alpha;
@@ -192,12 +202,17 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt }: Ci
     }
   });
 
-  // 5) Top
+  // 5) Top. Halka gibi burada da ince koyu kenar: amber açık zeminde tek başına silik.
   const d = s.asama === "fire" ? s.ballDist : 0;
   ctx.fillStyle = s.asama === "crash" ? renk.fail : renk.ball;
   ctx.beginPath();
   ctx.arc(Math.cos(s.fireAngle) * d, Math.sin(s.fireAngle) * d, g.ballR, 0, TAU);
   ctx.fill();
+  ctx.strokeStyle = renk.ink;
+  ctx.globalAlpha = 0.4;
+  ctx.lineWidth = Math.max(1, g.ballR * 0.16);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 
   ctx.restore();
 }
