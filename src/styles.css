@@ -102,6 +102,10 @@ header, footer {
    ve hiyerarşi okunmuyordu. Oysa bunlar eşit önemde değil: başlık hiç değişmeyen bir
    künye, oyuncu ona bir kez bakar; sayaç oyunun tek dinamik sayısı ve oynarken gözün
    gittiği yer. Ağırlık sayaca verildi, başlık künye tonuna çekildi. */
+/* Sayaç düğme olunca 44px taban yüksekliği getiriyor; dikey dolgu buna göre kısıldı,
+   yoksa üst çubuk 56 pikselden 72 piksele çıkıp oyun alanından yer götürüyordu. */
+header { padding-top: 6px; padding-bottom: 6px; }
+
 header h1 {
   font-size: 1.05rem;
   font-weight: 500;
@@ -110,13 +114,33 @@ header h1 {
   margin: 0;
 }
 
-.clock {
+/* Sayaç bir düğmedir (duraklatma), ama düğme gibi görünmez: kenarlık ve dolgu
+   alınır, geriye rakamlar kalır. Dokunma hedefi yine de 44 piksel. */
+button.clock {
   font-size: 1.9rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
+  color: var(--ink);
+  border: none;
+  background: none;
+  border-radius: 0;
+  padding: 0 4px;
+  gap: 0.22em;
+  min-height: 44px;
 }
 .clock.low { color: var(--fail); }
+
+/* İki dikey çubuk: ayrı bir simge dosyası ya da SVG olmadan, puntoyla ölçeklenerek.
+   Sayaç tek başına "dokunulabilir" görünmüyordu; bu onu denetim yapan işaret. */
+.duraklatIm {
+  flex: 0 0 auto;
+  width: 0.34em;
+  height: 0.46em;
+  border-left: 0.11em solid currentColor;
+  border-right: 0.11em solid currentColor;
+  opacity: 0.5;
+}
 
 .lvl { font-size: 1.1rem; color: var(--muted); white-space: nowrap; }
 .lvl b { color: var(--ink); font-weight: 600; font-size: 1.4rem; }
@@ -305,12 +329,13 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 @media (max-width: 360px) {
   header, footer { padding-left: 14px; padding-right: 14px; gap: 8px; }
   .bar { margin-left: 14px; margin-right: 14px; }
-  .clock { font-size: 1.6rem; }
-  .lvl { font-size: 1rem; }
-  .lvl b { font-size: 1.2rem; }
-  /* Bu genişlikte en uzun patron ipucu üç satıra çıkıyor. İki satırlık yer ayırmak
-     yetmez: çubuk 64 ile 81 piksel arasında oynar ve halkalar dikeyde zıplar. */
-  #hint { min-height: 4.05em; }
+  /* Duraklat simgesi üst çubuğa genişlik ekliyor; bu genişlikte "Level 1000 / 1000,
+     patron" ile birlikte sığması için punto ve dolgular kısılır. */
+  button.clock { font-size: 1.45rem; padding: 0; gap: 0.16em; }
+  header h1 { font-size: 0.95rem; }
+  .lvl { font-size: 0.95rem; }
+  .lvl b { font-size: 1.1rem; }
+  .lvl small { font-size: 0.8rem; }
 }
 
 /* Üst çubuktaki "/1000" soneki: level numarasının yanında ama onun ağırlığında değil. */
@@ -319,3 +344,34 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 /* Ayarlar panelindeki ilerleme özeti. */
 .ozet { margin: 0 0 1rem; color: var(--muted); font-size: 0.9rem; }
 .ozet:empty { display: none; }
+
+/* Devam ederken 3-2-1. Halkalar bu sırada DONUK kalır: geri sayım boyunca dönselerdi
+   oyuncu bedava gözlem süresi kazanır ve süre bütçesi (docs/SPEC.md, γ) delinirdi.
+   Geri sayımın işi bilgi vermek değil, "parmağını hazırla" demek. */
+.gerisayim {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-size: clamp(3rem, 18vmin, 7rem);
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transform: scale(1.25);
+  transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+}
+.gerisayim.aktif { opacity: 0.85; transform: scale(1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .gerisayim { transition: none; transform: none; }
+  .gerisayim.aktif { transform: none; }
+}
+
+/* İpucu sütunu 340 pikselin altında daralıp en uzun patron metnini üç satıra çıkarıyor.
+   İki satırlık yer ayırmak yetmez: alt çubuk 64 ile 82 piksel arasında oynar ve halkalar
+   dikeyde zıplar. 360 pikselde iki satır yettiği için eşik ayrı tutuldu. */
+@media (max-width: 340px) {
+  #hint { min-height: 4.05em; }
+}

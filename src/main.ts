@@ -47,6 +47,24 @@ let durum: LevelState = null as unknown as LevelState;
 let bitti = false;
 /** Ayarlar paneli açıkken oyun durur: uyarıyı okumak oyuncunun süresini yakmamalı. */
 let panelAcik = false;
+/** Oyuncunun kendi duraklatması (sayaca dokunarak ya da Esc ile). */
+let duraklatildi = false;
+
+/**
+ * Devam ederken çalışan geri sayım (saniye). Sıfırdan büyükken oyun HÂLÂ donuktur.
+ *
+ * Neden halkalar da donuk: geri sayım boyunca dönselerdi oyuncu bedava gözlem süresi
+ * kazanırdı ve süre bütçesi delinirdi — duraklat, izle, duraklat diye sömürülebilirdi
+ * (bkz. docs/SPEC.md, γ). Geri sayımın işi bilgi vermek değil, oyuncunun parmağını
+ * ekrana geri getirmesine zaman tanımak.
+ */
+let geriSayim = 0;
+const GERI_SAYIM_ADET = 3;
+const GERI_SAYIM_BEKLEME = 0.6;   // rakam başına saniye
+let sonGeriSayimRakami = -1;
+
+/** Oyun canlı değil: fizik durur, dokunuşlar yok sayılır. */
+const oyunDonuk = (): boolean => bitti || panelAcik || duraklatildi || geriSayim > 0;
 
 const tuval = tuvalKur(ui.canvas, () => { if (durum) cizVeYaz(); });
 // Ekranın tamamı dokunma alanı: canvas'a bağlansaydı üst ve alt çubuk ölü bölge olurdu.
@@ -58,7 +76,13 @@ const girdi = girdiBagla(ui.kok);
 ui.kok.addEventListener("pointerdown", () => { if (ayarlar.ses) sesiAc(); });
 // Sekme arkaplana alınınca oyun zaten duruyor (game/loop.ts); ses bağlamı da askıya
 // alınır, sonraki dokunuşta kendiliğinden uyanır.
-document.addEventListener("visibilitychange", () => { if (document.hidden) sesiDuraklat(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { sesiDuraklat(); return; }
+  // Arkaplandan dönüşte oyun doğrudan canlıya dönüyordu: uygulamayı değiştirip geri
+  // gelen oyuncu halkaları bir anda hareket hâlinde buluyordu. Duraklatmayla aynı
+  // muamele: önce geri sayım.
+  if (!oyunDonuk()) geriSayimBaslat();
+});
 
 // ---- Level yükleme: tek nesne toptan değişir, alan alan sıfırlama yok -------
 function levelYukle(n: number, denemeyiKoru = false): void {
@@ -66,6 +90,7 @@ function levelYukle(n: number, denemeyiKoru = false): void {
   const level = tablo.levels[n - 1];
   durum = createLevel(level, deneme);
   girdi.temizle();
+  geriSayimDurdur();
 
   // Numara kalın, geri kalanı künye tonunda: "patron" da sonekin içinde, çünkü kalın
   // 1,4 rem içinde 320 piksellik telefonda üst çubuğu taşırıyordu.
@@ -80,7 +105,7 @@ const yaz = (metin: string): void => { ui.hint.textContent = metin; };
 
 function saatiGuncelle(): void {
   const kalan = kalanSure(durum);
-  ui.clock.textContent = sureYazisi(kalan);
+  ui.clockSayi.textContent = sureYazisi(kalan);
   const az = kalan < durum.level.limit * 0.25;
   ui.clock.classList.toggle("low", az);
   ui.bar.classList.toggle("low", az);
@@ -126,7 +151,7 @@ function dokunusIsle(gercekZaman: number): void {
 // ---- Döngü -----------------------------------------------------------------
 const oyun = dongu({
   adim(dt, gercekZaman) {
-    if (bitti || panelAcik) { girdi.temizle(); return false; }
+    if (oyunDonuk()) { girdi.temizle(); return false; }
     dokunusIsle(gercekZaman);
     const s = step(durum, dt);
     if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); cal(ayarlar, "kayip"); yaz("Süre doldu"); return true; }
@@ -140,12 +165,77 @@ const oyun = dongu({
   },
   cizim(dt) {
     if (bitti) return;
-    // Panel açıkken halkalar donar ama çizim sürer: oyuncu ayarın etkisini anında görür.
+    geriSayimIlerlet(dt);
+    // Oyun donukken halkalar durur ama çizim sürer: oyuncu ayarın etkisini anında görür
+    // ve duraklatmada kaldığı kareyi olduğu gibi görür.
     const g = tuval.yerlesim(durum.rings.length);
-    if (!panelAcik) decay(durum, dt, g.S, g.outer);
+    if (!oyunDonuk()) decay(durum, dt, g.S, g.outer);
     saatiGuncelle();
     cizVeYaz();
   }
+});
+
+// ---- Duraklatma ------------------------------------------------------------
+//
+// Oyuncunun ara vermesi gereken bir durum her zaman olur. Eskiden tek yol ayarlar
+// panelini açmaktı ve panel kapanınca level BAŞTAN başlıyordu — yani ara vermenin
+// bedeli ilerlemeydi. Artık oyun tam durduğu karede bekler ve oradan devam eder.
+
+/** Geri sayımı başlatır: oyun donuk kalır, ekranda 3-2-1 görünür. */
+function geriSayimBaslat(): void {
+  if (bitti) return;
+  geriSayim = GERI_SAYIM_ADET * GERI_SAYIM_BEKLEME;
+  sonGeriSayimRakami = -1;
+  girdi.temizle();   // "Devam et"e basarken sızan dokunuş oyuna gitmesin
+  geriSayimIlerlet(0);
+}
+
+function geriSayimDurdur(): void {
+  geriSayim = 0;
+  sonGeriSayimRakami = -1;
+  ui.gerisayim.classList.remove("aktif");
+  ui.gerisayim.textContent = "";
+}
+
+function geriSayimIlerlet(dt: number): void {
+  if (geriSayim <= 0) return;
+  geriSayim = Math.max(0, geriSayim - dt);
+  if (geriSayim <= 0) { geriSayimDurdur(); return; }
+  const rakam = Math.ceil(geriSayim / GERI_SAYIM_BEKLEME);
+  if (rakam === sonGeriSayimRakami) return;
+  sonGeriSayimRakami = rakam;
+  // Her rakamda sınıfı kapatıp açmak geçişi yeniden tetikler: rakamlar tek tek belirir.
+  ui.gerisayim.classList.remove("aktif");
+  ui.gerisayim.textContent = String(rakam);
+  requestAnimationFrame(() => ui.gerisayim.classList.add("aktif"));
+}
+
+function duraklatmaAc(): void {
+  if (oyunDonuk()) return;
+  duraklatildi = true;
+  geriSayimDurdur();
+  girdi.temizle();
+  ui.duraklatMetin.textContent =
+    `${sureYazisi(kalanSure(durum))} saniyen kaldı. Halkalar tam durduğun yerde bekliyor.`;
+  ui.duraklat.hidden = false;
+  arkaKilit(true);
+  ui.devamDugme.focus({ preventScroll: true });
+}
+
+function duraklatmaKapat(): void {
+  ui.duraklat.hidden = true;
+  arkaKilit(false);
+  duraklatildi = false;
+  ui.devamDugme.blur();
+  geriSayimBaslat();
+}
+
+ui.clock.addEventListener("click", e => { e.stopPropagation(); duraklatmaAc(); ui.clock.blur(); });
+ui.devamDugme.addEventListener("click", duraklatmaKapat);
+
+// Masaüstünde Esc de duraklatır. Devam etmek bilinçli olmalı, o yüzden Esc geri almaz.
+window.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !oyunDonuk()) { e.preventDefault(); duraklatmaAc(); }
 });
 
 // ---- Bitiş ekranı ----------------------------------------------------------
@@ -167,6 +257,7 @@ ui.bitisDugme.addEventListener("click", () => {
   bitti = false;
   bastanBasla(kayit);
   levelYukle(1);
+  geriSayimBaslat();
 });
 
 // "Baştan başla" artık ayarlar panelinde (bkz. ui/shell.ts): Level 1'e döndüren seyrek
@@ -182,6 +273,7 @@ ui.reset.addEventListener("click", () => {
   ui.bitis.hidden = true;
   bastanBasla(kayit);
   levelYukle(1);
+  geriSayimBaslat();
   ui.reset.blur();   // sonraki Enter oyuna gitsin, düğmeye değil
 });
 
@@ -268,7 +360,7 @@ ui.nasilKapat.addEventListener("click", () => {
   ayarlar.uyariGoruldu = true;
   ayarlariYaz(ayarlar);
   panelAcik = false;
-  levelYukle(durum.level.n);
+  geriSayimBaslat();
 });
 ui.desenKutu.addEventListener("change", ayarlariUygula);
 ui.hareketKutu.addEventListener("change", ayarlariUygula);
@@ -283,8 +375,10 @@ ui.ayarKapat.addEventListener("click", () => {
   arkaKilit(false);
   ui.ayarKapat.blur();
   panelAcik = false;
-  // Panelde geçen süre levele yazılmasın: level baştan başlar.
-  levelYukle(durum.level.n);
+  // Panelde geçen süre zaten işlemiyordu (oyun donuktu). Eskiden level yine de baştan
+  // başlatılıyordu ve ayarları açmanın bedeli ilerlemeydi — oyuncu ara vermek için
+  // paneli kullanınca bölümü kaybediyordu. Artık kaldığı karede devam eder.
+  geriSayimBaslat();
 });
 
 levelYukle(kayit.level);

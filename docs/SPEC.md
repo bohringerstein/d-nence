@@ -184,6 +184,13 @@ Süre çubuğunun oluğu iki temada da zeminden ayrılmalıdır (açık 1,42:1, 
 - **Kanal ekranda kalır.** Kamalar eskiden kayıpta tamamen gizleniyordu; yani "neden kaybettim" sorusuna cevap veren tek öğe, tam da o soru sorulduğu anda siliniyordu. Geriye kırmızı bir halka ve sarsıntı kalıyordu: "kaybettin" diyordu ama "şu kadarla" demiyordu. Artık daralmış kanal kırmızı dolu çizilir ve topun ona sığmadığı görünür.
 - **Pay yazılır.** Kanalın geçiş eşiğinden ne kadar dar kaldığı, kaybın oluştuğu anda zaten hesaplanıyordu ama atılıyordu. Artık durumda saklanır ve ipucunda söylenir: 0,05°'nin altında "kıl payı", 10°'nin üstünde "yol erken daraldı", arada sayıyla ("1,4° dar kaldı"). **Süre dolduğunda ölçülecek bir pay yoktur; orada sayı uydurulmaz.**
 
+**Duraklatma.** Oyuncunun ara vermesi gereken bir durum her zaman olur; eskiden tek yol ayarlar panelini açmaktı ve panel kapanınca level **baştan başlıyordu** — yani ara vermenin bedeli ilerlemeydi.
+
+- **Denetim sayacın kendisidir.** Üst çubuktaki sayaç bir düğmedir ve yanında iki çubuktan oluşan bir duraklat simgesi taşır. Ayrı bir düğme bilerek yoktur: ekranın tamamı dokunma alanı olduğu için alt köşeye eklenen her düğme, başparmağın durduğu yere ölü bölge açar. Sayaç ise üst çubuktadır ve eşleşme birebirdir — zamanı durdurmak için zamana dokunulur. Masaüstünde Esc de duraklatır.
+- **Duraklatma tam bir donmadır.** Halkalar durduğu açıda kalır, süre işlemez, dokunuşlar yok sayılır. Örtü yarı saydamdır ki donmuş halkalar ve kanal arkadan görünsün: oyuncu "kaldığım yer duruyor" bilgisini gözüyle alır.
+- **Devam ederken üçten geri sayılır ve halkalar sayım boyunca DONUK kalır.** Bu bir adalet kuralıdır: halkalar geri sayımda dönseydi oyuncu bedava gözlem süresi kazanır ve süre bütçesi (γ) delinirdi — duraklat, izle, duraklat diye sömürülebilirdi. Geri sayımın işi bilgi vermek değil, parmağın ekrana dönmesine zaman tanımaktır.
+- **Aynı muamele her donma için geçerlidir:** ayarlar, "nasıl oynanır" ve arkaplandan dönüş de kaldığı kareden devam eder ve geri sayımla girer. Arkaplandan dönüşte oyun eskiden doğrudan canlıya dönüyordu; uygulamayı değiştirip geri gelen oyuncu halkaları bir anda hareket hâlinde buluyordu.
+
 **Birikimin görünmesi.** Ayarlar paneli ilerleme özetini gösterir: kaç bölüm açıldığı ve toplanan yıldız ("312 bölüm açıldı · 714 / 936 yıldız"). Toplanan yıldız eskiden oyun boyunca hiçbir yerde görünmüyordu; yalnızca 1000. bölümü bitiren oyuncu toplamını öğreniyordu. 1000 bölümlük bir oyunda devam etme sebebinin kendisi birikimin görünmesidir.
 
 **İpuçları.** Alt çubuktaki metin şu önceliğe göre seçilir:

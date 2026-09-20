@@ -1,7 +1,10 @@
 // Ekran düzeni (şartname 7. bölüm): üst çubuk, süre çubuğu, oyun alanı, alt çubuk.
 export interface Kabuk {
   kok: HTMLElement;
-  clock: HTMLElement;
+  /** Sayaç aynı zamanda duraklatma düğmesidir (bkz. HTML). */
+  clock: HTMLButtonElement;
+  /** Sayacın rakam kısmı; duraklat simgesi kardeş öğe olduğu için ayrı tutulur. */
+  clockSayi: HTMLElement;
   bar: HTMLElement;
   barFill: HTMLElement;
   lvl: HTMLElement;
@@ -14,6 +17,11 @@ export interface Kabuk {
   bitisMetin: HTMLElement;
   bitisDugme: HTMLButtonElement;
   flas: HTMLElement;
+  /** Devam ederken çalışan 3-2-1 sayacı. */
+  gerisayim: HTMLElement;
+  duraklat: HTMLElement;
+  duraklatMetin: HTMLElement;
+  devamDugme: HTMLButtonElement;
   ayarAc: HTMLButtonElement;
   ayarPanel: HTMLElement;
   ayarKapat: HTMLButtonElement;
@@ -39,13 +47,20 @@ const HTML = `
 <div class="app">
   <header>
     <h1>Dönence</h1>
-    <span class="clock" id="clock" aria-label="Kalan süre">0,0</span>
+    <!-- Sayacın kendisi duraklatma düğmesidir. Ayrı bir düğme koymuyoruz: ekranın
+         tamamı dokunma alanı olduğu için alt köşeye eklenen her düğme, başparmağın
+         durduğu yere ölü bölge açar. Sayaç ise üst çubukta ve eşleşme birebir:
+         zamanı durdurmak için zamana dokun. -->
+    <button class="clock" id="clock" type="button" aria-label="Duraklat">
+      <i class="duraklatIm" aria-hidden="true"></i><span id="clockSayi">0,0</span>
+    </button>
     <div class="lvl">Level <b id="lvl">1</b><small id="lvlToplam"></small></div>
   </header>
   <div class="bar" id="bar"><i id="barFill"></i></div>
   <div class="alan">
     <canvas id="c" aria-label="Oyun alanı. Dokunarak sıradaki halkayı kilitle."></canvas>
     <div class="flas" id="flas" aria-hidden="true"></div>
+    <div class="gerisayim" id="gerisayim" aria-hidden="true"></div>
   </div>
   <footer>
     <span id="hint" role="status" aria-live="polite"></span>
@@ -89,6 +104,15 @@ const HTML = `
   <div class="ortu" id="nasil" hidden role="dialog" aria-modal="true" aria-labelledby="nasilBaslik">
     <div class="kutu nasilKutu" id="nasilIcerik"></div>
   </div>
+  <!-- Duraklatma örtüsü bilerek yarı saydam: donmuş halkalar arkadan görünsün ki
+       oyuncu "kaldığım yer duruyor" bilgisini gözüyle alsın. -->
+  <div class="ortu" id="duraklat" hidden role="dialog" aria-modal="true" aria-labelledby="duraklatBaslik">
+    <div class="kutu">
+      <h2 id="duraklatBaslik">Duraklatıldı</h2>
+      <p id="duraklatMetin"></p>
+      <button id="devamDugme" type="button">Devam et</button>
+    </div>
+  </div>
   <div class="ortu" id="bitis" hidden role="dialog" aria-modal="true" aria-labelledby="bitisBaslik">
     <div class="kutu">
       <h2 id="bitisBaslik">Kasa açıldı</h2>
@@ -119,7 +143,8 @@ export function kabukKur(hedef: HTMLElement, nasilHtml: string): Kabuk {
   return {
     arka,
     kok: hedef,
-    clock: bul(hedef, "clock"),
+    clock: bul<HTMLButtonElement>(hedef, "clock"),
+    clockSayi: bul(hedef, "clockSayi"),
     bar: bul(hedef, "bar"),
     barFill: bul(hedef, "barFill"),
     lvl: bul(hedef, "lvl"),
@@ -131,6 +156,10 @@ export function kabukKur(hedef: HTMLElement, nasilHtml: string): Kabuk {
     bitisMetin: bul(hedef, "bitisMetin"),
     bitisDugme: bul<HTMLButtonElement>(hedef, "bitisDugme"),
     flas: bul(hedef, "flas"),
+    gerisayim: bul(hedef, "gerisayim"),
+    duraklat: bul(hedef, "duraklat"),
+    duraklatMetin: bul(hedef, "duraklatMetin"),
+    devamDugme: bul<HTMLButtonElement>(hedef, "devamDugme"),
     ayarAc: bul<HTMLButtonElement>(hedef, "ayarAc"),
     ayarPanel: bul(hedef, "ayarPanel"),
     ayarKapat: bul<HTMLButtonElement>(hedef, "ayarKapat"),

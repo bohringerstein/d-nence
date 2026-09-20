@@ -15,7 +15,9 @@ const SIMGE = {
   // Hızlanıp yavaşlayan halka: dalgalı çizgi
   wobble: `<svg viewBox="0 0 40 24" aria-hidden="true"><path d="M4 12q5-6 10 0t10 0 10 0" stroke="var(--ink)" stroke-width="3.5" stroke-linecap="round" fill="none"/></svg>`,
   // Sarı kama: topun çıkış yolu
-  kama: `<svg viewBox="0 0 40 24" aria-hidden="true"><path d="M4 12 L36 4 L36 20 Z" fill="var(--ball)" opacity="0.35"/><circle cx="7" cy="12" r="3.5" fill="var(--ball)"/></svg>`
+  kama: `<svg viewBox="0 0 40 24" aria-hidden="true"><path d="M4 12 L36 4 L36 20 Z" fill="var(--ball)" opacity="0.35"/><circle cx="7" cy="12" r="3.5" fill="var(--ball)"/></svg>`,
+  // Duraklatma: üst çubuktaki sayacın yanındaki iki çubuğun aynısı (bkz. styles.css .duraklatIm)
+  duraklat: `<svg viewBox="0 0 40 24" aria-hidden="true"><rect x="14" y="5" width="4" height="14" rx="1" fill="var(--ink)"/><rect x="22" y="5" width="4" height="14" rx="1" fill="var(--ink)"/></svg>`
 };
 
 const satir = (simge: string, baslik: string, metin: string): string =>
@@ -35,6 +37,7 @@ Tüm halkalar kilitlenince kasa açılır.</p>
   ${satir(SIMGE.preLocked, "Küçük kare", "Bu halka <b>baştan kilitli</b>. Yolun yönünü o belirler, sen değiştiremezsin.")}
   ${satir(SIMGE.gaps2, "İki boşluk", "Halkanın <b>iki kapısı</b> var. Hangisini kullandığın sonraki halkalar için kalan payı değiştirir.")}
   ${satir(SIMGE.wobble, "Dalgalı halka", "Sabit hızda dönmez, <b>hızlanıp yavaşlar</b>. Yavaşladığı anı bekle.")}
+  ${satir(SIMGE.duraklat, "Duraklat", "Üstteki <b>sayaca dokun</b>, oyun tam o karede durur. Devam edince üçten geri sayar; halkalar sayım bitene kadar beklemeye devam eder.")}
 </ul>
 
 <p class="giris"><b>Yıldızlar hızı değil hassasiyeti ölçer.</b> Kasa açıldığında kalan yol ne kadar
