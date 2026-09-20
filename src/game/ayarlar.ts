@@ -18,11 +18,17 @@ export interface Ayarlar {
   hareketAzalt: boolean;
   /** Kilitte ve kayıpta telefon titreşimi. */
   titresim: boolean;
+  /**
+   * Ses. Varsayılan AÇIK: tek dokunuşla oynanan bir oyunda dokunuşun ödülü sestir,
+   * ve iOS'ta titreşim desteklenmediği için orada tek dokunsal olmayan geri bildirim
+   * kanalı budur.
+   */
+  ses: boolean;
   /** İlk açılış uyarısı gösterildi mi. */
   uyariGoruldu: boolean;
 }
 
-const varsayilan = (): Ayarlar => ({ desenYumusat: false, hareketAzalt: false, titresim: true, uyariGoruldu: false });
+const varsayilan = (): Ayarlar => ({ desenYumusat: false, hareketAzalt: false, titresim: true, ses: true, uyariGoruldu: false });
 
 export function ayarlariOku(): Ayarlar {
   try {
@@ -33,6 +39,7 @@ export function ayarlariOku(): Ayarlar {
     if (typeof o.desenYumusat === "boolean") a.desenYumusat = o.desenYumusat;
     if (typeof o.hareketAzalt === "boolean") a.hareketAzalt = o.hareketAzalt;
     if (typeof o.titresim === "boolean") a.titresim = o.titresim;
+    if (typeof o.ses === "boolean") a.ses = o.ses;
     if (typeof o.uyariGoruldu === "boolean") a.uyariGoruldu = o.uyariGoruldu;
     if (!localStorage.getItem(KEY)) ayarlariYaz(a);
     return a;

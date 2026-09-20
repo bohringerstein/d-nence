@@ -1,7 +1,7 @@
 // İpucu önceliği (şartname 7. bölüm).
 import test from "node:test";
 import assert from "node:assert";
-import { ipucu, ogreticiTablosu, yildizYazisi, sureYazisi } from "./hints.ts";
+import { ipucu, ogreticiTablosu, yildizYazisi, sureYazisi , kayipYazisi } from "./hints.ts";
 import type { Level, Best } from "../core/index.ts";
 
 const level = (o: Partial<Level> = {}): Level =>
@@ -63,4 +63,28 @@ test("yıldız ve süre biçimleri", () => {
   assert.equal(yildizYazisi(1), "★☆☆");
   assert.equal(sureYazisi(4.25), "4,3");   // Türkçe ondalık ayırıcı virgül
   assert.equal(sureYazisi(12), "12,0");
+});
+
+// --- Kayıp mesajı: "az kalmıştı" mı, "yanlış an" mı? -------------------------
+//
+// Eskiden her kayıp aynı cümleyi veriyordu ("Açıklık kapandı"): 1 derece kaçıran da
+// 20 derece kaçıran da aynı şeyi okuyordu. Oysa bu iki durum oyuncu için tamamen farklı.
+test("kayıp mesajı payı söyler", () => {
+  assert.ok(kayipYazisi(0.02).includes("kıl payı"), kayipYazisi(0.02));
+  assert.ok(kayipYazisi(0.6).includes("0,6°"), kayipYazisi(0.6));
+  assert.ok(kayipYazisi(3.4).includes("3°"), kayipYazisi(3.4));
+  assert.ok(kayipYazisi(25).includes("erken daraldı"), kayipYazisi(25));
+});
+
+test("ölçülemeyen pay sayı uydurmaz", () => {
+  // Süre dolduğunda "şu kadar dar kaldı" diye bir şey yoktur.
+  for (const v of [-1, NaN, Infinity]) {
+    const m = kayipYazisi(v);
+    assert.equal(m, "Açıklık kapandı", `pay ${v} için sayı yazılmamalı: ${m}`);
+  }
+});
+
+test("pay mesajında ondalık ayırıcı virgül", () => {
+  // Oyunun geri kalanı virgül kullanıyor (süre: "8,0"); nokta tutarsız olurdu.
+  assert.ok(!kayipYazisi(0.6).includes("."), kayipYazisi(0.6));
 });

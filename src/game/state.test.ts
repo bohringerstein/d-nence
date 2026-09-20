@@ -210,3 +210,54 @@ test("decay görsel değerleri söndürür ve topu uçurur", () => {
 test("tablo 60 level ve tüm patronlar yerinde", () => {
   assert.equal(tablo.levels.length, LEVEL_COUNT);
 });
+
+// --- Kayıp payı: "az mı kaçırdım, çok mu?" -----------------------------------
+//
+// Oyuncu kaybettiğinde ekranda yalnızca kırmızı bir halka ve sarsıntı vardı: 1 derece
+// kaçıran da 20 derece kaçıran da aynı şeyi görüyordu. Bilgi kaybın oluştuğu anda zaten
+// hesaplanıyor; artık saklanıyor (crashPay) ve hem ipucunda hem çizimde kullanılıyor.
+test("açıklık kapandığında pay ölçülüp saklanıyor", () => {
+  // 6 halkalı bir bölümde hepsine üst üste, hiç beklemeden dokun: kanal kapanır.
+  const level = tablo.levels.find(l => l.rings.filter(r => !r.preLocked).length >= 5) as Level;
+  assert.ok(level, "çok halkalı bir bölüm bulunmalı");
+
+  let kayipBulundu = false;
+  for (let deneme = 0; deneme < 60 && !kayipBulundu; deneme++) {
+    const s = createLevel(level, 1);
+    // Rastgele bir noktaya kadar ilerle, sonra arka arkaya dokun.
+    for (let k = 0; k < deneme * 3; k++) step(s, ADIM);
+    for (let i = 0; i < 8; i++) {
+      const r: TapSonuc = tap(s, tablo.q3, tablo.q2);
+      if (r.tip === "kayip") {
+        kayipBulundu = true;
+        assert.ok(r.pay > 0, `pay pozitif olmalı, ${r.pay} geldi`);
+        assert.equal(s.asama, "crash");
+        assert.equal(s.crashPay, r.pay, "durum ile sonuç aynı payı taşımalı");
+        assert.ok(s.crashPay < Math.PI, "pay makul bir açı olmalı");
+        break;
+      }
+      if (r.tip !== "kilit") break;
+      step(s, ADIM);
+    }
+  }
+  assert.ok(kayipBulundu, "arka arkaya dokunmak bir yerde kanalı kapatmalı");
+});
+
+test("süre dolduğunda pay ölçülemez sayılır", () => {
+  // "Şu kadar dar kaldı" diye bir şey yok: sayı uydurulmamalı.
+  const level = tablo.levels[0];
+  const s = createLevel(level, 1);
+  let i = 0;
+  while (s.asama === "idle" && i++ < 100000) step(s, ADIM);
+  assert.equal(s.asama, "crash");
+  assert.equal(s.crashRing, HEPSI, "süre dolunca bütün halkalar kırmızı");
+  assert.equal(s.crashPay, -1, "ölçülemeyen pay YOK_PAY kalmalı");
+});
+
+test("yeni level payı sıfırlıyor", () => {
+  // Tek nesne kuralı: createLevel eksiksiz yeni bir durum üretir.
+  const s = createLevel(tablo.levels[0], 1);
+  assert.equal(s.crashPay, -1);
+  assert.equal(s.crashRing, YOK);
+  assert.equal(s.asama, "idle");
+});

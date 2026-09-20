@@ -14,9 +14,11 @@ import type { RingDef, LevelTable, Open } from "../src/core/index.ts";
 /** Üretim sırasındaki ham halka: tanıma gapScale eklenir, gap'i sizeGaps hesaplar. */
 interface RawRing extends RingDef { gapScale?: number }
 
-interface PlayResult { win: boolean; t: number; q?: number }
+/** Kayıp sebebi: "sure" = zaman doldu, "kanal" = açıklık geçilemeyecek kadar daraldı. */
+type Sebep = "sure" | "kanal";
+interface PlayResult { win: boolean; t: number; q?: number; sebep?: Sebep }
 interface Finalized { def: RingDef[]; best: number; limit: number; want: number; roomy: boolean }
-interface Evaluated { win: number; qs: number[] }
+interface Evaluated { win: number; qs: number[]; sureOrani: number; sureKaybi: number }
 type Candidate = Finalized & Evaluated & { tol: number; boss?: string; hint?: string };
 interface Boss { name: string; hint: string; tol: number; rings: () => RawRing[] }
 type Log = (...args: unknown[]) => void;
@@ -51,12 +53,12 @@ function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): 
         // İleri adım lt'yi adımdan SONRA, geri adım ÖNCE alır: ancak böyle tam tersine çevrilebilir.
         for (let k = Math.abs(e); k > 0; k -= dt) { const lt = sdt > 0 ? t + sdt : t; stepRings(rs, sdt, lt); t += sdt; }
         open = lockOpen(open, r);
-        if (!canPass(largestOpen(open).w)) return { win: false, t };
+        if (!canPass(largestOpen(open).w)) return { win: false, t, sebep: "kanal" };
         r.locked = true; last = t; done = true; break;
       }
       t += dt; stepRings(rs, dt, t);
     }
-    if (!done) return { win: false, t };
+    if (!done) return { win: false, t, sebep: "sure" };
   }
   const minGap = Math.min(...def.map(r => r.gap)) * DEG;
   return { win: true, t, q: starRatio(largestOpen(open).w, minGap) };
@@ -343,9 +345,17 @@ function playUsta(def: RingDef[], limit: number): PlayResult {
 }
 
 function evaluate(L: { def: RingDef[]; limit: number }, trials = 50): Evaluated {
-  es = 777; let w = 0; const qs: number[] = [];
-  for (let k = 0; k < trials; k++) { const r = play(L.def, L.limit); if (r.win) { w++; qs.push(r.q as number); } }
-  return { win: w / trials, qs };
+  es = 777; let w = 0, sure = 0; const qs: number[] = [];
+  for (let k = 0; k < trials; k++) {
+    const r = play(L.def, L.limit);
+    if (r.win) { w++; qs.push(r.q as number); } else if (r.sebep === "sure") sure++;
+  }
+  const kayip = trials - w;
+  // İki ölçü: sureOrani kayıpların içindeki pay (teşhis için), sureKaybi ise TÜM
+  // denemelerin içindeki pay (karar için). İkincisi doğru ölçüttür: %92 kazanılan bir
+  // bölümde kayıpların %75'i süre dolması olsa bile oyuncunun yalnızca %6'sı saate
+  // yenilir, bu bir sorun değildir.
+  return { win: w / trials, qs, sureOrani: kayip ? sure / kayip : 0, sureKaybi: sure / trials };
 }
 
 /**
@@ -400,14 +410,39 @@ const bossHedefi = (n: number, boss: boolean): number =>
 const target = (n: number): number =>
   Math.max(TABAN_KLAMP, Math.min(0.95, egri(n) + (nefesMi(n) ? NEFES_BONUS : 0)));
 // Yapıyı sabit tutup tolerans süresini ayarlayarak kazanma oranını hedefe oturt
+/**
+ * Kayıpların en çok bu kadarı "süre doldu" olabilir.
+ *
+ * Neden gerekli: limit, referans çözücünün süresinden türetiliyordu (best × 1,5 + 1,5).
+ * Çözücü açgözlüdür, ilk uygun hizalanmayı alır; insan daha iyisini bekler. Hizalanma
+ * fırsatının seyrek olduğu bölümlerde 1,5 kat pay yetmiyordu ve oyuncu bütün kilitleri
+ * doğru yapıp SON kilitte saate yeniliyordu. Ölçüm: 1000 bölümün 123'ünde kayıpların
+ * yarısından fazlası süre dolmasıydı; bazılarında %100. O bölümlerde oyun hassasiyet
+ * oyunu olmaktan çıkıp bekleme oyunu oluyordu — türdeki en kötü kayıp hissi.
+ *
+ * Artık zorluk yalnızca DARALMADAN gelir: süre, beceriyi ölçen değil taahhüde zorlayan
+ * bir sınır olarak kalır.
+ */
+const SURE_KAYBI_ESIGI = 0.10;
+/** Limit tasarım değerinin bu katından fazla açılmaz: süre baskısı büsbütün kaybolmasın. */
+const SURE_TAVANI = 2.2;
+
 function tune(rawRings: RawRing[], want: number, n: number, lo = 0.012, hi = 0.45): Candidate | null {
   let best: Candidate | null = null;
   for (let it = 0; it < 8; it++) {
     const tol = (lo + hi) / 2;
     const rings = rawRings.map(r => ({ ...r })); sizeGaps(rings, tol);
-    const L = finalize(rings, n);
-    if (!L) { lo = tol; continue; }
-    const ev = evaluate(L, 50);
+    const aday = finalize(rings, n);
+    if (!aday) { lo = tol; continue; }
+    let L: Finalized = aday;
+    let ev = evaluate(L, 50);
+    // Süre dolması baskın kayıp sebebiyse yapı değil limit yanlıştır: limiti aç.
+    for (let tur = 0; tur < 5 && ev.sureKaybi > SURE_KAYBI_ESIGI; tur++) {
+      const yeni = +(L.limit * 1.2).toFixed(1);
+      if (yeni > L.want * SURE_TAVANI) break;
+      L = { ...L, limit: yeni };
+      ev = evaluate(L, 50);
+    }
     const c = { ...L, ...ev, tol };
     if (L.best <= 16 && (!best || Math.abs(c.win - want) < Math.abs(best.win - want))) best = c;
     if (ev.win > want) hi = tol; else lo = tol;
@@ -437,11 +472,20 @@ function generate(log: Log = () => {}): LevelTable {
         if (!pick) pick = c;
         else {
           const dc = Math.abs(c.win - want), dp = Math.abs(pick.win - want);
-          const dahaIyi = dc < dp - 0.04 || (dc < dp + 0.04 && c.roomy && !pick.roomy) || (dc < dp && !(pick.roomy && !c.roomy));
+          // Hedefe yakınlık birincil; eşit yakınlıkta önce "saate değil daralmaya yenilen"
+          // aday, sonra ferah olan tercih edilir.
+          // "Temiz" = oyuncu kayda değer oranda saate yenilmiyor. Temiz bir aday,
+          // hedefe biraz daha uzak olsa bile kirli olanı yener: zorluk daralmadan
+          // gelmeli, bekleyişten değil.
+          const cTemiz = c.sureKaybi <= SURE_KAYBI_ESIGI, pTemiz = pick.sureKaybi <= SURE_KAYBI_ESIGI;
+          const dahaIyi = (cTemiz && !pTemiz && dc < dp + 0.10)
+            || (cTemiz === pTemiz && (dc < dp - 0.04
+              || (dc < dp + 0.04 && c.roomy && !pick.roomy)
+              || (dc < dp && !(pick.roomy && !c.roomy))));
           if (dahaIyi) pick = c;
         }
       }
-      if (pick && pick.roomy && Math.abs(pick.win - want) < 0.03) break;
+      if (pick && pick.roomy && pick.sureKaybi <= SURE_KAYBI_ESIGI && Math.abs(pick.win - want) < 0.03) break;
     }
     if (!pick) { console.error('level', n, 'bulunamadı'); process.exit(1); }
     if (boss) Object.assign(pick, { boss: boss.name, hint: boss.hint });
@@ -481,6 +525,8 @@ const serialize = (o: LevelTable): string => '{"q3":' + o.q3 + ',"q2":' + o.q2 +
  */
 const BAND = 0.20;
 const BAND_BOSS = 0.25;
+/** Bir bölümde denemelerin en çok bu kadarı saate yenilebilir (bkz. SURE_KAYBI_ESIGI). */
+const SURE_KAYBI_VERIFY = 0.25;
 const SOLVER_HEADROOM = 0.9; // çözücü, süre sınırının en fazla %90'ını kullanabilir
 
 function verify(): number {
@@ -494,6 +540,9 @@ function verify(): number {
   }
   const rows: string[] = []; const sorunlar: string[] = [];
   const oranlar: number[] = [];
+  // Denemelerin dörtte birinden fazlası saate yenilen bölümler: orada oyun hassasiyet
+  // oyunu olmaktan çıkıp bekleme oyunu olur (bkz. SURE_KAYBI_ESIGI).
+  const sureliler: string[] = [];
 
   for (const l of data.levels) {
     const ad = `${l.n}${l.boss ? "*" : ""}`;
@@ -508,6 +557,7 @@ function verify(): number {
     else if (best > l.limit * SOLVER_HEADROOM) sorunlar.push(`${ad}: çözücü ${best.toFixed(1)} sn, limit ${l.limit} sn — pay yok`);
     if (Math.abs(sapma) > (l.boss ? BAND_BOSS : BAND)) sorunlar.push(`${ad}: kazanma %${Math.round(ev.win * 100)}, hedef %${Math.round(hedef * 100)} (${sapma > 0 ? "+" : ""}${Math.round(sapma * 100)} puan)`);
     if (l.limit < tasarimLimiti(l.n, moving) - 0.05) sorunlar.push(`${ad}: limit tasarım değerinin altında`);
+    if (ev.sureKaybi > SURE_KAYBI_VERIFY) sureliler.push(`${ad}: denemelerin %${Math.round(ev.sureKaybi * 100)}'i süre dolmasıyla bitiyor`);
     oranlar.push(ev.win);
     rows.push(`${ad}:${Math.round(ev.win * 100)}%`);
   }
@@ -545,8 +595,17 @@ function verify(): number {
   const pay = [tumQ.filter(q => q >= data.q3).length, tumQ.filter(q => q < data.q3 && q >= data.q2).length, tumQ.filter(q => q < data.q2).length].map(v => v / tumQ.length);
   if (pay[0] < 0.15 || pay[0] > 0.35) sorunlar.push(`ustanın 3 yıldız oranı %${Math.round(pay[0] * 100)} — %15-35 dışında`);
 
+  // Süre dolması baskın kayıp sebebi olan bölümler (bkz. SURE_ORANI_ESIGI). Tek tük
+  // olması normal; yaygınlaşması zorluğun daralmadan değil saatten geldiği anlamına gelir.
+  const SURELI_TAVAN = Math.round(LEVEL_COUNT * 0.02);
+  if (sureliler.length > SURELI_TAVAN) {
+    sorunlar.push(`${sureliler.length} bölümde denemelerin dörtte birinden fazlası saate yeniliyor (en çok ${SURELI_TAVAN} olmalı): ` +
+      sureliler.slice(0, 6).join("; ") + (sureliler.length > 6 ? " …" : ""));
+  }
+
   console.log(rows.join("  "));
   console.log(`yıldız dağılımı (ustalık referansı): 3★ %${Math.round(pay[0] * 100)}  2★ %${Math.round(pay[1] * 100)}  1★ %${Math.round(pay[2] * 100)}`);
+  console.log(`saate yenilmenin baskın olduğu bölüm: ${sureliler.length} / ${LEVEL_COUNT}`);
 
   // Baştan kilitli halkalar kalan halkalara yeterli pay bırakıyor mu? (bkz. EN_AZ_PAY)
   for (const l of data.levels) {

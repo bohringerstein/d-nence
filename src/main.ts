@@ -1,10 +1,10 @@
 // Dönence: uygulamanın giriş noktası. Parçaları birbirine bağlar, kural içermez.
 import "./styles.css";
-import { LEVEL_COUNT, validateTable, STAR_LABEL } from "./core/index.ts";
+import { LEVEL_COUNT, validateTable, STAR_LABEL, DEG } from "./core/index.ts";
 import type { LevelTable, Best } from "./core/index.ts";
 // Level tablosu JS paketine GÖMÜLMEZ, ayrı bir dosya olarak indirilir.
 // 1000 bölümde tablo 643 KB; bu kadar veriyi JavaScript nesne sabiti olarak
-// ayrıştırmak telefonda yarım saniye yer, JSON.parse aynı veriyi `10 kat hızlı okur.
+// ayrıştırmak telefonda yarım saniye yer, JSON.parse aynı veriyi ~10 kat hızlı okur.
 // Servis çalışanı dosyayı önbelleğe aldığı için çevrimdışı çalışma etkilenmez.
 import tabloUrl from "../data/levels.json?url";
 
@@ -14,9 +14,10 @@ import { dongu, ADIM } from "./game/loop.ts";
 import { girdiBagla } from "./game/input.ts";
 import { tuvalKur, ciz } from "./game/render.ts";
 import { renkleriOku, renklerHazir, hareketAzalt, tercihleriIzle } from "./game/theme.ts";
-import { ogreticiTablosu, ipucu, yildizYazisi, sureYazisi } from "./game/hints.ts";
+import { ogreticiTablosu, ipucu, yildizYazisi, sureYazisi, kayipYazisi } from "./game/hints.ts";
 import { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel } from "./game/storage.ts";
 import { ayarlariOku, ayarlariYaz, halkaOpakligi, titret, titresimVarMi } from "./game/ayarlar.ts";
+import { cal, sesiAc, sesiDuraklat, sesVarMi } from "./game/ses.ts";
 import { kabukKur } from "./ui/shell.ts";
 import { NASIL_HTML } from "./ui/nasil.ts";
 
@@ -51,6 +52,14 @@ const tuval = tuvalKur(ui.canvas, () => { if (durum) cizVeYaz(); });
 // Ekranın tamamı dokunma alanı: canvas'a bağlansaydı üst ve alt çubuk ölü bölge olurdu.
 const girdi = girdiBagla(ui.kok);
 
+// iOS ses bağlamını yalnızca bir kullanıcı hareketinin İÇİNDE açar. Oyunun dokunuşları
+// zaman damgasıyla kuyruğa alınıp fizik adımında işlendiği için ses çalma anı artık
+// hareketin içinde değil; bu yüzden bağlam doğrudan buradan açılıyor.
+ui.kok.addEventListener("pointerdown", () => { if (ayarlar.ses) sesiAc(); });
+// Sekme arkaplana alınınca oyun zaten duruyor (game/loop.ts); ses bağlamı da askıya
+// alınır, sonraki dokunuşta kendiliğinden uyanır.
+document.addEventListener("visibilitychange", () => { if (document.hidden) sesiDuraklat(); });
+
 // ---- Level yükleme: tek nesne toptan değişir, alan alan sıfırlama yok -------
 function levelYukle(n: number, denemeyiKoru = false): void {
   const deneme = denemeyiKoru ? durum.deneme + 1 : 1;
@@ -58,7 +67,10 @@ function levelYukle(n: number, denemeyiKoru = false): void {
   durum = createLevel(level, deneme);
   girdi.temizle();
 
-  ui.lvl.textContent = level.boss ? `${n}, patron` : String(n);
+  // Numara kalın, geri kalanı künye tonunda: "patron" da sonekin içinde, çünkü kalın
+  // 1,4 rem içinde 320 piksellik telefonda üst çubuğu taşırıyordu.
+  ui.lvl.textContent = String(n);
+  ui.lvlToplam.textContent = ` / ${LEVEL_COUNT}${level.boss ? ", patron" : ""}`;
   yaz(ipucu({ level, deneme, rekor: kayit.bests[n], ogretici }));
   levelKaydet(kayit, n);
   saatiGuncelle();
@@ -92,12 +104,16 @@ function dokunusIsle(gercekZaman: number): void {
   const n = girdi.al(gercekZaman);
   for (let i = 0; i < n; i++) {
     const sonuc = tap(durum, tablo.q3, tablo.q2);
-    if (sonuc.tip === "kilit") titret(ayarlar, "kilit");
-    if (sonuc.tip === "kayip") { titret(ayarlar, "kayip"); yaz("Açıklık kapandı"); return; }
+    if (sonuc.tip === "kilit") { titret(ayarlar, "kilit"); cal(ayarlar, "kilit", sonuc.aciklik); }
+    if (sonuc.tip === "kayip") {
+      titret(ayarlar, "kayip"); cal(ayarlar, "kayip");
+      yaz(kayipYazisi(sonuc.pay / DEG));
+      return;
+    }
     if (sonuc.tip === "acildi") {
       const yeni: Best = { s: sonuc.yildiz, t: +sonuc.sure.toFixed(2) };
       const oncekiVardi = kayit.bests[durum.level.n] !== undefined;
-      titret(ayarlar, "acildi");
+      titret(ayarlar, "acildi"); cal(ayarlar, "acildi");
       const rekor = rekorKaydet(kayit, durum.level.n, yeni);
       yaz(`${STAR_LABEL[sonuc.yildiz]} ${yildizYazisi(sonuc.yildiz)} ${sureYazisi(sonuc.sure)} sn` +
           (rekor && oncekiVardi ? ", rekor" : ""));
@@ -113,7 +129,7 @@ const oyun = dongu({
     if (bitti || panelAcik) { girdi.temizle(); return false; }
     dokunusIsle(gercekZaman);
     const s = step(durum, dt);
-    if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); yaz("Süre doldu"); return true; }
+    if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); cal(ayarlar, "kayip"); yaz("Süre doldu"); return true; }
     if (s.tip === "bitti") {
       if (durum.asama === "crash") levelYukle(durum.level.n, true);
       else if (durum.level.n >= LEVEL_COUNT) { bitisGoster(); return false; }
@@ -194,6 +210,14 @@ function arkaKilit(kapali: boolean): void {
   for (const el of ui.arka) el.toggleAttribute("inert", kapali);
 }
 
+/** "312 bölüm açıldı · 714 / 936 yıldız" — birikimi görünür kılar. */
+function ilerlemeOzeti(): string {
+  const b = bitirilenLevel(kayit);
+  if (b === 0) return "Henüz bölüm açılmadı.";
+  const y = toplamYildiz(kayit);
+  return `${b} bölüm açıldı · ${y} / ${b * 3} yıldız`;
+}
+
 // ---- Ayarlar paneli --------------------------------------------------------
 function ayarPaneliAc(): void {
   panelAcik = true;
@@ -201,9 +225,12 @@ function ayarPaneliAc(): void {
   ui.desenKutu.checked = ayarlar.desenYumusat;
   ui.hareketKutu.checked = ayarlar.hareketAzalt;
   ui.titresimKutu.checked = ayarlar.titresim;
+  ui.sesKutu.checked = ayarlar.ses;
+  ui.sesSatir.hidden = !sesVarMi();
   // Cihaz titreşimi desteklemiyorsa (iOS Safari) seçeneği hiç gösterme.
   ui.titresimSatir.hidden = !titresimVarMi();
   ui.uyari.textContent = "";
+  ui.ozet.textContent = ilerlemeOzeti();
   ui.ayarPanel.hidden = false;
   // preventScroll şart: odaklanan düğme kutunun ALTINDA olduğu için tarayıcı onu
   // görünür kılmak adına kutuyu en aşağı kaydırıyor ve panel sondan açılıyordu.
@@ -214,6 +241,7 @@ function ayarlariUygula(): void {
   ayarlar.desenYumusat = ui.desenKutu.checked;
   ayarlar.hareketAzalt = ui.hareketKutu.checked;
   ayarlar.titresim = ui.titresimKutu.checked;
+  ayarlar.ses = ui.sesKutu.checked;
   azalt = hareketAzalt() || ayarlar.hareketAzalt;
   ayarlariYaz(ayarlar);
   sonFlas = -1;   // flaş katmanı yeni ayara göre tazelensin
@@ -245,6 +273,8 @@ ui.nasilKapat.addEventListener("click", () => {
 ui.desenKutu.addEventListener("change", ayarlariUygula);
 ui.hareketKutu.addEventListener("change", ayarlariUygula);
 ui.titresimKutu.addEventListener("change", () => { ayarlariUygula(); titret(ayarlar, "kilit"); });
+// Ses açılınca hemen bir örnek: ayarın ne yaptığı duyulsun.
+ui.sesKutu.addEventListener("change", () => { ayarlariUygula(); cal(ayarlar, "kilit", 0.6); });
 ui.ayarKapat.addEventListener("click", () => {
   ayarlariUygula();
   ayarlar.uyariGoruldu = true;

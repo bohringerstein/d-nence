@@ -172,7 +172,11 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
   ctx.globalCompositeOperation = "source-over";
 
   // 2) Açıklık kamaları
-  if (s.anyLocked && s.asama !== "crash") {
+  //
+  // Kayıpta kamalar eskiden TAMAMEN gizleniyordu: oyuncunun "neden kaybettim" sorusuna
+  // cevap veren tek öğe, tam da o soruyu sorduğu anda ekrandan siliniyordu. Artık
+  // daralmış kanal kırmızı DOLU çiziliyor; topun ona sığmadığı görünüyor.
+  if (s.anyLocked) {
     const dis = g.outer + g.S * KAMA_TASMA;
     // Geçer ve geçmez kama eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15).
     // Açık temada ikisinin zemine göre kontrastı 1,17 ve 1,20 çıkıyordu; aralarındaki
@@ -190,7 +194,13 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
         ctx.globalAlpha = 0.35;
         ctx.fill();
       } else {
-        // Renk körlüğü için ikinci işaret ve artık tek işaret: kesik kontur.
+        // Kayıpta dolgu geri gelir: "işte sığmadığın yer" tek bakışta okunmalı.
+        if (s.asama === "crash") {
+          ctx.fillStyle = renk.fail;
+          ctx.globalAlpha = 0.3;
+          ctx.fill();
+        }
+        // Renk körlüğü için ikinci işaret: kesik kontur.
         ctx.globalAlpha = 0.9;
         ctx.strokeStyle = renk.fail;
         ctx.lineWidth = 1.5;

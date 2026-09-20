@@ -6,7 +6,7 @@
 // "bir alanı sıfırlamayı unutmak" hatasıydı; bu yapıda o hata mümkün değil.
 import {
   liveRings, stepRings, newMask, applyMask, maskLargest, maskRuns, canPass,
-  starRatio, starCount, DEG
+  starRatio, starCount, DEG, NEED_PASS
 } from "../core/index.ts";
 import type { Level, Ring, Mask, Run, Stars } from "../core/index.ts";
 
@@ -15,6 +15,8 @@ export type Asama = "idle" | "fire" | "crash";
 /** Kayıpta kırmızıya dönecek halka: tek bir halka, ya da süre dolduysa hepsi. */
 export const HEPSI = -2;
 export const YOK = -1;
+/** crashPay için "ölçülemez" (süre doldu ya da henüz kayıp yok). */
+export const YOK_PAY = -1;
 
 export interface LevelState {
   readonly level: Level;
@@ -34,6 +36,15 @@ export interface LevelState {
   shake: number;
   lockPulse: number;
   crashRing: number;
+  /**
+   * Kayıpta kanalın geçiş eşiğinden ne kadar dar kaldığı (radyan, >= 0).
+   *
+   * Oyuncunun "az kalmıştı" mı yoksa "kötü bir dokunuştu" mu olduğunu anlaması için
+   * gerekli. Bilgi kaybın oluştuğu anda zaten hesaplanıyordu ama atılıyordu; ekranda
+   * yalnızca kırmızı bir halka ve sarsıntı kalıyordu, yani "kaybettin" diyordu ama
+   * "şu kadarla" demiyordu. Süre dolduğunda anlamsızdır, YOK_PAY olur.
+   */
+  crashPay: number;
   lastLocked: number;
   fireAngle: number;
   ballDist: number;
@@ -67,6 +78,7 @@ export function createLevel(level: Level, deneme: number): LevelState {
     shake: 0,
     lockPulse: 0,
     crashRing: YOK,
+    crashPay: YOK_PAY,
     lastLocked: YOK,
     fireAngle: 0,
     ballDist: 0
@@ -75,14 +87,26 @@ export function createLevel(level: Level, deneme: number): LevelState {
 
 export type TapSonuc =
   | { tip: "yok" }
-  | { tip: "kilit" }
-  | { tip: "kayip"; sebep: "aciklik" }
+  | { tip: "kilit"; aciklik: number }
+  | { tip: "kayip"; sebep: "aciklik"; pay: number }
   | { tip: "acildi"; yildiz: Stars; q: number; sure: number };
 
+/**
+ * Kanalın ne kadar ferah kaldığı: 1 = levelin en dar boşluğu kadar geniş, 0 = eşikte.
+ * Ses perdesi buna bağlanır (game/ses.ts): oyuncu daraldığını kulakla da duyar.
+ */
+function aciklikOrani(s: LevelState, w: number): number {
+  const minGap = Math.min(...s.level.rings.map(x => x.gap)) * DEG;
+  const pay = minGap - NEED_PASS;
+  if (pay <= 0) return 0;
+  return Math.max(0, Math.min(1, (w - NEED_PASS) / pay));
+}
+
 /** Kayba düşür. Görsel alanları da burada ayarlar ki çağıran unutamasın. */
-function cokert(s: LevelState, halka: number): void {
+function cokert(s: LevelState, halka: number, pay = YOK_PAY): void {
   s.asama = "crash";
   s.crashRing = halka;
+  s.crashPay = pay;
   s.flash = 1;
   s.shake = 1;
   s.endTimer = CRASH_SURE;
@@ -100,10 +124,14 @@ export function tap(s: LevelState, q3: number, q2: number): TapSonuc {
   s.anyLocked = true;
 
   const en = maskLargest(s.mask);
-  if (!canPass(en.w)) { cokert(s, s.active); return { tip: "kayip", sebep: "aciklik" }; }
+  if (!canPass(en.w)) {
+    const pay = Math.max(0, NEED_PASS - en.w);
+    cokert(s, s.active, pay);
+    return { tip: "kayip", sebep: "aciklik", pay };
+  }
 
   s.active = sonraki(s.rings, s.active + 1);
-  if (s.active < s.rings.length) return { tip: "kilit" };
+  if (s.active < s.rings.length) return { tip: "kilit", aciklik: aciklikOrani(s, en.w) };
 
   // Son hareketli halka kilitlendi: kasa açılıyor.
   s.asama = "fire";

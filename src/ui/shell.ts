@@ -5,6 +5,8 @@ export interface Kabuk {
   bar: HTMLElement;
   barFill: HTMLElement;
   lvl: HTMLElement;
+  /** "/1000" soneki: 1000 bölümlük bir oyunda nerede olduğun görünsün. */
+  lvlToplam: HTMLElement;
   canvas: HTMLCanvasElement;
   hint: HTMLElement;
   reset: HTMLButtonElement;
@@ -19,7 +21,12 @@ export interface Kabuk {
   hareketKutu: HTMLInputElement;
   titresimKutu: HTMLInputElement;
   titresimSatir: HTMLElement;
+  sesKutu: HTMLInputElement;
+  /** Tarayıcı ses üretemiyorsa satır hiç gösterilmez. */
+  sesSatir: HTMLElement;
   uyari: HTMLElement;
+  /** Ayarlar panelindeki ilerleme özeti (bölüm + yıldız). */
+  ozet: HTMLElement;
   nasil: HTMLElement;
   nasilIcerik: HTMLElement;
   nasilKapat: HTMLButtonElement;
@@ -33,7 +40,7 @@ const HTML = `
   <header>
     <h1>Dönence</h1>
     <span class="clock" id="clock" aria-label="Kalan süre">0,0</span>
-    <div class="lvl">Level <b id="lvl">1</b></div>
+    <div class="lvl">Level <b id="lvl">1</b><small id="lvlToplam"></small></div>
   </header>
   <div class="bar" id="bar"><i id="barFill"></i></div>
   <div class="alan">
@@ -48,6 +55,10 @@ const HTML = `
   <div class="ortu" id="ayarPanel" hidden role="dialog" aria-modal="true" aria-labelledby="ayarBaslik">
     <div class="kutu">
       <h2 id="ayarBaslik">Ayarlar</h2>
+      <!-- Toplanan yıldız oyun boyunca hiçbir yerde görünmüyordu: yalnızca 1000. bölümü
+           bitiren oyuncu toplamını öğreniyordu. Birikimin görünmesi, 1000 bölümlük bir
+           oyunda devam etme sebebinin kendisi. -->
+      <p class="ozet" id="ozet"></p>
       <p class="uyari" id="uyari"></p>
       <label class="secenek">
         <input type="checkbox" id="desenKutu">
@@ -56,6 +67,10 @@ const HTML = `
       <label class="secenek">
         <input type="checkbox" id="hareketKutu">
         <span><b>Hareketi azalt</b><small>Kayıptaki sarsıntı ve ekran flaşı kapanır.</small></span>
+      </label>
+      <label class="secenek" id="sesSatir">
+        <input type="checkbox" id="sesKutu">
+        <span><b>Ses</b><small>Kilitte kısa bir nota; kanal daraldıkça perde yükselir.</small></span>
       </label>
       <label class="secenek" id="titresimSatir">
         <input type="checkbox" id="titresimKutu">
@@ -108,6 +123,7 @@ export function kabukKur(hedef: HTMLElement, nasilHtml: string): Kabuk {
     bar: bul(hedef, "bar"),
     barFill: bul(hedef, "barFill"),
     lvl: bul(hedef, "lvl"),
+    lvlToplam: bul(hedef, "lvlToplam"),
     canvas: bul<HTMLCanvasElement>(hedef, "c"),
     hint: bul(hedef, "hint"),
     reset: bul<HTMLButtonElement>(hedef, "reset"),
@@ -122,7 +138,10 @@ export function kabukKur(hedef: HTMLElement, nasilHtml: string): Kabuk {
     hareketKutu: bul<HTMLInputElement>(hedef, "hareketKutu"),
     titresimKutu: bul<HTMLInputElement>(hedef, "titresimKutu"),
     titresimSatir: bul(hedef, "titresimSatir"),
+    sesKutu: bul<HTMLInputElement>(hedef, "sesKutu"),
+    sesSatir: bul(hedef, "sesSatir"),
     uyari: bul(hedef, "uyari"),
+    ozet: bul(hedef, "ozet"),
     nasil: bul(hedef, "nasil"),
     nasilIcerik: bul(hedef, "nasilIcerik"),
     nasilKapat: bul<HTMLButtonElement>(hedef, "nasilKapat"),

@@ -33,6 +33,22 @@ export function ogreticiTablosu(levels: Level[]): Record<number, string> {
 
 export const yildizYazisi = (s: Stars): string => "★".repeat(s) + "☆".repeat(3 - s);
 
+/**
+ * Kayıp mesajı: yol ne kadarla kapandı?
+ *
+ * "Açıklık kapandı" tek başına oyuncuya hiçbir şey öğretmiyordu; 1 derece mi kaçırdı
+ * yoksa 20 derece mi, ikisi de aynı cümleyi veriyordu. Oysa bu iki durum oyuncu için
+ * tamamen farklı: birincisi "bir daha", ikincisi "yanlış an". Pay derece cinsinden
+ * yazılır; 10 dereceden büyük farklarda sayı anlamını yitirir, orada söz yeter.
+ */
+export function kayipYazisi(payDerece: number): string {
+  if (!Number.isFinite(payDerece) || payDerece < 0) return "Açıklık kapandı";
+  if (payDerece < 0.05) return "Açıklık kapandı · kıl payı";
+  if (payDerece > 10) return "Açıklık kapandı · yol erken daraldı";
+  const sayi = payDerece < 1 ? payDerece.toFixed(1) : Math.round(payDerece).toString();
+  return `Açıklık kapandı · ${sayi.replace(".", ",")}° dar kaldı`;
+}
+
 /** Türkçe ondalık ayırıcı virgüldür. */
 export const sureYazisi = (t: number): string => t.toFixed(1).replace(".", ",");
 

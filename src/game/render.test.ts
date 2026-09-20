@@ -1,0 +1,120 @@
+// Çizim: kaybın ekranda açıklanması ve kamaların ayrımı.
+//
+// Canvas yerine çağrıları kaydeden sahte bir bağlam kullanılır. Ölçülen şey piksel
+// değil KARAR: hangi renkle, hangi opaklıkla, dolduruldu mu yoksa yalnızca konturlandı mı.
+import test from "node:test";
+import assert from "node:assert";
+import { newMask, BINS, layout } from "../core/index.ts";
+import type { Level } from "../core/index.ts";
+import { createLevel } from "./state.ts";
+import { ciz } from "./render.ts";
+import type { Tuval } from "./render.ts";
+
+interface Dolgu { renk: string; alfa: number }
+interface Kontur { renk: string; alfa: number; kesikli: boolean }
+
+function sahteTuval(): { tuval: Tuval; dolgular: Dolgu[]; konturlar: Kontur[] } {
+  const dolgular: Dolgu[] = [];
+  const konturlar: Kontur[] = [];
+  let kesikli = false;
+  const ctx = {
+    fillStyle: "", strokeStyle: "", globalAlpha: 1, lineWidth: 1,
+    lineCap: "butt" as CanvasLineCap, font: "", textAlign: "center" as CanvasTextAlign,
+    textBaseline: "middle" as CanvasTextBaseline,
+    globalCompositeOperation: "source-over" as GlobalCompositeOperation,
+    save() {}, restore() {}, translate() {}, beginPath() {}, closePath() {},
+    moveTo() {}, arc() {}, rect() {}, clearRect() {}, fillRect() {}, fillText() {},
+    measureText: (t: string) => ({ width: t.length * 20 }),
+    createRadialGradient: () => ({ addColorStop() {} }),
+    setLineDash(d: number[]) { kesikli = d.length > 0; },
+    fill() { dolgular.push({ renk: String(ctx.fillStyle), alfa: ctx.globalAlpha }); },
+    stroke() { konturlar.push({ renk: String(ctx.strokeStyle), alfa: ctx.globalAlpha, kesikli }); }
+  };
+  const tuval = {
+    canvas: {} as HTMLCanvasElement,
+    ctx: ctx as unknown as CanvasRenderingContext2D,
+    W: 400, H: 700,
+    yerlesim: (n: number) => layout(400, 700, n),
+    boyutla() {}, birak() {}, sonYari: 0
+  } as unknown as Tuval;
+  return { tuval, dolgular, konturlar };
+}
+
+const RENK = { bg: "#E9EEF0", ink: "#1D3440", ball: "#E89B00", fail: "#E5484D", win: "#2E9E6A", muted: "#5A6E79" };
+const SECENEK = { hareketAzalt: true, halkaOpakligi: 0.4 };
+
+const level = (): Level => ({
+  n: 5, boss: null, hint: null, limit: 10,
+  rings: [
+    { speed: 1, gap: 60, gaps: 1, gapOffset: 180, flip: 0, wobble: false, preLocked: false, start: 0 },
+    { speed: -1.2, gap: 60, gaps: 1, gapOffset: 180, flip: 0, wobble: false, preLocked: false, start: 1 }
+  ]
+});
+
+/** Verilen dilim sayısı kadar açık bir kanal bırakır (1 dilim = 0,5°). */
+function kanalKur(s: ReturnType<typeof createLevel>, acikDilim: number): void {
+  const m = newMask();
+  for (let b = 0; b < BINS; b++) m[b] = 0;
+  for (let b = 100; b < 100 + acikDilim; b++) m[b] = 1;
+  s.mask = m;
+  s.anyLocked = true;
+}
+
+test("geçer kama doldurulur, geçmez kama yalnızca kesik konturla çizilir", () => {
+  // 60 dilim = 30°, geçiş eşiği 18° -> geçer.
+  const g = sahteTuval();
+  const s = createLevel(level(), 1);
+  kanalKur(s, 60);
+  ciz(g.tuval, s, RENK, SECENEK);
+  assert.ok(g.dolgular.some(d => d.renk === RENK.ball && Math.abs(d.alfa - 0.35) < 1e-6),
+    "geçer kama top rengiyle %35 dolmalı");
+
+  // 20 dilim = 10°, eşiğin altında -> dolgu YOK, kesik kontur VAR.
+  const d2 = sahteTuval();
+  const s2 = createLevel(level(), 1);
+  kanalKur(s2, 20);
+  ciz(d2.tuval, s2, RENK, SECENEK);
+  assert.ok(!d2.dolgular.some(x => x.renk === RENK.fail),
+    "oyun sürerken geçmez kama doldurulmamalı: ayrım dolgu var/yok olmalı");
+  assert.ok(d2.konturlar.some(k => k.renk === RENK.fail && k.kesikli),
+    "geçmez kama kesik kırmızı konturla işaretlenmeli (renk körlüğü)");
+});
+
+test("KAYIPTA daralmış kanal kırmızı DOLU çizilir", () => {
+  // Bu türün en kritik saniyesi: oyuncu neden kaybettiğini görmeli. Kamalar eskiden
+  // kayıpta tamamen gizleniyordu; "neden" sorusuna cevap veren tek öğe, tam da o soru
+  // sorulduğu anda siliniyordu.
+  const g = sahteTuval();
+  const s = createLevel(level(), 1);
+  kanalKur(s, 20);
+  s.asama = "crash";
+  s.crashRing = 1;
+  s.crashPay = 0.05;
+  ciz(g.tuval, s, RENK, SECENEK);
+
+  assert.ok(g.dolgular.some(d => d.renk === RENK.fail && d.alfa > 0.2),
+    "kayıpta kanal kırmızı dolu olmalı");
+  assert.ok(g.konturlar.some(k => k.renk === RENK.fail && k.kesikli),
+    "kesik kontur kayıpta da kalmalı");
+});
+
+test("hiç kilit yokken kama çizilmez", () => {
+  // Kanal ancak ilk kilitle tanımlanır; öncesinde gösterilecek bir şey yok.
+  const g = sahteTuval();
+  const s = createLevel(level(), 1);
+  ciz(g.tuval, s, RENK, SECENEK);
+  assert.ok(!g.dolgular.some(d => d.renk === RENK.fail), "kilit yokken kırmızı kama olmaz");
+});
+
+test("top kayıpta kırmızı, normalde amber", () => {
+  const a = sahteTuval();
+  const s1 = createLevel(level(), 1);
+  ciz(a.tuval, s1, RENK, SECENEK);
+  assert.ok(a.dolgular.some(d => d.renk === RENK.ball), "top amber çizilmeli");
+
+  const b = sahteTuval();
+  const s2 = createLevel(level(), 1);
+  s2.asama = "crash";
+  ciz(b.tuval, s2, RENK, SECENEK);
+  assert.ok(b.dolgular.some(d => d.renk === RENK.fail), "kayıpta top kırmızı olmalı");
+});

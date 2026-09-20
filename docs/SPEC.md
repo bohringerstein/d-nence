@@ -129,7 +129,8 @@ Durumlar: `idle` (oynanıyor), `fire` (top fırlıyor), `crash` (kayıp).
 
 Dikey düzen, yukarıdan aşağıya:
 
-1. **Üst çubuk:** solda "Dönence", ortada kalan süre (0,1 sn hassasiyet, virgülle), sağda "Level N" (patron levelinde "N, patron").
+1. **Üst çubuk:** solda "Dönence", ortada kalan süre (0,1 sn hassasiyet, virgülle), sağda **"Level N / 1000"** (patron levelinde sonuna ", patron" eklenir).
+   Toplam sayı şart: 1000 bölümlük bir oyunda "Level 347" tek başına nerede olduğunu söylemez. Numara kalın, geri kalanı künye tonunda ve küçük punto — "patron" da sonekin içindedir, çünkü kalın 1,4 rem içinde 320 piksellik telefonda üst çubuğu taşırıyordu.
    Ağırlık **sayaçtadır**: başlık künye tonunda ve küçük punto, sayaç en büyük öğe. Dördü de aynı puntodayken (başlık 24, sayaç 24, level 22,4 px) hiyerarşi okunmuyordu; oysa başlık hiç değişmez, sayaç oyunun tek dinamik sayısıdır.
 2. **Süre çubuğu:** kalan süre oranında dolu ince çubuk. Son %25'te çubuk ve sayaç kırmızıya döner.
 3. **Oyun alanı:** kalan tüm alan.
@@ -139,7 +140,7 @@ Dikey düzen, yukarıdan aşağıya:
 
 Oyun alanında çizim sırası:
 1. Arka planda levelin numarası, büyük ve çok soluk (patron levelinde sarı). Punto `S × 0,5`'tir, ama metnin yarı genişliği en dış halkayı aşarsa oranla küçültülür — dört hanede ("1000") rakam hem halkaları hem temizlenen kutuyu taşıyordu. Rakam çizildikten hemen sonra merkezde yumuşak kenarlı bir delik silinir: gövdesi tam topun altından geçiyordu (1, 4, 7 gibi merkezden geçen rakamlarda, yani Level 1'de).
-2. Açıklık kamaları, yalnızca en az bir halka kilitliyken. **Geçer kama sarı %35 dolu; geçmez kama doldurulmaz**, yalnızca kesik kırmızı konturla çevrilir. Eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15) ve açık temada aralarındaki fark 1,03:1 idi — fiilen ayırt edilemiyorlardı. Yeni modelde ayrım hem parlaklığa hem doluluğa bağlıdır, yani renkten bağımsız iki kanal taşır (açık tema 1,28:1, koyu tema 2,43:1).
+2. Açıklık kamaları, yalnızca en az bir halka kilitliyken. **Geçer kama sarı %35 dolu; geçmez kama doldurulmaz**, yalnızca kesik kırmızı konturla çevrilir. **Kayıpta kural değişir: daralmış kanal kırmızı DOLU çizilir** — oyuncunun neden kaybettiğini görmesi gereken tek an odur (aşağıda "Kaybın açıklanması"). Eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15) ve açık temada aralarındaki fark 1,03:1 idi — fiilen ayırt edilemiyorlardı. Yeni modelde ayrım hem parlaklığa hem doluluğa bağlıdır, yani renkten bağımsız iki kanal taşır (açık tema 1,28:1, koyu tema 2,43:1).
 3. Halkalar: kilitli olanlar tam opak; sıradaki (aktif) halka sarı ve kalın; ondan sonraki halka %75; diğerleri %40. Kilitlenme anında çizgi kısa süre kalınlaşır.
 4. İşaretler: baştan kilitli halkada küçük kare, yön değiştiren halkada kırmızı nokta (boşluğun tam karşısında).
 5. Top.
@@ -177,6 +178,13 @@ Amber açık temada zeminle yalnızca **1,97:1** yapar. Bu yüzden iki farklı y
 - **Arayüzde amber kullanılmaz.** Örtü başlıkları ve odak halkası `--ink` (11,1:1), onay kutusu `--ui-accent` (5,10:1). Onay kutusu özellikle önemli: durumu okunmayan ayar "deseni yumuşat" idi, yani tam da o ayara ihtiyacı olan kişi açık mı kapalı mı olduğunu göremiyordu. Bu ayrımın geri kaymasını bir test engeller.
 
 Süre çubuğunun oluğu iki temada da zeminden ayrılmalıdır (açık 1,42:1, koyu 1,53:1). Ölçümlerin tamamı `src/ui/contrast.test.ts` içinde sınanır.
+
+**Kaybın açıklanması.** Kayıp anı bu türün en kritik saniyesidir: oyuncu "az kalmıştı, bir daha" mı diyor, yoksa "ne oldu ya?" mı — devam etme kararı orada verilir. Bu yüzden iki şey yapılır:
+
+- **Kanal ekranda kalır.** Kamalar eskiden kayıpta tamamen gizleniyordu; yani "neden kaybettim" sorusuna cevap veren tek öğe, tam da o soru sorulduğu anda siliniyordu. Geriye kırmızı bir halka ve sarsıntı kalıyordu: "kaybettin" diyordu ama "şu kadarla" demiyordu. Artık daralmış kanal kırmızı dolu çizilir ve topun ona sığmadığı görünür.
+- **Pay yazılır.** Kanalın geçiş eşiğinden ne kadar dar kaldığı, kaybın oluştuğu anda zaten hesaplanıyordu ama atılıyordu. Artık durumda saklanır ve ipucunda söylenir: 0,05°'nin altında "kıl payı", 10°'nin üstünde "yol erken daraldı", arada sayıyla ("1,4° dar kaldı"). **Süre dolduğunda ölçülecek bir pay yoktur; orada sayı uydurulmaz.**
+
+**Birikimin görünmesi.** Ayarlar paneli ilerleme özetini gösterir: kaç bölüm açıldığı ve toplanan yıldız ("312 bölüm açıldı · 714 / 936 yıldız"). Toplanan yıldız eskiden oyun boyunca hiçbir yerde görünmüyordu; yalnızca 1000. bölümü bitiren oyuncu toplamını öğreniyordu. 1000 bölümlük bir oyunda devam etme sebebinin kendisi birikimin görünmesidir.
 
 **İpuçları.** Alt çubuktaki metin şu önceliğe göre seçilir:
 1. Patron leveli, ilk deneme: `"<ad>: <açıklama>"`.
@@ -218,6 +226,11 @@ Bunun üzerine iki şey zorunludur:
 
 Ayrıca **"Hareketi azalt"** ayarı, sistem tercihinden bağımsız olarak sarsıntıyı ve flaşı kapatır (ikisinden biri açıksa kapalıdır).
 
+**Ses.** Üç ses vardır ve üçü de Web Audio ile **sentezlenir**; ses dosyası yoktur, dolayısıyla ne paket boyutu ne lisans meselesi açar. Kilitte kısa bir nota, kasa açıldığında yükselen üçlü, kayıpta alçalan bir ton. **Kilit notasının perdesi kanal daraldıkça yükselir:** oyuncu sıkıştığını ekrana bakmadan da duyar — bu, kaybın neden geldiğini anlatan ikinci kanaldır (görseli, yukarıdaki kırmızı kama).
+
+*Neden kapsamda:* bu türde ses dekorasyon değil, dokunuşun ödülüdür; üstelik iOS Safari `navigator.vibrate` sağlamadığı için orada oyuncunun aldığı tek görsel-olmayan geri bildirim budur.
+*iOS notu:* `AudioContext` yalnızca bir kullanıcı hareketinin içinde açılabilir. Oyunun dokunuşları zaman damgasıyla kuyruğa alınıp fizik adımında işlendiği için ses çalma anı artık hareketin içinde değildir; bu yüzden bağlam ayrıca ve doğrudan `pointerdown`'dan açılır. Tarayıcı ses üretemiyorsa seçenek hiç gösterilmez ve çağrılar sessizce geçilir.
+
 **Titreşim.** Kilitte kısa (12 ms), kayıpta belirgin (45 ms), kasa açıldığında çok darbeli bir desen. Varsayılan açık, ayarlardan kapatılabilir. Hareket azaltmadan bağımsızdır: biri görsel hareket, diğeri dokunsal geri bildirimdir. `navigator.vibrate` desteklenmiyorsa (iOS Safari) seçenek hiç gösterilmez ve çağrı sessizce geçilir.
 
 ## 8. Level sistemi
@@ -249,6 +262,10 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
    ```
    İlk terim kuraldır: süre halka sayısından gelir ve geç levellerde kademeli sıkılaşır (hareketli halka başına ilk on levelde ~3,7 sn, son on levelde ~2,7 sn). İkinci terim yalnızca güvenlik ağıdır — levelin bitirilebilir kalmasını garanti eder. Aday seçiminde, kazanma oranı denk (≤4 puan fark) adaylar arasında çözücünün tasarım limitine rahat sığdığı aday tercih edilir, böylece güvenlik ağı nadiren devreye girer.
    *Neden:* limit eskiden doğrudan çözücü süresinden geliyordu; çözücü "uygun hizalanma ne zaman gelirse" beklediği için bu süre gürültüydü. Sonuçta komşu leveller arasında 15 sn'ye varan sıçramalar oluyor ve ekrandaki en büyük sayı zorluk hakkında ters sinyal veriyordu.
+
+   **Ama iki terim de yetmez: limit, oyuncunun saate yenilmediğini göstermek zorundadır.** Her aday, insan benzeri oyuncuyla oynatıldıktan sonra kayıplarının kaç tanesinin "süre doldu" olduğuna bakılır. Denemelerin **%10'undan fazlası** saate yeniliyorsa limit %20 adımlarla açılır (tasarım limitinin en çok 2,2 katına kadar). Aday seçiminde bu ölçütü sağlayan ("temiz") bir aday, hedefe 10 puana kadar daha uzak olsa bile sağlamayanı yener. Doğrulama, denemelerinin dörtte birinden fazlasını saate kaybeden bölümleri sayar ve 20'yi (bölümlerin %2'si) aşarsa hata verir.
+
+   *Neden:* çözücü açgözlüdür, ilk uygun hizalanmayı alır; insan daha iyisini bekler. Hizalanma fırsatının seyrek olduğu bölümlerde 1,5 kat pay yetmiyordu ve oyuncu bütün kilitleri doğru yapıp **son kilitte** saate yeniliyordu. Ölçüm: eski tabloda 1000 bölümün **123'ünde** kayıpların yarısından fazlası süre dolmasıydı, bazılarında %100. O bölümlerde oyun hassasiyet oyunu olmaktan çıkıp bekleme oyunu oluyordu — türdeki en kötü kayıp hissi, çünkü oyuncu hata yapmadığı hâlde kaybeder. Yeni tabloda bu sayı **16**. Yan etki olarak zorluk hak ettiği yere kaydı: en dar boşluk ortalaması 38,8°'den 36,2°'ye indi (hassasiyet arttı) ve 85° tavanına dayanan bölüm sayısı 47'den 9'a düştü.
 5. **İnsan benzeri oyuncu.** Dokunuşları ortalama 0 ve standart sapma 60 ms olan normal dağılımla sapar; kalan payın %70'ini kullanmaya razıdır. Her aday 50 kez oynatılır.
    **Sapma simetrik uygulanır (zorunlu).** Erken ya da geç dokunuş, tüm halkaları birlikte ileri veya geri sarar — tek halkanın açısını kaydırmak değildir. Aksi halde `wobble` çarpanı ve `flip` sayacı hesaba katılmaz; bu hata bir önceki sürümde kazanma oranını level başına 19 puana kadar şişiriyordu.
 6. **Yön değiştiren halkanın dönüşü görülebilmeli.** Oyuncu dıştan içe gider ve her kilit kabaca 0,6 saniye alır; bir halkanın kilitlenme anı `0,3 + 0,6 × (önündeki hareketli halka sayısı)` olarak tahmin edilir. `flip` yalnızca kilitlenmesi 1,2 saniyeden geç olan halkalara verilir ve periyodu o sürenin %70'ine sığdırılır. Erken kilitlenen halkanın `flip`'i kaldırılır.
@@ -339,7 +356,8 @@ Mağaza sürümü istenirse ileride Capacitor ile paketlenir; çekirdek kurallar
 
 Bunlar ilk sürümde yapılmaz, ancak mimari bunlara engel olmamalıdır:
 - Level seçim ekranı ve yıldız özeti.
-- Ses efektleri. *(Titreşim 7. bölümde uygulandı.)*
+- *(Ses ve titreşim 7. bölümde uygulandı.)*
+- **Bölüm seçimi / bölüm haritası.** Yıldızlar toplanıyor ve toplamı ayarlarda görünüyor, ama toplandığı bölüme geri dönülemiyor: 47. bölümde 1 yıldız aldıysan bir daha oraya gidemezsin. Bu türde yıldız sistemi asıl tutundurma motorudur; 1000 bölümlük bir oyunda eksikliği en çok burada hissedilir. Kayıt şemasına "ulaşılan en yüksek bölüm" eklenmesini gerektirir, yoksa geri dönmek ilerlemeyi geri alır.
 - Uygulama mağazası paketi (Capacitor).
 - Günlük meydan okuma leveli.
 - Oynanış istatistikleri (hangi levelde kaç deneme). Bu veri, simülasyondaki insan modelinin gerçek oyuncularla kalibre edilmesine yarar.

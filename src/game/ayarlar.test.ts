@@ -68,8 +68,8 @@ test("localStorage erişilemezse oyun düşmez", () => {
 });
 
 test("deseni yumuşat kilitsiz halkaların opaklığını düşürür", () => {
-  const kapali = { desenYumusat: false, hareketAzalt: false, titresim: true, uyariGoruldu: true };
-  const acik = { desenYumusat: true, hareketAzalt: false, titresim: true, uyariGoruldu: true };
+  const kapali = { desenYumusat: false, hareketAzalt: false, titresim: true, ses: true, uyariGoruldu: true };
+  const acik = { desenYumusat: true, hareketAzalt: false, titresim: true, ses: true, uyariGoruldu: true };
   assert.equal(halkaOpakligi(kapali), 0.4);
   assert.ok(halkaOpakligi(acik) < halkaOpakligi(kapali), "yumuşatma opaklığı düşürmeli");
   assert.ok(halkaOpakligi(acik) > 0.15, "halkalar tamamen kaybolmamalı");
@@ -91,7 +91,7 @@ function vibrateKur(destek: boolean): number[][] {
   return cagrilar;
 }
 
-const ayar = (titresim: boolean) => ({ desenYumusat: false, hareketAzalt: false, titresim, uyariGoruldu: true });
+const ayar = (titresim: boolean) => ({ desenYumusat: false, hareketAzalt: false, titresim, ses: true, uyariGoruldu: true });
 
 test("titreşim desteği doğru algılanıyor", () => {
   vibrateKur(true);
@@ -132,4 +132,28 @@ test("vibrate hata fırlatırsa oyun düşmez", () => {
 test("varsayılan olarak titreşim açık", () => {
   depo.temizle();
   assert.equal(ayarlariOku().titresim, true);
+});
+
+// --- Ses ayarı ---------------------------------------------------------------
+test("ses varsayılan olarak açık", () => {
+  // Tek dokunuşla oynanan bir oyunda dokunuşun ödülü sestir; iOS'ta titreşim
+  // desteklenmediği için orada tek dokunsal olmayan geri bildirim kanalı budur.
+  depo.temizle();
+  assert.equal(ayarlariOku().ses, true);
+});
+
+test("ses ayarı olmayan eski kayıt açık kabul edilir", () => {
+  // Ses sonradan eklendi: kaydı önceden yazılmış oyuncu sessiz kalmamalı.
+  depo.temizle();
+  depo.setItem("donence:ayarlar:v1", JSON.stringify({ desenYumusat: true, titresim: false }));
+  const a = ayarlariOku();
+  assert.equal(a.ses, true, "eksik alan varsayılana düşmeli");
+  assert.equal(a.desenYumusat, true, "diğer ayarlar korunmalı");
+  assert.equal(a.titresim, false);
+});
+
+test("ses kapalı kaydediliyor ve geri okunuyor", () => {
+  depo.temizle();
+  depo.setItem("donence:ayarlar:v1", JSON.stringify({ ses: false }));
+  assert.equal(ayarlariOku().ses, false);
 });
