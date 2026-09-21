@@ -30,12 +30,18 @@ export interface Metinler {
   // ---- Ekran iskeleti ----
   oyunAlani: string;
   duraklatDugmesi: string;
+  /** Sayacın erişilebilir adında kullanılır; görünen rakam onun devamı olarak okunur. */
+  kalanSure: string;
   levelOneki: string;
   patronEki: string;
   ayarlar: string;
   tamam: string;
   nasilOynanir: string;
   bastanBasla: string;
+  /** "Baştan başla" düğmesinin altındaki açıklama; paneldeki tek açıklamasız kontroldü. */
+  bastanBaslaAciklama: string;
+  /** İlk basıştan sonra düğmenin aldığı hal: hangi bölümün kaybolacağını söyler. */
+  bastanBaslaOnay: (level: number) => string;
   anladim: string;
 
   // ---- Ayarlar ----

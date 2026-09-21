@@ -15,12 +15,15 @@ export const EN: Metinler = {
 
   oyunAlani: "Play area. Tap to lock the next ring.",
   duraklatDugmesi: "Pause",
+  kalanSure: "time left",
   levelOneki: "Level",
   patronEki: ", boss",
   ayarlar: "Settings",
   tamam: "Done",
   nasilOynanir: "How to play",
   bastanBasla: "Start over",
+  bastanBaslaAciklama: "Goes back to level 1. Your stars stay.",
+  bastanBaslaOnay: level => `Are you sure? You will lose level ${level}`,
   anladim: "Got it",
 
   ilerlemeYok: "No levels opened yet.",
@@ -75,7 +78,8 @@ export const EN: Metinler = {
     metronom: { ad: "Metronome", ipucu: "The rings swing back and forth; catch them crossing the middle" },
     catal: { ad: "Fork", ipucu: "Every ring has two gates, and the one you pick decides the next" },
     tavsanKaplumbaga: { ad: "Tortoise and hare", ipucu: "The slow ones ask for patience, the fast ones for sharp aim" },
-    buyukKasa: { ad: "Grand vault", ipucu: "The last vault. Everything at once" }
+    buyukKasa: { ad: "Grand vault", ipucu: "Everything at once: speed, direction, two gates" },
+    sonKasa: { ad: "Final vault", ipucu: "The last of a thousand. Whatever you have left, use it now" }
   },
 
   nasil: {
@@ -83,7 +87,7 @@ export const EN: Metinler = {
     giris: `Every tap locks the next ring right where it is, working <b>from the outside in</b>.
 Where the gaps of the locked rings overlap is the <b>yellow wedge</b>: the ball's way out.
 Each new lock can only <b>narrow</b> it. If it gets too narrow for the ball, you lose.
-Lock every ring and the vault opens.`,
+Lock every ring and the vault opens. <b>Running out of time also loses the level</b> — the number at the top is your time left.`,
     satir: {
       kama: {
         baslik: "Yellow wedge",

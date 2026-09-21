@@ -90,3 +90,26 @@ test("pay mesajında ondalık ayırıcı virgül", () => {
   // Oyunun geri kalanı virgül kullanıyor (süre: "8,0"); nokta tutarsız olurdu.
   assert.ok(!kayipYazisi(0.6, TR).includes("."), kayipYazisi(0.6, TR));
 });
+
+// --- Patron ipucu ilk kayıptan sonra da kalır --------------------------------
+//
+// Regresyon: patron metni yalnızca deneme === 1 iken dönüyordu; ikinci denemede alt
+// çubukta sadece "Deneme 2" kalıyordu. Yani "Ayna: Hepsi aynı anda hizalanıyor" cümlesi
+// tam da oyuncunun ona ihtiyaç duyduğu anda siliniyordu — öğretici ipucu için bilerek
+// kurulan kuralın tersi.
+test("patron ipucu ikinci denemede de görünür", () => {
+  const p = TR.patron.ayna;
+  const m = ipucu({ level: level({ n: 10, boss: "ayna" as const }), deneme: 3, rekor: undefined, ogretici, m: TR });
+  assert.ok(m.includes(p.ad) && m.includes(p.ipucu), `patron metni kayboldu: "${m}"`);
+  assert.ok(m.includes("Deneme 3"), `deneme sayısı da görünmeli: "${m}"`);
+});
+
+test("patron bölümü bitirilmişse ipucu yerini rekora bırakır", () => {
+  // Kuralı bilen oyuncuya tekrar anlatmaya gerek yok; öğretici ipucuyla aynı mantık.
+  const m = ipucu({
+    level: level({ n: 10, boss: "ayna" as const }), deneme: 2,
+    rekor: { s: 2, t: 6.1 }, ogretici, m: TR
+  });
+  assert.ok(!m.includes(TR.patron.ayna.ipucu), `rekor varken ipucu gösterilmemeli: "${m}"`);
+  assert.ok(m.includes("en iyin"), m);
+});

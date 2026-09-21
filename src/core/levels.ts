@@ -10,7 +10,8 @@ import type { RingDef } from "./rings.ts";
  * Görünen ad ve ipucu src/dil/ altında bu anahtarlarla aranır. Çekirdek dil katmanını
  * tanımaz — oyun kuralları hangi dilde oynandığından bağımsızdır.
  */
-export const PATRON_ANAHTARLARI = ["ayna", "merkez", "metronom", "catal", "tavsanKaplumbaga", "buyukKasa"] as const;
+export const PATRON_ANAHTARLARI =
+  ["ayna", "merkez", "metronom", "catal", "tavsanKaplumbaga", "buyukKasa", "sonKasa"] as const;
 export type PatronAnahtari = typeof PATRON_ANAHTARLARI[number];
 
 export interface Level {

@@ -87,8 +87,11 @@ test("patron levelleri işaretli ve tanınan bir anahtar taşıyor", () => {
     assert.ok(l.boss && (C.PATRON_ANAHTARLARI as readonly string[]).includes(l.boss),
       `level ${l.n}: bilinmeyen patron anahtarı ${JSON.stringify(l.boss)}`);
   });
+  // Altı tasarım döngüde tekrar eder, yedincisi yalnızca kapanışta kullanılır.
   const adlar = new Set(patronlar.map(l => l.boss));
-  assert.equal(adlar.size, 6, "altı farklı patron tasarımı olmalı");
+  assert.equal(adlar.size, 7, "altı döngü tasarımı + kapanış patronu olmalı");
+  assert.equal(new Set(patronlar.slice(0, -1).map(l => l.boss)).size, 6,
+    "son bölüm dışında altı tasarım dönmeli");
 });
 
 test("aynı leveldeki hiçbir iki halka birebir aynı değil", () => {
@@ -101,4 +104,14 @@ test("aynı leveldeki hiçbir iki halka birebir aynı değil", () => {
       görülen.add(k);
     });
   }
+});
+
+test("son bölüm kapanış patronu", () => {
+  // 1000 bölümlük bir oyunun kapanış anı olmalı; döngünün nereye denk geldiğine
+  // bırakılamaz (bırakıldığında "çatal" çıkıyordu).
+  const son = data.levels[data.levels.length - 1];
+  assert.equal(son.boss, "sonKasa", `son bölüm kapanış patronu olmalı, ${son.boss} geldi`);
+  // Ve bu anahtar BAŞKA hiçbir bölümde kullanılmamalı.
+  const kacKez = data.levels.filter(l => l.boss === "sonKasa").length;
+  assert.equal(kacKez, 1, `kapanış patronu yalnızca son bölümde olmalı, ${kacKez} yerde var`);
 });

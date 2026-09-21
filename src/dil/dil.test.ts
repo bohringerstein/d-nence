@@ -130,3 +130,20 @@ test("ekran iskeletinde elle yazılmış Türkçe metin kalmamış", () => {
   const turkce = sablon.match(/>[^<>]*[çğışöüÇĞİŞÖÜ][^<>]*</g) ?? [];
   assert.deepEqual(turkce, [], "markup'ta çevrilmemiş metin: " + turkce.join(" | "));
 });
+
+// ---- Kapanış bölümü --------------------------------------------------------
+
+test("son bölümün kendi patronu var ve 'son' sözü tekrar etmiyor", () => {
+  // Patron döngüsü 6'lı, patron aralığı 10: 1000. bölüm 100. patrona denk geliyor ve
+  // 100 mod 6 = "çatal" ediyordu. Yani 1000 bölümlük oyunun kapanışı altı tasarımdan
+  // rastgele birine düşüyor, finali olmuyordu. Üstelik "Büyük kasa: Son kasa..." metni
+  // 60'tan 960'a kadar 16 kez çıkıp oyuncuya 60. bölümde "son kasa" diyordu.
+  for (const k of kodlar) {
+    const m = DILLER[k];
+    assert.ok(m.patron.sonKasa, `${k}: kapanış patronu eksik`);
+    const buyuk = (m.patron.buyukKasa.ad + " " + m.patron.buyukKasa.ipucu).toLowerCase();
+    const sonSozu = k === "tr" ? "son" : "last";
+    assert.ok(!buyuk.split(/\W+/).includes(sonSozu),
+      `${k}: tekrar eden patron metni "${sonSozu}" demememeli — 16 bölümde çıkıyor`);
+  }
+});

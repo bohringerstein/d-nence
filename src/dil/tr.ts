@@ -8,12 +8,15 @@ export const TR: Metinler = {
 
   oyunAlani: "Oyun alanı. Dokunarak sıradaki halkayı kilitle.",
   duraklatDugmesi: "Duraklat",
+  kalanSure: "kalan süre",
   levelOneki: "Level",
   patronEki: ", patron",
   ayarlar: "Ayarlar",
   tamam: "Tamam",
   nasilOynanir: "Nasıl oynanır",
   bastanBasla: "Baştan başla",
+  bastanBaslaAciklama: "Level 1'e döner. Yıldızların kalır.",
+  bastanBaslaOnay: level => `Emin misin? Level ${level} kaybolur`,
   anladim: "Anladım",
 
   ilerlemeYok: "Henüz bölüm açılmadı.",
@@ -68,7 +71,8 @@ export const TR: Metinler = {
     metronom: { ad: "Metronom", ipucu: "Halkalar sallanıyor, orta noktadan geçerken yakala" },
     catal: { ad: "Çatal", ipucu: "Her halkada iki kapı var, hangisini seçtiğin sonrakini belirler" },
     tavsanKaplumbaga: { ad: "Tavşan ile kaplumbağa", ipucu: "Yavaşlar sabırlı, hızlılar keskin nişan ister" },
-    buyukKasa: { ad: "Büyük kasa", ipucu: "Son kasa. Her şey bir arada" }
+    buyukKasa: { ad: "Büyük kasa", ipucu: "Her şey bir arada: hız, yön, iki kapı" },
+    sonKasa: { ad: "Son kasa", ipucu: "Bin kasanın sonuncusu. Elinde ne varsa şimdi" }
   },
 
   nasil: {
@@ -76,7 +80,7 @@ export const TR: Metinler = {
     giris: `Ekrana her dokunduğunda <b>dıştan içe</b> sıradaki halka olduğu yerde kilitlenir.
 Kilitli halkaların boşluklarının kesiştiği yer <b>sarı kama</b>dır: topun çıkış yolu.
 Her yeni kilit bu yolu ancak <b>daraltır</b>. Yol topun geçemeyeceği kadar daralırsa kaybedersin.
-Tüm halkalar kilitlenince kasa açılır.`,
+Tüm halkalar kilitlenince kasa açılır. <b>Sayaç biterse de kaybedersin</b>: üstteki sayı kalan süren.`,
     satir: {
       kama: {
         baslik: "Sarı kama",

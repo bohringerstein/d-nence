@@ -162,7 +162,11 @@ button.clock {
 }
 .bar.low i { background: var(--fail); }
 
-.alan { flex: 1 1 auto; min-height: 0; position: relative; }
+/* overflow: hidden ŞART. Geri sayım rakamı scale(1.25) ile büyütülerek beliriyor ve
+   bu, 320 piksellik ekranda öğeyi görsel olarak 400 piksel yapıyordu (−40'tan 360'a):
+   sayfa 40 piksel yatay kayıyordu. Ekranın tamamı dokunma alanı olduğu için yatay bir
+   sürükleme sayfayı gerçekten oynatıyordu. */
+.alan { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; }
 
 canvas {
   width: 100%;
@@ -396,3 +400,39 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   flex: 0 0 auto;
 }
 .dilSecim select:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* Yalnızca ekran okuyucu için: görsel olarak gizli ama erişilebilirlik ağacında var.
+   display:none ya da visibility:hidden ağaçtan da siler, o yüzden kırpma yöntemi. */
+.gizli {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Düğme altı açıklaması. Ayarlardaki dört onay kutusunun hepsinde açıklama var;
+   "Baştan başla" paneldeki tek açıklamasız kontroldü — üstelik geri dönüşü olmayan tek
+   eylem. Bölüm seçimi olmadığı için 412. bölümdeki oyuncu kazara basarsa 411 bölümü
+   yeniden oynamak zorunda kalır. */
+.dugmeNot {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  margin: 0.35rem 0 0.25rem;
+}
+.dugmeNot:empty { display: none; }
+/* Onay bekleyen hal: düğme kendi uyarısına dönüşür. */
+.kutu button.onayBekliyor { color: var(--fail); }
+
+/* "Nasıl oynanır"ın İLK AÇILIŞ hali. Altı gösterge satırından dördü (kırmızı nokta L13,
+   küçük kare L7, iki boşluk L11, değişken hız L19) oyuncunun onlarca bölüm boyunca
+   göremeyeceği şeyleri anlatıyordu. Oyun bu mekanikleri zaten doğru anda alt çubukta
+   tek satırla tanıtıyor; ilk açılışta tekrar etmenin tek etkisi metin duvarı.
+   Tamamı Ayarlar'dan okunabilir. Işığa duyarlılık uyarısı HER İKİ HALDE de kalır. */
+.nasilKutu.kisa .gosterge li:not([data-anahtar="kama"]):not([data-anahtar="duraklat"]) {
+  display: none;
+}
+.nasilKutu.kisa .yildizNot { display: none; }

@@ -42,7 +42,7 @@ test("ışığa duyarlılık notu ilk açılış ekranında", () => {
 });
 
 test("her gösterge satırının bir simgesi var", () => {
-  const satir = (NASIL_HTML.match(/<li>/g) || []).length;
+  const satir = (NASIL_HTML.match(/<li data-anahtar=/g) || []).length;
   const simge = (NASIL_HTML.match(/<svg/g) || []).length;
   assert.equal(satir, simge, `${satir} satır ama ${simge} simge`);
   assert.ok(satir >= 5, "en az beş mekanik anlatılmalı");

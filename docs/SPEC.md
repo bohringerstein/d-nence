@@ -192,9 +192,12 @@ Amber açık temada zeminle yalnızca **1,97:1** yapar. Bu yüzden iki farklı y
 
 Süre çubuğunun oluğu iki temada da zeminden ayrılmalıdır (açık 1,42:1, koyu 1,53:1). Ölçümlerin tamamı `src/ui/contrast.test.ts` içinde sınanır.
 
+**Kapanış bölümü.** Son bölüm **her zaman** kapanış patronudur (`sonKasa` anahtarı); döngünün nereye denk geldiğine bırakılmaz. Patron döngüsü 6'lı ve patron aralığı 10 olduğu için 1000. bölüm 100. patrona düşüyordu ve 100 mod 6 = "çatal" ediyordu: **1000 bölümlük oyunun kapanış anı yoktu.** Üstelik döngüdeki "Büyük kasa" metni "Son kasa…" diye başlıyor ve 60'tan 960'a kadar **16 kez** çıkıp oyuncuya 60. bölümde "son kasa" diyordu. Tekrar eden patron metni artık "son" demez; o söz yalnızca gerçekten son olan bölüme aittir.
+
 **Kaybın açıklanması.** Kayıp anı bu türün en kritik saniyesidir: oyuncu "az kalmıştı, bir daha" mı diyor, yoksa "ne oldu ya?" mı — devam etme kararı orada verilir. Bu yüzden iki şey yapılır:
 
 - **Kanal ekranda kalır.** Kamalar eskiden kayıpta tamamen gizleniyordu; yani "neden kaybettim" sorusuna cevap veren tek öğe, tam da o soru sorulduğu anda siliniyordu. Geriye kırmızı bir halka ve sarsıntı kalıyordu: "kaybettin" diyordu ama "şu kadarla" demiyordu. Artık daralmış kanal kırmızı dolu çizilir ve topun ona sığmadığı görünür.
+- **Mesaj okunacak kadar kalır.** Kayıp animasyonu 0,9 saniye sürer ve bitince level yeniden yüklenir; yükleme de ipucunu hemen eziyordu. Yani bu cümle ekranda 0,9 saniye duruyordu — okumak bundan uzun sürer. Sonuç mesajları (kayıp, kazanma, süre dolması) artık **korumalı** yazılır ve bir sonraki denemeye taşar; yeniden başlama gecikmez. Koruma yalnızca oyun canlıyken işler: duraklatan oyuncu okuma süresini yakmaz.
 - **Pay yazılır.** Kanalın geçiş eşiğinden ne kadar dar kaldığı, kaybın oluştuğu anda zaten hesaplanıyordu ama atılıyordu. Artık durumda saklanır ve ipucunda söylenir: 0,05°'nin altında "kıl payı", 10°'nin üstünde "yol erken daraldı", arada sayıyla ("1,4° dar kaldı"). **Süre dolduğunda ölçülecek bir pay yoktur; orada sayı uydurulmaz.**
 
 **Duraklatma.** Oyuncunun ara vermesi gereken bir durum her zaman olur; eskiden tek yol ayarlar panelini açmaktı ve panel kapanınca level **baştan başlıyordu** — yani ara vermenin bedeli ilerlemeydi.
@@ -203,6 +206,11 @@ Süre çubuğunun oluğu iki temada da zeminden ayrılmalıdır (açık 1,42:1, 
 - **Duraklatma tam bir donmadır.** Halkalar durduğu açıda kalır, süre işlemez, dokunuşlar yok sayılır. Örtü yarı saydamdır ki donmuş halkalar ve kanal arkadan görünsün: oyuncu "kaldığım yer duruyor" bilgisini gözüyle alır.
 - **Devam ederken üçten geri sayılır ve halkalar sayım boyunca DONUK kalır.** Bu bir adalet kuralıdır: halkalar geri sayımda dönseydi oyuncu bedava gözlem süresi kazanır ve süre bütçesi (γ) delinirdi — duraklat, izle, duraklat diye sömürülebilirdi. Geri sayımın işi bilgi vermek değil, parmağın ekrana dönmesine zaman tanımaktır.
 - **Aynı muamele her donma için geçerlidir:** ayarlar, "nasıl oynanır" ve arkaplandan dönüş de kaldığı kareden devam eder ve geri sayımla girer. Arkaplandan dönüşte oyun eskiden doğrudan canlıya dönüyordu; uygulamayı değiştirip geri gelen oyuncu halkaları bir anda hareket hâlinde buluyordu.
+
+**"Nasıl oynanır" ilk açılışta kısadır.** Altı gösterge satırından dördü (kırmızı nokta, küçük kare, iki boşluk, değişken hız) oyuncunun **onlarca bölüm boyunca göremeyeceği** mekanikleri anlatıyordu ve ekran 320 pikselde 2,9 ekran kaydırma tutuyordu. Oyun bu mekanikleri zaten ilk göründükleri bölümde alt çubukta tek satırla tanıtır; ilk açılışta tekrar etmenin tek etkisi metin duvarıdır. İlk açılışta yalnızca giriş, "Sarı kama", "Duraklat" ve **ışığa duyarlılık uyarısı** gösterilir — tek ekrana sığar, kaydırma gerekmez. Tamamı Ayarlar'dan okunur.
+
+**"Baştan başla" iki aşamalıdır.** Oyundaki geri dönüşü olmayan tek eylem budur: Level 1'e döndürür ve bölüm seçimi olmadığı için 412. bölümdeki oyuncu 411 bölümü yeniden oynamak zorunda kalır. Üstelik paneldeki en sık basılan düğmenin ("Tamam") hemen üstünde durur. İlk basış düğmeyi uyarıya çevirir ("Emin misin? Level 412 kaybolur"), ikincisi çalıştırır; panel kapanıp açılınca uyarı hali sıfırlanır. Altında ne yaptığını söyleyen bir açıklama da vardır — paneldeki diğer dört kontrolün hepsinde vardı, yalnızca bunda yoktu.
+*Bu, "her dokunuş kalıcıdır" ilkesiyle çelişmez: o ilke halka kilitlerine aittir, menüdeki yıkıcı bir eyleme değil.*
 
 **Birikimin görünmesi.** Ayarlar paneli ilerleme özetini gösterir: kaç bölüm açıldığı ve toplanan yıldız ("312 bölüm açıldı · 714 / 936 yıldız"). Toplanan yıldız eskiden oyun boyunca hiçbir yerde görünmüyordu; yalnızca 1000. bölümü bitiren oyuncu toplamını öğreniyordu. 1000 bölümlük bir oyunda devam etme sebebinin kendisi birikimin görünmesidir.
 
@@ -222,6 +230,9 @@ Süre çubuğunun oluğu iki temada da zeminden ayrılmalıdır (açık 1,42:1, 
 **Erişilebilirlik ve cihaz:** güvenli alan boşlukları (çentik, ana ekran çubuğu) hesaba katılır; ekran yakınlaştırma ve kaydırma kapalıdır; açık/koyu tema desteklenir; hareket azaltma ayarı açıksa sarsıntı ve flaş kapatılır. Ayrıca:
 
 - **Dokunma hedefleri en az 44 pikseldir.** Tek dokunuşla oynanan bir oyunda düğmelerin ıskalanması kabul edilemez.
+- **Escape açık örtüyü kapatır**, kapalıyken duraklatır. Tek istisna duraklatma örtüsüdür: devam etmek bilinçli olmalıdır. Eskiden Escape yalnızca *açıyordu*, yani herhangi bir örtü açıkken tamamen ölüydü ve dört diyalogdan çıkış yolu tek bir düğmeydi.
+- **Sayacın erişilebilir adı `aria-label` DEĞİLDİR**, görsel olarak gizli bir metindir. `aria-label` görünen rakamı ezer: ekran okuyucu yalnızca "Duraklat, düğme" der ve **kalan süreyi hiç duymaz** — oysa süre iki kayıp koşulundan biridir ve tek göstergesi odur. Erişilebilir adın görünen metni içermemesi ayrıca WCAG 2.5.3 (Label in Name) ihlalidir. Süre çubuğu `aria-hidden`'dır: sayacın görsel kopyasıdır, iki kez söylenmemelidir.
+- **Oyun alanı `overflow: hidden`'dır.** Geri sayım rakamı `scale(1.25)` ile büyütülerek belirir ve bu, 320 piksellik ekranda öğeyi görsel olarak 400 piksel yapıyordu: sayfa 40 piksel yatay kayıyordu. Ekranın tamamı dokunma alanı olduğu için yatay bir sürükleme sayfayı gerçekten oynatıyordu.
 - **Örtü açıkken arka plan `inert`'tir.** `aria-modal="true"` yalnızca ekran okuyucuya bilgi verir, klavye odağını tutmaz; bu olmadan Tab örtüden çıkıp arkadaki düğmelere gidiyordu.
 - **"Nasıl oynanır" ekranının kapatma düğmesi yapışkandır** (kutunun altında sabit). Kutu kaydırılabilir ve düğme en altta kalınca ilk açılışta görünmüyordu. Bu ekranda Esc ve zemine tıklama **bilerek yoktur**: kapatmak "gördüm" bayrağını yazar ve ekranda ışığa duyarlılık uyarısı da vardır, kazara atlanmamalıdır. Ayarlar ve bitiş ekranı için böyle bir kısıt yoktur.
 

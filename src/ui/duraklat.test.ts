@@ -24,9 +24,14 @@ test("sayaç bir düğme ve duraklatma etiketi taşıyor", () => {
   // alt köşeye eklenen her düğme başparmağın durduğu yere ölü bölge açar.
   const m = shell.match(/<button class="clock" id="clock"[^>]*>/);
   assert.ok(m, "sayaç <button> olmalı");
-  // Etiket artık dil dosyasından geliyor; markup yalnızca ONA bağlanmalı.
-  assert.ok(m[0].includes('aria-label="${m.duraklatDugmesi}"'),
-    "sayacın erişilebilir adı dil dosyasındaki duraklatma metni olmalı");
+  // Erişilebilir ad aria-label DEĞİL, görsel olarak gizli bir metin olmalı.
+  // aria-label görünen rakamı EZER: ekran okuyucu sadece "Duraklat, düğme" der ve
+  // kalan süreyi hiç duymaz — oysa süre iki kayıp koşulundan biri. Ayrıca erişilebilir
+  // adın görünen metni içermemesi WCAG 2.5.3 (Label in Name) ihlalidir.
+  assert.ok(!/aria-label/.test(m[0]), "sayaçta aria-label olmamalı: görünen rakamı ezer");
+  assert.ok(shell.includes("{m.duraklatDugmesi}, ") && shell.includes("{m.kalanSure}"),
+    "gizli etiket duraklatma adını ve kalan süreyi birlikte söylemeli");
+  assert.ok(/\.gizli\s*\{/.test(css), "görsel gizleme sınıfı tanımlı olmalı");
   assert.equal(TR.duraklatDugmesi, "Duraklat");
   assert.ok(shell.includes('id="clockSayi"'), "rakamlar ayrı bir öğede olmalı (simge kardeş öğe)");
 });
@@ -72,4 +77,37 @@ test("nasıl oynanır duraklatmayı anlatıyor", () => {
   // Sayaca dokunmak keşfedilebilir olmalı: simge tek başına yetmez.
   assert.ok(/duraklat/i.test(NASIL_HTML), "duraklatma açıklaması eksik");
   assert.ok(/sayac|sayaç|süre/i.test(NASIL_HTML), "duraklatmanın nerede olduğu yazmalı");
+});
+
+// --- Sonuç mesajı okunacak kadar kalıyor mu? ---------------------------------
+//
+// Kayıp animasyonu 0,9 saniye sürüyor ve bitince level yeniden yükleniyor; yükleme de
+// ipucunu hemen eziyordu. Yani "Açıklık kapandı · 1,4° dar kaldı" — oyuncunun "neden
+// kaybettim" sorusuna cevap veren tek cümle — ekranda 0,9 saniye duruyordu. O cümleyi
+// okumak bundan uzun sürer.
+test("kayıp, kazanma ve süre dolması mesajları korumalı yazılıyor", () => {
+  for (const cagri of ["yazKoru(kayipYazisi(", "yazKoru(M.sonucSatiri(", "yazKoru(M.sureDoldu)"]) {
+    assert.ok(main.includes(cagri), `sonuç mesajı korumasız yazılıyor: ${cagri}`);
+  }
+  // Level yüklemesi mesajı EZMEMELİ, ertelemeli.
+  assert.ok(/yazVeyaErtele\(ipucu\(/.test(main),
+    "level yüklenirken ipucu doğrudan yazılırsa sonuç mesajı ezilir");
+  assert.ok(!/[^a-zA-Z]yaz\(ipucu\(/.test(main), "level yüklemesi yaz() ile ipucunu ezmemeli");
+});
+
+test("mesaj süresi kayıp animasyonundan uzun", () => {
+  // Kilit, kayıp animasyonunu (0,9 sn) aşmalı ki mesaj sonraki denemeye taşsın.
+  const m = main.match(/const SONUC_SURESI = ([\d.]+)/);
+  assert.ok(m, "SONUC_SURESI tanımlı olmalı");
+  const state = fs.readFileSync(path.join(kok, "src", "game", "state.ts"), "utf8");
+  const c = state.match(/CRASH_SURE = ([\d.]+)/);
+  assert.ok(c, "CRASH_SURE okunamadı");
+  assert.ok(Number(m[1]) > Number(c[1]) + 0.5,
+    `mesaj ${m[1]} sn yaşıyor ama kayıp animasyonu ${c[1]} sn; okunacak süre kalmıyor`);
+});
+
+test("duraklatmak mesaj süresini yakmıyor", () => {
+  // Oyuncu duraklatıp mesajı okuyabilmeli; kilit yalnızca oyun canlıyken işlemeli.
+  assert.ok(/if \(!oyunDonuk\(\)\) ipucuKilidiIlerlet\(dt\)/.test(main),
+    "ipucu kilidi oyun donukken de ilerliyor");
 });

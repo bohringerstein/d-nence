@@ -17,6 +17,7 @@ export interface Kabuk {
   canvas: HTMLCanvasElement;
   hint: HTMLElement;
   reset: HTMLButtonElement;
+  resetNot: HTMLElement;
   bitis: HTMLElement;
   bitisMetin: HTMLElement;
   bitisDugme: HTMLButtonElement;
@@ -56,12 +57,13 @@ const html = (m: Metinler): string => `
          tamamı dokunma alanı olduğu için alt köşeye eklenen her düğme, başparmağın
          durduğu yere ölü bölge açar. Sayaç ise üst çubukta ve eşleşme birebir:
          zamanı durdurmak için zamana dokun. -->
-    <button class="clock" id="clock" type="button" aria-label="${m.duraklatDugmesi}">
-      <i class="duraklatIm" aria-hidden="true"></i><span id="clockSayi">0,0</span>
+    <button class="clock" id="clock" type="button">
+      <i class="duraklatIm" aria-hidden="true"></i><span class="gizli">${m.duraklatDugmesi}, ${m.kalanSure}</span><span id="clockSayi">0,0</span>
     </button>
     <div class="lvl">${m.levelOneki} <b id="lvl">1</b><small id="lvlToplam"></small></div>
   </header>
-  <div class="bar" id="bar"><i id="barFill"></i></div>
+  <!-- Süre çubuğu sayacın görsel kopyası; ekran okuyucuya iki kez söylenmesin. -->
+  <div class="bar" id="bar" aria-hidden="true"><i id="barFill"></i></div>
   <div class="alan">
     <canvas id="c" aria-label="${m.oyunAlani}"></canvas>
     <div class="flas" id="flas" aria-hidden="true"></div>
@@ -106,6 +108,7 @@ const html = (m: Metinler): string => `
            tamamı dokunma alanı olunca oraya kazara basma riski arttı; seyrek ve geri
            alınamaz bir eylem olduğu için ayarlara taşındı. -->
       <button id="reset" type="button">${m.bastanBasla}</button>
+      <small class="dugmeNot" id="resetNot">${m.bastanBaslaAciklama}</small>
       <button id="ayarKapat" type="button">${m.tamam}</button>
     </div>
   </div>
@@ -163,6 +166,7 @@ export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): 
     canvas: bul<HTMLCanvasElement>(hedef, "c"),
     hint: bul(hedef, "hint"),
     reset: bul<HTMLButtonElement>(hedef, "reset"),
+    resetNot: bul(hedef, "resetNot"),
     bitis: bul(hedef, "bitis"),
     bitisMetin: bul(hedef, "bitisMetin"),
     bitisDugme: bul<HTMLButtonElement>(hedef, "bitisDugme"),

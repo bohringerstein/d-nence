@@ -263,6 +263,14 @@ const mk = (o: Partial<RawRing>): RawRing =>
 const BOSS_SIRASI = [10, 20, 30, 40, 50, 60];
 const bossTasarimi = (n: number): Boss | undefined => {
   if (!bossMu(n)) return undefined;
+  // SON BÖLÜM her zaman kapanış patronudur. Döngü 6'lı, patron aralığı 10 ve
+  // 1000. bölüm 100. patrona denk geliyor: 100 mod 6 = "çatal". Yani 1000 bölümlük
+  // oyunun kapanışı altı tasarımdan rastgele birine düşüyordu — finali yoktu.
+  // Yapı "Büyük kasa"nın aynısı, yalnızca anahtarı (ve dolayısıyla metni) farklı.
+  if (n === LEVEL_COUNT) {
+    const b = BOSSES[60];
+    return b && { ...b, anahtar: "sonKasa" };
+  }
   const tur = Math.floor(n / BOSS_ARALIGI) - 1;          // 0, 1, 2, ...
   return BOSSES[BOSS_SIRASI[tur % BOSS_SIRASI.length]];
 };

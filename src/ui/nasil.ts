@@ -32,7 +32,7 @@ const SIRA: GostergeAnahtari[] = ["kama", "flip", "preLocked", "gaps2", "wobble"
 export function nasilHtml(m: Metinler): string {
   const satirlar = SIRA.map(k => {
     const s = m.nasil.satir[k];
-    return `<li><i>${SIMGE[k]}</i><span><b class="ad">${s.baslik}</b>${s.metin}</span></li>`;
+    return `<li data-anahtar="${k}"><i>${SIMGE[k]}</i><span><b class="ad">${s.baslik}</b>${s.metin}</span></li>`;
   }).join("\n  ");
 
   return `
@@ -44,7 +44,7 @@ export function nasilHtml(m: Metinler): string {
   ${satirlar}
 </ul>
 
-<p class="giris">${m.nasil.yildizlar}</p>
+<p class="giris yildizNot">${m.nasil.yildizlar}</p>
 
 <p class="uyari">${m.nasil.uyari}</p>
 `;

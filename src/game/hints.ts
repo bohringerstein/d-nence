@@ -50,9 +50,14 @@ export interface IpucuGirdi {
 }
 
 export function ipucu({ level, deneme, rekor, ogretici, m }: IpucuGirdi): string {
-  if (level.boss && deneme === 1) {
+  // Patron ipucu da öğretici ipucu gibi davranır: bölüm daha önce BİTİRİLMEMİŞSE
+  // deneme sayacı onu ezmez. Eskiden yalnızca ilk denemede gösteriliyordu ve
+  // "Ayna: Hepsi aynı anda hizalanıyor" cümlesi tam da oyuncunun ona ihtiyaç duyduğu
+  // anda — ilk kayıptan sonra — siliniyordu. Aşağıdaki kuralın tersiydi.
+  if (level.boss && !rekor) {
     const p = m.patron[level.boss];
-    return `${p.ad}: ${p.ipucu}`;
+    const metin = `${p.ad}: ${p.ipucu}`;
+    return deneme > 1 ? m.denemeVeIpucu(deneme, metin) : metin;
   }
 
   // Öğretici ipucu deneme sayacını EZER, tersi değil.

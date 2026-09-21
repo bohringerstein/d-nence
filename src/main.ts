@@ -104,12 +104,48 @@ function levelYukle(n: number, denemeyiKoru = false): void {
   // 1,4 rem içinde 320 piksellik telefonda üst çubuğu taşırıyordu.
   ui.lvl.textContent = String(n);
   ui.lvlToplam.textContent = ` / ${LEVEL_COUNT}${level.boss ? M.patronEki : ""}`;
-  yaz(ipucu({ level, deneme, rekor: kayit.bests[n], ogretici, m: M }));
+  yazVeyaErtele(ipucu({ level, deneme, rekor: kayit.bests[n], ogretici, m: M }));
   levelKaydet(kayit, n);
   saatiGuncelle();
 }
 
+/**
+ * Alt çubuk metni. Sonuç mesajları KORUMALI yazılır.
+ *
+ * Neden: kayıp animasyonu 0,9 saniye sürüyor ve bitince level yeniden yükleniyor,
+ * yüklenme de ipucunu hemen eziyordu. Yani "Açıklık kapandı · 1,4° dar kaldı" —
+ * oyuncunun "neden kaybettim" sorusuna cevap veren tek cümle — ekranda 0,9 saniye
+ * duruyordu. O cümleyi okumak bundan uzun sürer. Mesaj artık bir sonraki denemeye
+ * taşar; yeniden başlama gecikmez, yalnızca açıklama okunacak kadar kalır.
+ */
 const yaz = (metin: string): void => { ui.hint.textContent = metin; };
+
+/** Sonuç mesajının ekranda kalacağı süre (kayıp animasyonu dahil). */
+const SONUC_SURESI = 2.4;
+let ipucuKilidi = 0;
+let bekleyenIpucu: string | null = null;
+
+function yazKoru(metin: string): void {
+  yaz(metin);
+  ipucuKilidi = SONUC_SURESI;
+  bekleyenIpucu = null;
+}
+
+/** Kilit varken ipucu bekletilir; yoksa hemen yazılır. */
+function yazVeyaErtele(metin: string): void {
+  if (ipucuKilidi > 0) bekleyenIpucu = metin;
+  else yaz(metin);
+}
+
+function ipucuKilidiIlerlet(dt: number): void {
+  if (ipucuKilidi <= 0) return;
+  ipucuKilidi -= dt;
+  if (ipucuKilidi > 0) return;
+  if (bekleyenIpucu !== null) { yaz(bekleyenIpucu); bekleyenIpucu = null; }
+}
+
+/** Level değişiminde bekleyen mesaj kalmasın (yeniden başla, bitiş ekranı). */
+function ipucuKilidiSifirla(): void { ipucuKilidi = 0; bekleyenIpucu = null; }
 
 function saatiGuncelle(): void {
   const kalan = kalanSure(durum);
@@ -140,7 +176,7 @@ function dokunusIsle(gercekZaman: number): void {
     if (sonuc.tip === "kilit") { titret(ayarlar, "kilit"); cal(ayarlar, "kilit", sonuc.aciklik); }
     if (sonuc.tip === "kayip") {
       titret(ayarlar, "kayip"); cal(ayarlar, "kayip");
-      yaz(kayipYazisi(sonuc.pay / DEG, M));
+      yazKoru(kayipYazisi(sonuc.pay / DEG, M));
       return;
     }
     if (sonuc.tip === "acildi") {
@@ -148,7 +184,7 @@ function dokunusIsle(gercekZaman: number): void {
       const oncekiVardi = kayit.bests[durum.level.n] !== undefined;
       titret(ayarlar, "acildi"); cal(ayarlar, "acildi");
       const rekor = rekorKaydet(kayit, durum.level.n, yeni);
-      yaz(M.sonucSatiri(M.yildizEtiketi[sonuc.yildiz], yildizYazisi(sonuc.yildiz), sureYazisi(sonuc.sure, M)) +
+      yazKoru(M.sonucSatiri(M.yildizEtiketi[sonuc.yildiz], yildizYazisi(sonuc.yildiz), sureYazisi(sonuc.sure, M)) +
           (rekor && oncekiVardi ? M.rekorEki : ""));
       return;
     }
@@ -162,7 +198,7 @@ const oyun = dongu({
     if (oyunDonuk()) { girdi.temizle(); return false; }
     dokunusIsle(gercekZaman);
     const s = step(durum, dt);
-    if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); cal(ayarlar, "kayip"); yaz(M.sureDoldu); return true; }
+    if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); cal(ayarlar, "kayip"); yazKoru(M.sureDoldu); return true; }
     if (s.tip === "bitti") {
       if (durum.asama === "crash") levelYukle(durum.level.n, true);
       else if (durum.level.n >= LEVEL_COUNT) { bitisGoster(); return false; }
@@ -174,6 +210,8 @@ const oyun = dongu({
   cizim(dt) {
     if (bitti) return;
     geriSayimIlerlet(dt);
+    // Kilit yalnızca oyun CANLIYKEN işler: duraklatan oyuncu mesajı okuma süresini yakmasın.
+    if (!oyunDonuk()) ipucuKilidiIlerlet(dt);
     // Oyun donukken halkalar durur ama çizim sürer: oyuncu ayarın etkisini anında görür
     // ve duraklatmada kaldığı kareyi olduğu gibi görür.
     const g = tuval.yerlesim(durum.rings.length);
@@ -242,7 +280,15 @@ ui.devamDugme.addEventListener("click", duraklatmaKapat);
 
 // Masaüstünde Esc de duraklatır. Devam etmek bilinçli olmalı, o yüzden Esc geri almaz.
 window.addEventListener("keydown", e => {
-  if (e.key === "Escape" && !oyunDonuk()) { e.preventDefault(); duraklatmaAc(); }
+  if (e.key !== "Escape") return;
+  e.preventDefault();
+  // Açıkken kapatır, kapalıyken duraklatır. DURAKLATMA ÖRTÜSÜ hariç: devam etmek
+  // bilinçli olmalı (bkz. duraklatmaKapat). Eskiden Escape yalnızca açıyordu, yani
+  // herhangi bir örtü açıkken tamamen ölüydü ve dört diyalogdan çıkış yolu tek düğmeydi.
+  if (!ui.nasil.hidden) { ui.nasilKapat.click(); return; }
+  if (!ui.ayarPanel.hidden) { ui.ayarKapat.click(); return; }
+  if (!ui.bitis.hidden) { ui.bitisDugme.click(); return; }
+  if (!oyunDonuk()) duraklatmaAc();
 });
 
 // ---- Bitiş ekranı ----------------------------------------------------------
@@ -260,14 +306,42 @@ ui.bitisDugme.addEventListener("click", () => {
   ui.bitis.hidden = true;
   arkaKilit(false);
   bitti = false;
+  ipucuKilidiSifirla();
   bastanBasla(kayit);
   levelYukle(1);
   geriSayimBaslat();
 });
 
-// "Baştan başla" artık ayarlar panelinde (bkz. ui/shell.ts): Level 1'e döndüren seyrek
-// bir eylem, alt çubukta başparmağın durduğu köşede durmamalı.
+/**
+ * "Baştan başla" İKİ AŞAMALIDIR.
+ *
+ * Bu, oyundaki geri dönüşü olmayan tek eylem: Level 1'e döndürür ve bölüm seçimi
+ * olmadığı için 412. bölümdeki oyuncu 411 bölümü yeniden oynamak zorunda kalır.
+ * Üstelik paneldeki en sık basılan düğmenin ("Tamam") hemen üstünde, 44 piksel
+ * yüksekliğinde duruyor. İlk basış düğmeyi uyarıya çevirir, ikincisi çalıştırır.
+ *
+ * "Her dokunuş kalıcıdır" ilkesiyle çelişmez: o ilke halka kilitlerine aittir,
+ * menüdeki yıkıcı bir eyleme değil.
+ */
+let resetOnayBekliyor = false;
+
+function resetOnayiSifirla(): void {
+  if (!resetOnayBekliyor) return;
+  resetOnayBekliyor = false;
+  ui.reset.textContent = M.bastanBasla;
+  ui.reset.classList.remove("onayBekliyor");
+  ui.resetNot.textContent = M.bastanBaslaAciklama;
+}
+
 ui.reset.addEventListener("click", () => {
+  if (!resetOnayBekliyor) {
+    resetOnayBekliyor = true;
+    ui.reset.textContent = M.bastanBaslaOnay(durum.level.n);
+    ui.reset.classList.add("onayBekliyor");
+    ui.resetNot.textContent = "";
+    return;
+  }
+  resetOnayiSifirla();
   ayarlariUygula();
   ayarlar.uyariGoruldu = true;
   ayarlariYaz(ayarlar);
@@ -276,6 +350,7 @@ ui.reset.addEventListener("click", () => {
   panelAcik = false;
   bitti = false;
   ui.bitis.hidden = true;
+  ipucuKilidiSifirla();
   bastanBasla(kayit);
   levelYukle(1);
   geriSayimBaslat();
@@ -328,6 +403,7 @@ function ayarPaneliAc(): void {
   ui.titresimSatir.hidden = !titresimVarMi();
   ui.uyari.textContent = "";
   ui.ozet.textContent = ilerlemeOzeti();
+  resetOnayiSifirla();   // panel yeniden açılınca uyarı hali taşınmasın
   ui.ayarPanel.hidden = false;
   // preventScroll şart: odaklanan düğme kutunun ALTINDA olduğu için tarayıcı onu
   // görünür kılmak adına kutuyu en aşağı kaydırıyor ve panel sondan açılıyordu.
@@ -347,9 +423,15 @@ function ayarlariUygula(): void {
 ui.ayarAc.addEventListener("click", e => { e.stopPropagation(); if (!bitti) ayarPaneliAc(); ui.ayarAc.blur(); });
 
 // ---- Nasıl oynanır ---------------------------------------------------------
-function nasilAc(): void {
+/**
+ * @param kisa İlk açılışta true: oyuncunun henüz göremeyeceği mekanik satırları ve
+ *   yıldız paragrafı gizlenir (bkz. styles.css .nasilKutu.kisa). Tamamı Ayarlar'dan
+ *   açılınca görünür. Işığa duyarlılık uyarısı HER İKİ HALDE de kalır.
+ */
+function nasilAc(kisa = false): void {
   panelAcik = true;
   arkaKilit(true);
+  ui.nasilIcerik.classList.toggle("kisa", kisa);
   ui.ayarPanel.hidden = true;
   ui.nasil.hidden = false;
   // Önce odak (kaydırmadan), sonra başa sar: ters sırada tarayıcı kutuyu aşağı kaydırıyor.
@@ -402,7 +484,7 @@ tuval.boyutla();
 oyun.basla();
 
 // İlk açılışta kuralları ve ışığa duyarlılık notunu bir kez göster (bkz. ui/nasil.ts).
-if (!ayarlar.uyariGoruldu) nasilAc();
+if (!ayarlar.uyariGoruldu) nasilAc(true);
 
 // Geliştirme sırasında elle sınamak için; oyun bunu kullanmaz ve üretim derlemesine girmez.
 if (import.meta.env.DEV) {
