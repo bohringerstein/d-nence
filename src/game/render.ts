@@ -245,8 +245,23 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
     //    Sabit bir açı kullanmak iki kapılı halkalarda işareti boşluğun içine düşürüyordu.
     const a = isaretAcisi(r);
     if (r.preLocked) {
-      ctx.fillStyle = renk.ink;
-      ctx.fillRect(Math.cos(a) * R - 4, Math.sin(a) * R - 4, 8, 8);
+      // Kare eskiden MÜREKKEP rengiyle dolduruluyordu — ama baştan kilitli halka da
+      // mürekkep rengiyle ve tam opaklıkla çizilir (locked: true), yani kare halkanın
+      // üstünde görünmez oluyordu. 1000 bölümün 431'inde durum buydu ve Level 7'deki
+      // ipucu "kareli halka baştan kilitli" diyerek olmayan bir şeyi arattırıyordu.
+      //
+      // Artık zemin renginde dolup mürekkeple çevriliyor: halkada delik açmış gibi değil,
+      // üstüne oturmuş bir perçin gibi okunuyor. Kenarlık şart — dolgusu tek başına
+      // kalsaydı küçük bir boşluk sanılabilirdi.
+      const yan = Math.max(7, g.lineWidth * 1.6);
+      const mx = Math.cos(a) * R, my = Math.sin(a) * R;
+      ctx.fillStyle = renk.bg;
+      ctx.strokeStyle = renk.ink;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.rect(mx - yan / 2, my - yan / 2, yan, yan);
+      ctx.fill();
+      ctx.stroke();
     }
     if (r.flip && !r.locked) {
       ctx.fillStyle = renk.fail;

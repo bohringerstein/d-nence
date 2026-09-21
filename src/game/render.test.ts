@@ -118,3 +118,34 @@ test("top kayıpta kırmızı, normalde amber", () => {
   ciz(b.tuval, s2, RENK, SECENEK);
   assert.ok(b.dolgular.some(d => d.renk === RENK.fail), "kayıpta top kırmızı olmalı");
 });
+
+// --- Baştan kilitli halkanın işareti görünür mü? -----------------------------
+//
+// Regresyon: kare MÜREKKEP rengiyle dolduruluyordu, ama baştan kilitli halka da
+// mürekkep rengiyle ve tam opaklıkla çizilir — kare halkanın üstünde görünmez oluyordu.
+// 1000 bölümün 431'inde durum buydu ve Level 7'deki ipucu "kareli halka baştan kilitli"
+// diyerek olmayan bir şeyi arattırıyordu.
+const kilitliLevel = (): Level => ({
+  n: 7, boss: null, hint: null, limit: 10,
+  rings: [
+    { speed: 1, gap: 60, gaps: 1, gapOffset: 180, flip: 0, wobble: false, preLocked: false, start: 0 },
+    { speed: 0, gap: 60, gaps: 1, gapOffset: 180, flip: 0, wobble: false, preLocked: true, start: 1 }
+  ]
+});
+
+test("baştan kilitli halkanın karesi halkadan farklı renkte", () => {
+  const g = sahteTuval();
+  ciz(g.tuval, createLevel(kilitliLevel(), 1), RENK, SECENEK);
+  assert.ok(g.dolgular.some(d => d.renk === RENK.bg),
+    "kare zemin renginde dolmalı; mürekkeple dolarsa mürekkep rengindeki halkanın üstünde kaybolur");
+  assert.ok(g.konturlar.some(k => k.renk === RENK.ink && !k.kesikli),
+    "karenin mürekkep kenarlığı olmalı: dolgusu tek başına kalsa halkada boşluk sanılırdı");
+});
+
+test("baştan kilitli halka yokken zemin renkli dolgu da yok", () => {
+  // Kare yalnızca preLocked halkada çizilmeli; başka bir şeyi zemin rengiyle doldurmuyoruz.
+  const g = sahteTuval();
+  ciz(g.tuval, createLevel(level(), 1), RENK, SECENEK);
+  assert.ok(!g.dolgular.some(d => d.renk === RENK.bg),
+    "preLocked halka yokken zemin renginde dolgu olmamalı");
+});

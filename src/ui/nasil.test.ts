@@ -12,7 +12,7 @@ test("her mekanik göstergede açıklanıyor", () => {
     ["Kırmızı nokta", "yön değiştir"],
     ["Küçük kare", "baştan kilitli"],
     ["İki boşluk", "iki kapı"],
-    ["Dalgalı halka", "hızlanıp yavaşlar"],
+    ["Değişken hız", "hızlanıp yavaşlar"],
     ["Sarı kama", "çıkış yolun"]
   ];
   for (const [baslik, anahtar] of gerekli) {
