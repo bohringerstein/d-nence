@@ -8,7 +8,11 @@ import test from "node:test";
 import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
-import { NASIL_HTML } from "./nasil.ts";
+import { nasilHtml } from "./nasil.ts";
+import { TR } from "../dil/tr.ts";
+
+/** Testler Türkçe metinle çalışır; İngilizce eksiksizliği dil.test.ts sınar. */
+const NASIL_HTML = nasilHtml(TR);
 
 const kok = path.join(import.meta.dirname, "..", "..");
 const shell = fs.readFileSync(path.join(kok, "src", "ui", "shell.ts"), "utf8");
@@ -20,7 +24,10 @@ test("sayaç bir düğme ve duraklatma etiketi taşıyor", () => {
   // alt köşeye eklenen her düğme başparmağın durduğu yere ölü bölge açar.
   const m = shell.match(/<button class="clock" id="clock"[^>]*>/);
   assert.ok(m, "sayaç <button> olmalı");
-  assert.ok(m[0].includes('aria-label="Duraklat"'), "sayacın erişilebilir adı duraklatma olmalı");
+  // Etiket artık dil dosyasından geliyor; markup yalnızca ONA bağlanmalı.
+  assert.ok(m[0].includes('aria-label="${m.duraklatDugmesi}"'),
+    "sayacın erişilebilir adı dil dosyasındaki duraklatma metni olmalı");
+  assert.equal(TR.duraklatDugmesi, "Duraklat");
   assert.ok(shell.includes('id="clockSayi"'), "rakamlar ayrı bir öğede olmalı (simge kardeş öğe)");
 });
 

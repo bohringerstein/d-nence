@@ -375,3 +375,24 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 @media (max-width: 340px) {
   #hint { min-height: 4.05em; }
 }
+
+/* Dil seçici. Ayarlardaki öbür satırlarla aynı hizada durur ama onay kutusu değil,
+   açılır liste taşır; kendi satır düzeni var. */
+.dilSecim {
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.dilSecim select {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: none;
+  border: 1.5px solid var(--muted);
+  border-radius: 999px;
+  padding: 0 10px;
+  min-height: 38px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.dilSecim select:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

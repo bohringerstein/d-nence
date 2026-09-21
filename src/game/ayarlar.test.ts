@@ -68,8 +68,8 @@ test("localStorage erişilemezse oyun düşmez", () => {
 });
 
 test("deseni yumuşat kilitsiz halkaların opaklığını düşürür", () => {
-  const kapali = { desenYumusat: false, hareketAzalt: false, titresim: true, ses: true, uyariGoruldu: true };
-  const acik = { desenYumusat: true, hareketAzalt: false, titresim: true, ses: true, uyariGoruldu: true };
+  const kapali = { desenYumusat: false, hareketAzalt: false, titresim: true, ses: true, dil: null, uyariGoruldu: true };
+  const acik = { desenYumusat: true, hareketAzalt: false, titresim: true, ses: true, dil: null, uyariGoruldu: true };
   assert.equal(halkaOpakligi(kapali), 0.4);
   assert.ok(halkaOpakligi(acik) < halkaOpakligi(kapali), "yumuşatma opaklığı düşürmeli");
   assert.ok(halkaOpakligi(acik) > 0.15, "halkalar tamamen kaybolmamalı");
@@ -91,7 +91,7 @@ function vibrateKur(destek: boolean): number[][] {
   return cagrilar;
 }
 
-const ayar = (titresim: boolean) => ({ desenYumusat: false, hareketAzalt: false, titresim, ses: true, uyariGoruldu: true });
+const ayar = (titresim: boolean) => ({ desenYumusat: false, hareketAzalt: false, titresim, ses: true, dil: null, uyariGoruldu: true });
 
 test("titreşim desteği doğru algılanıyor", () => {
   vibrateKur(true);

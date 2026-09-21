@@ -17,12 +17,6 @@ export const starRatio = (widthRad: number, minGapRad: number): number =>
 export const starCount = (q: number, q3: number, q2: number): Stars =>
   q >= q3 ? 3 : q >= q2 ? 2 : 1;
 
-export const STAR_LABEL: Record<Stars, string> = {
-  3: "Temiz açılış",
-  2: "İyi açılış",
-  1: "Kıl payı"
-};
-
 /** Rekor karşılaştırması: daha çok yıldız her zaman daha iyi, eşit yıldızda kısa süre kazanır. */
 export interface Best { s: Stars; t: number }
 

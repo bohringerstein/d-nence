@@ -9,7 +9,7 @@ import {
   canPass, stepRings, liveRings, validateTable, solve,
   OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio
 } from "../src/core/index.ts";
-import type { RingDef, LevelTable, Open } from "../src/core/index.ts";
+import type { RingDef, LevelTable, Open, PatronAnahtari } from "../src/core/index.ts";
 
 /** Üretim sırasındaki ham halka: tanıma gapScale eklenir, gap'i sizeGaps hesaplar. */
 interface RawRing extends RingDef { gapScale?: number }
@@ -19,8 +19,12 @@ type Sebep = "sure" | "kanal";
 interface PlayResult { win: boolean; t: number; q?: number; sebep?: Sebep }
 interface Finalized { def: RingDef[]; best: number; limit: number; want: number; roomy: boolean }
 interface Evaluated { win: number; qs: number[]; sureOrani: number; sureKaybi: number }
-type Candidate = Finalized & Evaluated & { tol: number; boss?: string; hint?: string };
-interface Boss { name: string; hint: string; tol: number; rings: () => RawRing[] }
+type Candidate = Finalized & Evaluated & { tol: number; boss?: PatronAnahtari };
+/**
+ * Patron tasarımı. Görünen ad ve ipucu BURADA DEĞİL, src/dil/ altında: tabloya yalnızca
+ * anahtar yazılır. Eskiden Türkçe metin 1000 satırın içine gömülüydü ve çevrilemezdi.
+ */
+interface Boss { anahtar: PatronAnahtari; tol: number; rings: () => RawRing[] }
 type Log = (...args: unknown[]) => void;
 
 const OUT = path.join(import.meta.dirname, "..", "data", "levels.json");
@@ -264,19 +268,19 @@ const bossTasarimi = (n: number): Boss | undefined => {
 };
 
 const BOSSES: Record<number, Boss | undefined> = {
-  10: { name: 'Ayna', hint: 'Hepsi aynı anda hizalanıyor, o anı bekle ve hızlı dokun', tol: 0.2,
+  10: { anahtar: 'ayna', tol: 0.2,
     // Hizlar birbirinden farkli olmali: esit hiz + esit start = birebir ayni halka, o kilit acikligi hic daraltmaz.
     // start = A - s * 2.5 oldugu icin hepsi yine t = 2,5 sn'de A acisinda hizalanir.
     rings: () => [1.3, -1.3, 1.9, -1.9].map(s => mk({ speed: s, start: A - s * 2.5 })) },
-  20: { name: 'Merkez', hint: 'Ortadaki kilitli halka yolu gösteriyor', tol: 0.15,
+  20: { anahtar: 'merkez', tol: 0.15,
     rings: () => [2.0, -1.4, 0, 1.4, -2.0].map((s, i) => mk(i === 2 ? { speed: 1, preLocked: true, start: A } : { speed: s, start: R() * TAU })) },
-  30: { name: 'Metronom', hint: 'Halkalar sallanıyor, orta noktadan geçerken yakala', tol: 0.13,
+  30: { anahtar: 'metronom', tol: 0.13,
     rings: () => [1.5, -1.6, 1.4, -1.5, 1.6].map(s => mk({ speed: s, flip: 1.2, start: A - s * 0.6 + (R() - 0.5) * 0.4 })) },
-  40: { name: 'Çatal', hint: 'Her halkada iki kapı var, hangisini seçtiğin sonrakini belirler', tol: 0.12,
+  40: { anahtar: 'catal', tol: 0.12,
     rings: () => [1.2, -1.5, 1.3, -1.1, 1.6].map(s => mk({ speed: s, gaps: 2, gapOffset: 150 + R() * 30, start: R() * TAU })) },
-  50: { name: 'Tavşan ile kaplumbağa', hint: 'Yavaşlar sabırlı, hızlılar keskin nişan ister', tol: 0.11,
+  50: { anahtar: 'tavsanKaplumbaga', tol: 0.11,
     rings: () => [0.5, -2.4, 0.6, -2.5, 0.5, -2.3].map(s => mk({ speed: s, start: R() * TAU })) },
-  60: { name: 'Büyük kasa', hint: 'Son kasa. Her şey bir arada', tol: 0.11,
+  60: { anahtar: 'buyukKasa', tol: 0.11,
     rings: () => [mk({ speed: 1, preLocked: true, start: A }), mk({ speed: -1.9, flip: 2.1, start: R() * TAU }), mk({ speed: 1.6, gaps: 2, gapOffset: 165, start: R() * TAU }),
       mk({ speed: -1.4, wobble: true, start: R() * TAU }), mk({ speed: 2.1, flip: 1.7, start: R() * TAU }), mk({ speed: -1.7, start: R() * TAU })] }
 };
@@ -539,7 +543,7 @@ function generate(log: Log = () => {}): LevelTable {
       if (pick && pick.roomy && pick.sureKaybi <= SURE_KAYBI_ESIGI && Math.abs(pick.win - want) < 0.03) break;
     }
     if (!pick) { console.error('level', n, 'bulunamadı'); process.exit(1); }
-    if (boss) Object.assign(pick, { boss: boss.name, hint: boss.hint });
+    if (boss) Object.assign(pick, { boss: boss.anahtar });
     // Yıldız eşikleri için ustalık referansı her levelde 25 kez oynatılır (bkz. playUsta).
     es = 4242;
     for (let k = 0; k < 25; k++) {
@@ -552,7 +556,7 @@ function generate(log: Log = () => {}): LevelTable {
   // Ustalık referansının levellerin %25'inde 3 yıldız, %60'ında en az 2 yıldız alması
   // hedefleniyor: 3 yıldız gerçekten iyi oynamanın karşılığı olsun.
   const pct = (p: number): number => allQ[Math.min(allQ.length - 1, Math.floor(allQ.length * p))];
-  const out = { q3: +pct(0.75).toFixed(2), q2: +pct(0.4).toFixed(2), levels: levels.map((l, i) => ({ n: i + 1, boss: l.boss || null, hint: l.hint || null, limit: l.limit, rings: l.def })) };
+  const out = { q3: +pct(0.75).toFixed(2), q2: +pct(0.4).toFixed(2), levels: levels.map((l, i) => ({ n: i + 1, boss: l.boss ?? null, limit: l.limit, rings: l.def })) };
   log('yıldız eşikleri q3/q2:', out.q3, out.q2);
   log(levels.map((l, i) => `${i + 1}${l.boss ? '*' : ''}:${Math.round(l.win * 100)}%/${l.limit}s/${l.def.length}h/${Math.round(l.def[0].gap)}°`).join('  '));
   return out;

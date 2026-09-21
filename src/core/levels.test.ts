@@ -77,11 +77,16 @@ test("her levelde en az bir hareketli halka ve makul geometri var", () => {
   }
 });
 
-test("patron levelleri işaretli ve isimli", () => {
+test("patron levelleri işaretli ve tanınan bir anahtar taşıyor", () => {
   const patronlar = data.levels.filter(l => l.boss);
   // Her BOSS_ARALIGI bölümde bir patron; altı tasarım sırayla tekrar eder.
   assert.deepEqual(patronlar.map(l => l.n), C.BOSS_LEVELS);
-  patronlar.forEach(l => { assert.ok(l.hint && l.hint.length > 10, `level ${l.n}: ipucu eksik`); });
+  // Görünen ad ve ipucu artık tabloda DEĞİL (çevrilebilsin diye src/dil/ altında).
+  // Burada yalnızca anahtarın tanındığı denetlenir; metinlerin eksiksizliği ayrı sınanır.
+  patronlar.forEach(l => {
+    assert.ok(l.boss && (C.PATRON_ANAHTARLARI as readonly string[]).includes(l.boss),
+      `level ${l.n}: bilinmeyen patron anahtarı ${JSON.stringify(l.boss)}`);
+  });
   const adlar = new Set(patronlar.map(l => l.boss));
   assert.equal(adlar.size, 6, "altı farklı patron tasarımı olmalı");
 });

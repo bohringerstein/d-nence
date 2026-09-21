@@ -1,4 +1,8 @@
 // Ekran düzeni (şartname 7. bölüm): üst çubuk, süre çubuğu, oyun alanı, alt çubuk.
+//
+// Metinlerin hiçbiri burada yazılı değil: hepsi src/dil/ altından gelir.
+import { DILLER } from "../dil/index.ts";
+import type { Metinler, DilKodu } from "../dil/index.ts";
 export interface Kabuk {
   kok: HTMLElement;
   /** Sayaç aynı zamanda duraklatma düğmesidir (bkz. HTML). */
@@ -32,6 +36,7 @@ export interface Kabuk {
   sesKutu: HTMLInputElement;
   /** Tarayıcı ses üretemiyorsa satır hiç gösterilmez. */
   sesSatir: HTMLElement;
+  dilKutu: HTMLSelectElement;
   uyari: HTMLElement;
   /** Ayarlar panelindeki ilerleme özeti (bölüm + yıldız). */
   ozet: HTMLElement;
@@ -43,7 +48,7 @@ export interface Kabuk {
   arka: HTMLElement[];
 }
 
-const HTML = `
+const html = (m: Metinler): string => `
 <div class="app">
   <header>
     <h1>Dönence</h1>
@@ -51,25 +56,25 @@ const HTML = `
          tamamı dokunma alanı olduğu için alt köşeye eklenen her düğme, başparmağın
          durduğu yere ölü bölge açar. Sayaç ise üst çubukta ve eşleşme birebir:
          zamanı durdurmak için zamana dokun. -->
-    <button class="clock" id="clock" type="button" aria-label="Duraklat">
+    <button class="clock" id="clock" type="button" aria-label="${m.duraklatDugmesi}">
       <i class="duraklatIm" aria-hidden="true"></i><span id="clockSayi">0,0</span>
     </button>
-    <div class="lvl">Level <b id="lvl">1</b><small id="lvlToplam"></small></div>
+    <div class="lvl">${m.levelOneki} <b id="lvl">1</b><small id="lvlToplam"></small></div>
   </header>
   <div class="bar" id="bar"><i id="barFill"></i></div>
   <div class="alan">
-    <canvas id="c" aria-label="Oyun alanı. Dokunarak sıradaki halkayı kilitle."></canvas>
+    <canvas id="c" aria-label="${m.oyunAlani}"></canvas>
     <div class="flas" id="flas" aria-hidden="true"></div>
     <div class="gerisayim" id="gerisayim" aria-hidden="true"></div>
   </div>
   <footer>
     <span id="hint" role="status" aria-live="polite"></span>
-    <button id="ayarAc" type="button" class="ikon" aria-label="Ayarlar">Ayarlar</button>
+    <button id="ayarAc" type="button" class="ikon" aria-label="${m.ayarlar}">${m.ayarlar}</button>
   </footer>
 
   <div class="ortu" id="ayarPanel" hidden role="dialog" aria-modal="true" aria-labelledby="ayarBaslik">
     <div class="kutu">
-      <h2 id="ayarBaslik">Ayarlar</h2>
+      <h2 id="ayarBaslik">${m.ayarlar}</h2>
       <!-- Toplanan yıldız oyun boyunca hiçbir yerde görünmüyordu: yalnızca 1000. bölümü
            bitiren oyuncu toplamını öğreniyordu. Birikimin görünmesi, 1000 bölümlük bir
            oyunda devam etme sebebinin kendisi. -->
@@ -77,27 +82,31 @@ const HTML = `
       <p class="uyari" id="uyari"></p>
       <label class="secenek">
         <input type="checkbox" id="desenKutu">
-        <span><b>Deseni yumuşat</b><small>Kilitlenmemiş halkalar daha soluk çizilir.</small></span>
+        <span><b>${m.desen.baslik}</b><small>${m.desen.aciklama}</small></span>
       </label>
       <label class="secenek">
         <input type="checkbox" id="hareketKutu">
-        <span><b>Hareketi azalt</b><small>Kayıptaki sarsıntı ve ekran flaşı kapanır.</small></span>
+        <span><b>${m.hareket.baslik}</b><small>${m.hareket.aciklama}</small></span>
       </label>
       <label class="secenek" id="sesSatir">
         <input type="checkbox" id="sesKutu">
-        <span><b>Ses</b><small>Kilitte kısa bir nota; kanal daraldıkça perde yükselir.</small></span>
+        <span><b>${m.ses.baslik}</b><small>${m.ses.aciklama}</small></span>
       </label>
       <label class="secenek" id="titresimSatir">
         <input type="checkbox" id="titresimKutu">
-        <span><b>Titreşim</b><small>Kilitte ve kayıpta telefon titreşir.</small></span>
+        <span><b>${m.titresim.baslik}</b><small>${m.titresim.aciklama}</small></span>
       </label>
-      <button id="nasilAc" type="button">Nasıl oynanır</button>
+      <label class="secenek dilSecim">
+        <span><b>${m.dil}</b></span>
+        <select id="dilKutu"><!--DILLER--></select>
+      </label>
+      <button id="nasilAc" type="button">${m.nasilOynanir}</button>
       <!-- "Baştan başla" alt çubuktaydı: Level 1'e döndüren bir eylem, hızlı hızlı
            dokunulan bir oyunda başparmağın durduğu sağ alt köşede duruyordu. Ekranın
            tamamı dokunma alanı olunca oraya kazara basma riski arttı; seyrek ve geri
            alınamaz bir eylem olduğu için ayarlara taşındı. -->
-      <button id="reset" type="button">Baştan başla</button>
-      <button id="ayarKapat" type="button">Tamam</button>
+      <button id="reset" type="button">${m.bastanBasla}</button>
+      <button id="ayarKapat" type="button">${m.tamam}</button>
     </div>
   </div>
 
@@ -108,16 +117,16 @@ const HTML = `
        oyuncu "kaldığım yer duruyor" bilgisini gözüyle alsın. -->
   <div class="ortu" id="duraklat" hidden role="dialog" aria-modal="true" aria-labelledby="duraklatBaslik">
     <div class="kutu">
-      <h2 id="duraklatBaslik">Duraklatıldı</h2>
+      <h2 id="duraklatBaslik">${m.duraklatildi}</h2>
       <p id="duraklatMetin"></p>
-      <button id="devamDugme" type="button">Devam et</button>
+      <button id="devamDugme" type="button">${m.devamEt}</button>
     </div>
   </div>
   <div class="ortu" id="bitis" hidden role="dialog" aria-modal="true" aria-labelledby="bitisBaslik">
     <div class="kutu">
-      <h2 id="bitisBaslik">Kasa açıldı</h2>
+      <h2 id="bitisBaslik">${m.kasaAcildi}</h2>
       <p id="bitisMetin"></p>
-      <button id="bitisDugme" type="button">Baştan oyna</button>
+      <button id="bitisDugme" type="button">${m.bastanOyna}</button>
     </div>
   </div>
 </div>`;
@@ -128,15 +137,17 @@ const bul = <T extends HTMLElement>(kok: ParentNode, id: string): T => {
   return el;
 };
 
-export function kabukKur(hedef: HTMLElement, nasilHtml: string): Kabuk {
-  hedef.innerHTML = HTML;
+export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): Kabuk {
+  const diller = (Object.keys(DILLER) as DilKodu[])
+    .map(k => `<option value="${k}">${DILLER[k].ad}</option>`).join("");
+  hedef.innerHTML = html(m).replace("<!--DILLER-->", diller);
   // "Nasıl oynanır" içeriği ayrı bir modülden gelir (ui/nasil.ts) ve kapatma
   // düğmesi burada eklenir ki bul() onu bulabilsin.
   const ic = hedef.querySelector("#nasilIcerik");
   // Kapatma düğmesi kendi yapışkan şeridinde: kutu kaydırılabilir ve düğme en altta
   // kalınca ilk açılışta görünmüyordu (bkz. styles.css .nasilAlt).
-  if (ic) ic.innerHTML = nasilHtml +
-    '<div class="nasilAlt"><button id="nasilKapat" type="button">Anladım</button></div>';
+  if (ic) ic.innerHTML = nasilIcerik +
+    `<div class="nasilAlt"><button id="nasilKapat" type="button">${m.anladim}</button></div>`;
   const arka = Array.from(
     hedef.querySelectorAll<HTMLElement>(".app > header, .app > .bar, .app > .alan, .app > footer"));
   if (arka.length !== 4) throw new Error("arka plan öğeleri eksik: " + arka.length);
@@ -169,6 +180,7 @@ export function kabukKur(hedef: HTMLElement, nasilHtml: string): Kabuk {
     titresimSatir: bul(hedef, "titresimSatir"),
     sesKutu: bul<HTMLInputElement>(hedef, "sesKutu"),
     sesSatir: bul(hedef, "sesSatir"),
+    dilKutu: bul<HTMLSelectElement>(hedef, "dilKutu"),
     uyari: bul(hedef, "uyari"),
     ozet: bul(hedef, "ozet"),
     nasil: bul(hedef, "nasil"),

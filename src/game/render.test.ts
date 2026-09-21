@@ -44,7 +44,7 @@ const RENK = { bg: "#E9EEF0", ink: "#1D3440", ball: "#E89B00", fail: "#E5484D", 
 const SECENEK = { hareketAzalt: true, halkaOpakligi: 0.4 };
 
 const level = (): Level => ({
-  n: 5, boss: null, hint: null, limit: 10,
+  n: 5, boss: null, limit: 10,
   rings: [
     { speed: 1, gap: 60, gaps: 1, gapOffset: 180, flip: 0, wobble: false, preLocked: false, start: 0 },
     { speed: -1.2, gap: 60, gaps: 1, gapOffset: 180, flip: 0, wobble: false, preLocked: false, start: 1 }
@@ -126,7 +126,7 @@ test("top kayıpta kırmızı, normalde amber", () => {
 // 1000 bölümün 431'inde durum buydu ve Level 7'deki ipucu "kareli halka baştan kilitli"
 // diyerek olmayan bir şeyi arattırıyordu.
 const kilitliLevel = (): Level => ({
-  n: 7, boss: null, hint: null, limit: 10,
+  n: 7, boss: null, limit: 10,
   rings: [
     { speed: 1, gap: 60, gaps: 1, gapOffset: 180, flip: 0, wobble: false, preLocked: false, start: 0 },
     { speed: 0, gap: 60, gaps: 1, gapOffset: 180, flip: 0, wobble: false, preLocked: true, start: 1 }

@@ -27,8 +27,8 @@ export default defineConfig({
       manifest: {
         name: "Dönence",
         short_name: "Dönence",
-        description: "Tek dokunuşla oynanan, level tabanlı bir kasa açma oyunu.",
-        lang: "tr",
+        description: "A one-tap vault-cracking game: lock the spinning rings and keep the ball a way out.",
+        lang: "en",
         dir: "ltr",
         start_url: ".",
         scope: ".",

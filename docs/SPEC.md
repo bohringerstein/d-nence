@@ -164,7 +164,18 @@ Oyun alanında çizim sırası:
 
 "Top/vurgu" (`--ball`) **yalnızca canvas'ta** kullanılır: top, sıradaki halka ve geçer kama. Arayüz öğeleri (örtü başlıkları, odak halkası, onay kutusu) "arayüz vurgusu"nu (`--ui-accent`) kullanır — aradaki fark açık temada okunabilirliktir, aşağıya bakınız.
 
-**Yazı tipi:** Fredoka (400, 500 ve 600 ağırlıkları), yedek olarak `"Trebuchet MS", system-ui, sans-serif`. Tüm metinler Türkçedir.
+**Diller.** Oyuncunun gördüğü **hiçbir metin koda gömülü değildir**; hepsi `src/dil/` altındadır. Şu an Türkçe ve İngilizce var.
+
+- **Sözleşme tiplidir** (`src/dil/tipler.ts`): eksik bir çeviri **derleme hatası** verir. "Şu ekran hâlâ Türkçe kalmış" hatası bu yapıda mümkün değildir ve gözle aramak imkânsızdır.
+- **Varsayılan dil, cihazın dilidir** — Türkçe değil. `navigator.languages` sırayla taranır ve **desteklenen ilk** dil seçilir (ilki değil: kullanıcı bir öncelik listesi tutar, listede aşağıda duran ama bildiğimiz dili çöpe atmak yanlış olurdu). Bölge eki atılır: `tr-CY` de Türkçedir. Oyuncu ayarlardan üstüne yazabilir; seçimi kaydedilir.
+- **Hiçbiri desteklenmiyorsa yedek İNGİLİZCEDİR**, Türkçe değil. Oyun Türkçe yazıldı ama küresel pazara çıkıyor: Japon bir oyuncu için Türkçe, İngilizce'den daha anlaşılmazdır.
+- **Sayı biçimi dile bağlıdır** (`Intl.NumberFormat`): sayaç Türkçe `8,0`, İngilizce `8.0`. Metin çevirip sayıyı unutmak bu tür işlerin klasik eksiğidir.
+- **Patron adları ve ipuçları tabloda değildir.** `levels.json` yalnızca anahtar taşır (`"boss": "ayna"`); görünen ad ve ipucu dil dosyasındadır. Eskiden Türkçe metin 1000 satırın içine gömülüydü ve çevrilemezdi. Anahtarlar **çekirdekte** tanımlıdır (`PATRON_ANAHTARLARI`) çünkü veridirler, metin değil — çekirdek dil katmanını tanımaz.
+- **Dil değişince sayfa yeniden yüklenir.** Ekran metinleri bir kez kuruluyor; canlı değiştirmek bütün kabuğu yeniden kurup dinleyicileri yeniden bağlamak demek olurdu ve yarı çevrilmiş ekran riski doğururdu. Seyrek bir eylem için temiz yol budur.
+- **`index.html` ve PWA manifest'i tek dillidir** (İngilizce): statik dosyalardır, çalışma anında değişmezler. Oyunun kendisi cihaz diline göre gelir.
+- Oyunun **adı çevrilmez**. İngilizcede "kasa" karşılığı tutarlı olarak **vault**'tur.
+
+**Yazı tipi:** Fredoka (400, 500 ve 600 ağırlıkları), yedek olarak `"Trebuchet MS", system-ui, sans-serif`. Gömülü alt kümeler `latin` ve `latin-ext`: Türkçe ve Avrupa dilleri kapsanır, **Kiril/Arap/CJK kapsanmaz** — o dillere geçilecekse alt küme de eklenmelidir.
 
 Yazı tipi **projeye gömülüdür**, Google Fonts CDN'inden çekilmez. Üç gerekçe: (1) oyun bir PWA ve çevrimdışı da aynı görünmeli — CDN'den gelen bir dosya servis çalışanının önbelleğine giremiyordu; (2) CDN, ziyaretçinin IP adresini üçüncü bir tarafa iletir ve bu Avrupa'da KVKK/GDPR açısından tartışmalıdır; (3) üçüncü bir alan adına DNS + TLS el sıkışması yok. **Uygulama hiçbir dış alan adına bağlanmaz**; bunu bir test denetler.
 

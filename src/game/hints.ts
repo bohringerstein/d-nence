@@ -1,32 +1,22 @@
 // Alt çubuktaki ipucu metni (şartname 7. bölüm).
+//
+// Metinlerin kendisi burada DEĞİL, src/dil/ altında. Burada yalnızca hangi metnin
+// ne zaman gösterileceği kuralı var — o kural dilden bağımsızdır.
 import { firstSeen } from "../core/index.ts";
 import type { Level, Best, Stars } from "../core/index.ts";
-
-/** Öğretici ipuçları: her biri yalnızca level daha önce bitirilmemişse gösterilir. */
-const SABIT: Record<number, string> = {
-  1: "Dokun, dış halkayı kilitle",
-  2: "Sarı kama ortak açıklık. Sonraki boşluğu ona hizala",
-  3: "Yıldızlar, kasa açıldığında kalan açıklığın genişliğine göre",
-  4: "İpucu: ilk kilidi, ikinci halkanın boşluğu yaklaşırken vur"
-};
-
-/** Her özelliğin patron olmayan ilk göründüğü levelde gösterilecek açıklama. */
-const OZELLIK: Record<string, string> = {
-  preLocked: "Kareli halka baştan kilitli, kanalın yönünü o belirler",
-  gaps2: "İki kapılı halka: hangi kapıyı kullandığın sonrakileri etkiler",
-  flip: "Kırmızı noktalı halkalar ara ara yön değiştirir",
-  wobble: "Bazı halkalar hızlanıp yavaşlıyor"
-};
+import { sayi } from "../dil/index.ts";
+import type { Metinler, OzellikAnahtari } from "../dil/index.ts";
 
 /** Tablodan bir kez hesaplanır: level numarası -> öğretici ipucu. */
-export function ogreticiTablosu(levels: Level[]): Record<number, string> {
-  const out: Record<number, string> = { ...SABIT };
+export function ogreticiTablosu(levels: Level[], m: Metinler): Record<number, string> {
+  const out: Record<number, string> = { ...m.ogretici };
   const ilk = firstSeen(levels);
   for (const k in ilk) {
     const n = ilk[k];
     // Aynı levelde iki özellik ilk kez görünürse ilki kazanır; ikisini birden göstermek
     // alt çubuğa sığmaz ve oyuncuyu boğar.
-    if (!(n in out) && OZELLIK[k]) out[n] = OZELLIK[k];
+    const metin = m.ozellik[k as OzellikAnahtari];
+    if (!(n in out) && metin) out[n] = metin;
   }
   return out;
 }
@@ -41,26 +31,29 @@ export const yildizYazisi = (s: Stars): string => "★".repeat(s) + "☆".repeat
  * tamamen farklı: birincisi "bir daha", ikincisi "yanlış an". Pay derece cinsinden
  * yazılır; 10 dereceden büyük farklarda sayı anlamını yitirir, orada söz yeter.
  */
-export function kayipYazisi(payDerece: number): string {
-  if (!Number.isFinite(payDerece) || payDerece < 0) return "Açıklık kapandı";
-  if (payDerece < 0.05) return "Açıklık kapandı · kıl payı";
-  if (payDerece > 10) return "Açıklık kapandı · yol erken daraldı";
-  const sayi = payDerece < 1 ? payDerece.toFixed(1) : Math.round(payDerece).toString();
-  return `Açıklık kapandı · ${sayi.replace(".", ",")}° dar kaldı`;
+export function kayipYazisi(payDerece: number, m: Metinler): string {
+  if (!Number.isFinite(payDerece) || payDerece < 0) return m.aciklikKapandi;
+  if (payDerece < 0.05) return m.kilPayiKayip;
+  if (payDerece > 10) return m.erkenDaraldi;
+  return m.darKaldi(payDerece < 1 ? sayi(m, payDerece, 1) : sayi(m, Math.round(payDerece), 0));
 }
 
-/** Türkçe ondalık ayırıcı virgüldür. */
-export const sureYazisi = (t: number): string => t.toFixed(1).replace(".", ",");
+/** Süre: ondalık ayırıcı dile göre değişir (Türkçe "8,0", İngilizce "8.0"). */
+export const sureYazisi = (t: number, m: Metinler): string => sayi(m, t, 1);
 
 export interface IpucuGirdi {
   level: Level;
   deneme: number;
   rekor: Best | undefined;
   ogretici: Record<number, string>;
+  m: Metinler;
 }
 
-export function ipucu({ level, deneme, rekor, ogretici }: IpucuGirdi): string {
-  if (level.boss && deneme === 1) return `${level.boss}: ${level.hint}`;
+export function ipucu({ level, deneme, rekor, ogretici, m }: IpucuGirdi): string {
+  if (level.boss && deneme === 1) {
+    const p = m.patron[level.boss];
+    return `${p.ad}: ${p.ipucu}`;
+  }
 
   // Öğretici ipucu deneme sayacını EZER, tersi değil.
   //
@@ -69,8 +62,8 @@ export function ipucu({ level, deneme, rekor, ogretici }: IpucuGirdi): string {
   // açıklık" cümlesi oyunun belkemiği ve tek kayıpla siliniyordu. Deneme sayısı yine
   // görünüyor, sadece ipucunun önüne geçmiyor.
   const ogr = !rekor ? ogretici[level.n] : undefined;
-  if (ogr) return deneme > 1 ? `Deneme ${deneme} · ${ogr}` : ogr;
+  if (ogr) return deneme > 1 ? m.denemeVeIpucu(deneme, ogr) : ogr;
 
-  if (deneme > 1) return `Deneme ${deneme}` + (rekor ? `, en iyin ${yildizYazisi(rekor.s)}` : "");
-  return rekor ? `En iyin ${yildizYazisi(rekor.s)} ${sureYazisi(rekor.t)} sn` : "Dokun, sıradaki halkayı kilitle";
+  if (deneme > 1) return rekor ? m.denemeVeRekor(deneme, yildizYazisi(rekor.s)) : m.deneme(deneme);
+  return rekor ? m.enIyin(yildizYazisi(rekor.s), sureYazisi(rekor.t, m)) : m.ilkDokunus;
 }

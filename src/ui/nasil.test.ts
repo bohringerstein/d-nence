@@ -5,7 +5,11 @@
 // mekaniği yalnızca ilk göründüğü levelde bir kez anlatıyordu.
 import test from "node:test";
 import assert from "node:assert";
-import { NASIL_HTML } from "./nasil.ts";
+import { nasilHtml } from "./nasil.ts";
+import { TR } from "../dil/tr.ts";
+
+/** Testler Türkçe metinle çalışır; İngilizce eksiksizliği dil.test.ts sınar. */
+const NASIL_HTML = nasilHtml(TR);
 
 test("her mekanik göstergede açıklanıyor", () => {
   const gerekli = [

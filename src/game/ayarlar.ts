@@ -7,6 +7,9 @@
 // kontrast (riskli >0,4). Deseni küçük tutan şey görüş açısı: telefonda sadece 11°.
 // Yine de bir uyarı ve bir yumuşatma seçeneği sunuyoruz.
 
+import { gecerliDilMi } from "../dil/index.ts";
+import type { DilKodu } from "../dil/index.ts";
+
 const KEY = "donence:ayarlar:v1";
 /** Oyunun eski adıyla yazılmış ayarlar. Bulunursa okunur ve yeni anahtara taşınır. */
 const ESKI_KEY = "kasa:ayarlar:v1";
@@ -26,9 +29,17 @@ export interface Ayarlar {
   ses: boolean;
   /** İlk açılış uyarısı gösterildi mi. */
   uyariGoruldu: boolean;
+  /**
+   * Oyuncunun seçtiği dil. **null = cihazın dilini izle** (varsayılan).
+   *
+   * Varsayılanın "tr" değil null olması önemli: küresel pazara çıkan bir oyunda
+   * Almanya-daki biri uygulamayı açtığında Türkçe görürse ayarları bulamaz ve siler.
+   * null ile cihaz ne diyorsa o gelir; oyuncu isterse üstüne yazar ve seçimi kalır.
+   */
+  dil: DilKodu | null;
 }
 
-const varsayilan = (): Ayarlar => ({ desenYumusat: false, hareketAzalt: false, titresim: true, ses: true, uyariGoruldu: false });
+const varsayilan = (): Ayarlar => ({ desenYumusat: false, hareketAzalt: false, titresim: true, ses: true, uyariGoruldu: false, dil: null });
 
 export function ayarlariOku(): Ayarlar {
   try {
@@ -41,6 +52,7 @@ export function ayarlariOku(): Ayarlar {
     if (typeof o.titresim === "boolean") a.titresim = o.titresim;
     if (typeof o.ses === "boolean") a.ses = o.ses;
     if (typeof o.uyariGoruldu === "boolean") a.uyariGoruldu = o.uyariGoruldu;
+    if (gecerliDilMi(o.dil)) a.dil = o.dil;
     if (!localStorage.getItem(KEY)) ayarlariYaz(a);
     return a;
   } catch {

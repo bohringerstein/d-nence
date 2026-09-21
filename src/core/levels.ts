@@ -3,12 +3,26 @@
 import { TAU, NEED, DEG } from "./geometry.ts";
 import type { RingDef } from "./rings.ts";
 
+/**
+ * Patron bölümlerinin anahtarları.
+ *
+ * Bunlar VERİdir, metin değil: bir bölümün hangi patron tasarımı olduğunu söylerler.
+ * Görünen ad ve ipucu src/dil/ altında bu anahtarlarla aranır. Çekirdek dil katmanını
+ * tanımaz — oyun kuralları hangi dilde oynandığından bağımsızdır.
+ */
+export const PATRON_ANAHTARLARI = ["ayna", "merkez", "metronom", "catal", "tavsanKaplumbaga", "buyukKasa"] as const;
+export type PatronAnahtari = typeof PATRON_ANAHTARLARI[number];
+
 export interface Level {
   n: number;
-  /** Patron leveliyse adı, değilse null. */
-  boss: string | null;
-  /** Patron leveli ipucu, değilse null. */
-  hint: string | null;
+  /**
+   * Patron leveliyse patron ANAHTARI ("ayna", "catal", ...), değilse null.
+   *
+   * Eskiden burada görünen adın kendisi ("Ayna") ve ayrı bir ipucu metni dururdu —
+   * yani oyuncuya gösterilen Türkçe metin 1000 satırın içine gömülüydü ve
+   * çevrilemezdi. Ad ve ipucu artık src/dil/ altında, anahtarla aranır.
+   */
+  boss: PatronAnahtari | null;
   /** Süre sınırı, saniye. */
   limit: number;
   /** Dıştan içe sıralı. */
@@ -58,6 +72,11 @@ export function validateTable(data: LevelTable): string[] {
     const ad = "level " + (i + 1);
     if (l.n !== i + 1) err.push(ad + ": n alanı sırayla gitmiyor");
     if (typeof l.limit !== "number" || l.limit <= 0) err.push(ad + ": limit geçersiz");
+    // Patron anahtarı tanınmıyorsa oyun o bölümde adsız kalırdı; şemada yakala.
+    if (l.boss !== null && !(PATRON_ANAHTARLARI as readonly string[]).includes(l.boss)) {
+      err.push(ad + ": bilinmeyen patron anahtarı " + JSON.stringify(l.boss));
+    }
+    if (bossMu(i + 1) !== (l.boss !== null)) err.push(ad + ": patron olup olmadığı " + BOSS_ARALIGI + " kuralıyla uyuşmuyor");
     if (!Array.isArray(l.rings) || l.rings.length < 2 || l.rings.length > 6) {
       err.push(ad + ": halka sayısı 2-6 dışında");
       return;
