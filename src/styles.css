@@ -660,50 +660,33 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 .gizlilikSatir a { color: var(--muted); }
 .gizlilikSatir a:hover, .gizlilikSatir a:focus-visible { color: var(--ink); }
 
-/* Bölüm seçimi (src/ui/secim.ts). Yüz düğme birden çizilir; kutu kendi içinde kayar
-   (taşma ayarı .kutu tabanında). Sütun sayısı genişliğe göre kendiliğinden ayarlanır:
-   320 piksellik bir telefonda 4, geniş ekranda 6 sütun. */
-.secimKutu { max-width: 26rem; }
-.secimSayfa {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  margin: 0.25rem 0 0.75rem;
-  font-variant-numeric: tabular-nums;
+/* Ayarlar panelindeki grup başlıkları. Panel düz bir listeyken 320 pikselde
+   "Nasıl oynanır", "Baştan başla" ve gizlilik fold altında kalıyordu. */
+.grupBaslik {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--muted);
+  text-align: left;
+  margin: 1rem 0 0.25rem;
 }
-.secimSayfa button { min-width: 44px; min-height: 44px; font-size: 1.2rem; }
-.secimSayfa button:disabled { opacity: 0.35; cursor: default; }
+.grupCizgi { border: 0; border-top: 1px solid var(--track); margin: 1rem 0 0.5rem; }
 
-.secimIzgara {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(3.1rem, 1fr));
-  gap: 6px;
+/* İlerleme yedeği (src/game/storage.ts disaAktar). */
+.yedekKutu { max-width: 24rem; }
+.yedekAlan {
+  width: 100%;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid var(--track);
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
 }
-.secimDugme {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  /* 44px dokunma hedefi: yüz küçük düğmenin yan yana durduğu tek ekran burası. */
-  min-height: 44px;
-  padding: 4px 2px;
-  /* Hap değil kare: ızgarada yan yana duran yüz öğenin hap olması onları düğmeden
-     çok etiket gibi gösteriyor ve sayılar dar kalıyordu. */
-  border-radius: 10px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.secimDugme b { font-size: 0.95rem; font-weight: 600; }
-/* Yıldız satırı her zaman yer kaplar: boşken düğmeler zıplamasın. */
-.secimDugme i { font-size: 0.55rem; line-height: 1; font-style: normal; min-height: 0.7em; }
-.secimDugme.bitti { color: var(--ink); }
-/* Yıldızlar amber DEĞİL: 0,55 rem'lik bir glifte amber açık temada 1,97:1 okunur
-   (bkz. contrast.test.ts). Dolu/boş ayrımını zaten glifin kendisi taşıyor (★ / ☆),
-   ki bu renkten güçlü bir kanal. */
-.secimDugme:disabled { opacity: 0.4; cursor: default; }
-/* Şu an oynanan bölüm: kalın kenarlık. Renk tek başına işaret olarak kullanılmıyor,
-   aria-current de veriliyor (bkz. ui/secim.ts). */
-.secimDugme.simdiki { border-width: 2px; border-color: var(--ink); color: var(--ink); }
+.yedekAlan:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+#ayarPanel .kutu > .grupBaslik, #ayarPanel .kutu > .grupCizgi { width: 100%; }
+.yedekKutu button { display: flex; width: 100%; max-width: 14rem; margin: 0.5rem auto 0; }

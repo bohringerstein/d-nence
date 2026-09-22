@@ -62,7 +62,7 @@ test("örtüler tek bir açma/kapama deseni kullanıyor", () => {
   // gizlenen ağacın içinde kalıyordu — body'ye bile düşmüyordu (tarayıcıda ölçüldü).
   // Sonraki Tab görünmez bir noktadan başlıyordu: WCAG 2.2 SC 2.4.3 ihlali.
   assert.ok(/import \{ ortuAc, ortuKapat \}/.test(main), "örtü deseni içe aktarılmalı");
-  for (const id of ["ayarPanel", "secim", "nasil", "duraklat", "bitis"]) {
+  for (const id of ["ayarPanel", "secim", "nasil", "duraklat", "bitis", "yedek"]) {
     assert.ok(main.includes(`ortuAc(ui.${id}, `), id + " ortuAc ile açılmalı");
     assert.ok(main.includes(`ortuKapat(ui.${id}, `), id + " ortuKapat ile kapanmalı");
   }
@@ -75,7 +75,7 @@ test("kapanışta odak OYUN ALANINA döner, düğmeye değil", () => {
   // bir sonraki boşluk tuşunun o düğmeyi çalıştırması demek olurdu — ayarları
   // kapatıp boşluğa basan oyuncu ayarları yeniden açardı.
   const kapatmalar = main.match(/ortuKapat\(ui\.\w+, [^)]+\)/g) ?? [];
-  assert.ok(kapatmalar.length >= 5, "beş örtünün de kapanışı olmalı");
+  assert.ok(kapatmalar.length >= 6, "altı örtünün de kapanışı olmalı");
   for (const k of kapatmalar) {
     assert.ok(k.endsWith("ui.canvas)"), "odak oyun alanına dönmeli: " + k);
   }

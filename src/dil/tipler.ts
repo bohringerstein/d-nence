@@ -72,6 +72,26 @@ export interface Metinler {
   ses: Secenek;
   titresim: Secenek;
   dil: string;
+  /** Ayarlar panelindeki grup başlıkları. */
+  grupOyun: string;
+  grupGorunum: string;
+
+  // ---- İlerleme yedeği ----
+  //
+  // Kayıt tek bir tarayıcı profilinde duruyor ve onu kurtarmanın başka yolu yok:
+  // telefon değiştiren oyuncu ilerlemesini kaybeder, mağaza sürümüne geçen oyuncu da
+  // (farklı origin, kayıt görünmez).
+  yedek: string;
+  yedekAciklama: string;
+  yedekKopyala: string;
+  yedekKopyalandi: string;
+  yedekYapistir: string;
+  yedekYukle: string;
+  /** İkinci basışta çıkan onay: yükleme var olan ilerlemenin üstüne yazar. */
+  yedekYukleOnay: string;
+  yedekGecersiz: string;
+  yedekYuklendi: (bolum: number) => string;
+
   /** Ayarlardaki gizlilik politikası bağlantısı (public/gizlilik.html). */
   gizlilik: string;
 

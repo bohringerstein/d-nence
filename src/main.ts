@@ -15,7 +15,7 @@ import { girdiBagla } from "./game/input.ts";
 import { tuvalKur, ciz } from "./game/render.ts";
 import { renkleriOku, renklerHazir, hareketAzalt, tercihleriIzle } from "./game/theme.ts";
 import { ogreticiTablosu, ipucu, yildizYazisi, sureYazisi, kayipYazisi, kalanYazisi } from "./game/hints.ts";
-import { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, tabloSurumuUygula } from "./game/storage.ts";
+import { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, tabloSurumuUygula, disaAktar, iceAktar, yedegiYukle } from "./game/storage.ts";
 import { izgaraHtml, sayfaSayisi, sayfasi, aralik } from "./ui/secim.ts";
 import { acilisBolumu, resetOnayHedefi, kazanincaSonraki } from "./game/akis.ts";
 import { ayarlariOku, ayarlariYaz, halkaOpakligi, titret, titresimVarMi } from "./game/ayarlar.ts";
@@ -23,6 +23,7 @@ import { cal, sesiAc, sesiDuraklat, sesVarMi } from "./game/ses.ts";
 import { kabukKur } from "./ui/shell.ts";
 import { nasilHtml } from "./ui/nasil.ts";
 import { ortuAc, ortuKapat } from "./ui/ortu.ts";
+import { guncellemeHazir, guncellemeyiUygula } from "./game/guncelleme.ts";
 import { DILLER, cihazDili, gecerliDilMi, sayi } from "./dil/index.ts";
 
 const hedef = document.getElementById("app");
@@ -291,6 +292,8 @@ const oyun = dongu({
       else {
         const sonraki = kazanincaSonraki(durum.level.n);
         if (sonraki.tip === "bitis") { bitisGoster(); return false; }
+        // Bölüm sınırı, yenilemenin oyuncudan hiçbir şey götürmediği tek an.
+        if (guncellemeyiDene(sonraki.n)) return false;
         levelYukle(sonraki.n);
       }
       return false;   // level değişti: bu karede daha fazla adım atma
@@ -310,6 +313,20 @@ const oyun = dongu({
     cizVeYaz();
   }
 });
+
+/**
+ * Yeni sürüm hazırsa ŞİMDİ uygular; sayfa yenilenir ve `true` döner.
+ *
+ * Önce ilerleme yazılır, yoksa oyuncu yenilemeden sonra bir bölüm geriden başlar.
+ * Yalnızca güvenli anlardan çağrılır: bölüm kazanıldıktan sonra ve duraklatmadan
+ * dönerken. Oyun ortasında yenilemek oyuncunun turunu keserdi.
+ */
+function guncellemeyiDene(sonrakiBolum: number): boolean {
+  if (!guncellemeHazir()) return false;
+  levelKaydet(kayit, sonrakiBolum);
+  guncellemeyiUygula();
+  return true;
+}
 
 // ---- Duraklatma ------------------------------------------------------------
 //
@@ -357,6 +374,8 @@ function duraklatmaAc(): void {
 }
 
 function duraklatmaKapat(): void {
+  // İkinci güvenli an: oyuncu zaten durmuş, bölüm baştan başlayacak.
+  if (guncellemeyiDene(durum.level.n)) return;
   ortuKapat(ui.duraklat, ui.canvas);
   arkaKilit(false);
   duraklatildi = false;
@@ -382,6 +401,7 @@ window.addEventListener("keydown", e => {
   // herhangi bir örtü açıkken tamamen ölüydü ve dört diyalogdan çıkış yolu tek düğmeydi.
   if (!ui.nasil.hidden) { ui.nasilKapat.click(); return; }
   if (!ui.secim.hidden) { ui.secimKapat.click(); return; }
+  if (!ui.yedek.hidden) { ui.yedekKapat.click(); return; }
   if (!ui.ayarPanel.hidden) { ui.ayarKapat.click(); return; }
   // Bitiş ekranında Escape "Baştan oyna"yı TETİKLEMEZ: o düğme oyunu 1. bölüme alır,
   // Escape ise iptal demektir. Kapanış bölümüne dönülür, hiçbir durum değişmez.
@@ -459,6 +479,7 @@ ui.reset.addEventListener("click", () => {
   ayarlariYaz(ayarlar);
   ui.ayarPanel.hidden = true;
   ui.secim.hidden = true;
+  ui.yedek.hidden = true;
   arkaKilit(false);
   panelAcik = false;
   bitti = false;
@@ -515,6 +536,7 @@ function ayarPaneliAc(): void {
   // Cihaz titreşimi desteklemiyorsa (iOS Safari) seçeneği hiç gösterme.
   ui.titresimSatir.hidden = !titresimVarMi();
   ui.secim.hidden = true;
+  ui.yedek.hidden = true;
   ui.uyari.textContent = "";
   ui.ozet.textContent = ilerlemeOzeti();
   resetOnayiSifirla();   // panel yeniden açılınca uyarı hali taşınmasın
@@ -661,6 +683,76 @@ ui.secimIzgara.addEventListener("click", e => {
   ipucuKilidiSifirla();
   levelYukle(n);
   geriSayimBaslat();
+});
+
+// ---- İlerleme yedeği -------------------------------------------------------
+//
+// Kayıt tek bir tarayıcı profilinin localStorage'ında; telefon değiştiren oyuncunun
+// onu kurtarmasının başka yolu yok. Mağaza sürümüne geçişte de aynı olacak, çünkü
+// Capacitor içeriği başka bir origin'den sunar (capacitor://localhost).
+let yedekOnayBekliyor = false;
+
+function yedekOnayiSifirla(): void {
+  if (!yedekOnayBekliyor) return;
+  yedekOnayBekliyor = false;
+  ui.yedekYukle.textContent = M.yedekYukle;
+  ui.yedekYukle.classList.remove("onayBekliyor");
+}
+
+function yedekAc(): void {
+  panelAcik = true;
+  arkaKilit(true);
+  ui.ayarPanel.hidden = true;
+  ui.yedekKod.value = disaAktar(kayit);
+  ui.yedekGiris.value = "";
+  ui.yedekNot.textContent = "";
+  yedekOnayiSifirla();
+  ortuAc(ui.yedek, ui.yedekBaslik);
+}
+
+ui.yedekAc.addEventListener("click", () => { ayarlariUygula(); yedekAc(); });
+ui.yedekKapat.addEventListener("click", () => {
+  ortuKapat(ui.yedek, ui.canvas);
+  arkaKilit(false);
+  panelAcik = false;
+  geriSayimBaslat();
+});
+ui.yedek.addEventListener("click", e => { if (e.target === ui.yedek) ui.yedekKapat.click(); });
+
+ui.yedekKopyala.addEventListener("click", () => {
+  // Panoya yazma bir kullanıcı hareketinin içinde olmalı; düğme tıklaması bu.
+  // Başarısız olursa (izin yok, eski tarayıcı) metin seçilir: oyuncu elle kopyalar.
+  ui.yedekKod.select();
+  navigator.clipboard?.writeText(ui.yedekKod.value)
+    .then(() => { ui.yedekNot.textContent = M.yedekKopyalandi; })
+    .catch(() => { /* seçim zaten yapıldı */ });
+});
+
+/**
+ * Geri yükleme İKİ AŞAMALIDIR: var olan ilerlemenin üstüne yazar, yani "Baştan
+ * başla" ile aynı sınıftan geri alınamaz bir eylem.
+ */
+ui.yedekYukle.addEventListener("click", () => {
+  const yeni = iceAktar(ui.yedekGiris.value);
+  if (!yeni) {
+    yedekOnayiSifirla();
+    ui.yedekNot.textContent = M.yedekGecersiz;
+    return;
+  }
+  if (!yedekOnayBekliyor) {
+    yedekOnayBekliyor = true;
+    ui.yedekYukle.textContent = M.yedekYukleOnay;
+    ui.yedekYukle.classList.add("onayBekliyor");
+    return;
+  }
+  yedekOnayiSifirla();
+  Object.assign(kayit, yeni);
+  yedegiYukle(kayit);
+  // Yedek başka bir tablodan gelmiş olabilir; aynı kural işler.
+  tabloSurumuUygula(kayit, tablo.v);
+  ui.yedekNot.textContent = M.yedekYuklendi(bitirilenLevel(kayit));
+  ipucuKilidiSifirla();
+  levelYukle(acilisBolumu(kayit));
 });
 
 ui.desenKutu.addEventListener("change", ayarlariUygula);

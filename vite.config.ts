@@ -21,8 +21,14 @@ export default defineConfig({
   },
   plugins: [
     VitePWA({
-      // Yeni sürüm sessizce kurulur; oyuncuya "güncelle" diye sormaya gerek yok.
-      registerType: "autoUpdate",
+      // "autoUpdate" DEĞİL. O mod yalnızca bir kayıt satırı üretiyordu ve sayfayı hiç
+      // yenilemiyordu: yeni servis çalışanı devralıyor ama açık sayfa eski varlıkları
+      // tutmaya devam ediyordu — oyuncu "sert yenileme" yapmadan yeni sürümü hiç
+      // görmüyordu. "prompt" ile kaydı biz yapıyoruz ve yenilemeyi GÜVENLİ BİR ANDA
+      // kendimiz tetikliyoruz (bkz. src/game/guncelleme.ts). Oyuncuya soru sorulmuyor.
+      registerType: "prompt",
+      // Kaydı src/game/guncelleme.ts yapıyor; eklentinin kendi betiği gerekmez.
+      injectRegister: false,
       includeAssets: ["apple-touch-icon.png", "icon.svg"],
       manifest: {
         // id BUGÜN örtük olarak start_url'den ("/") türetiliyor; açıkça yazmak

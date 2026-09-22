@@ -49,6 +49,16 @@ export interface Kabuk {
   uyari: HTMLElement;
   /** Ayarlar panelindeki ilerleme özeti (bölüm + yıldız). */
   ozet: HTMLElement;
+  /** İlerleme yedeği örtüsü ve parçaları (bkz. game/storage.ts disaAktar). */
+  yedek: HTMLElement;
+  yedekBaslik: HTMLElement;
+  yedekAc: HTMLButtonElement;
+  yedekKapat: HTMLButtonElement;
+  yedekKod: HTMLTextAreaElement;
+  yedekKopyala: HTMLButtonElement;
+  yedekGiris: HTMLTextAreaElement;
+  yedekYukle: HTMLButtonElement;
+  yedekNot: HTMLElement;
   /** Bölüm seçimi örtüsü ve parçaları (bkz. ui/secim.ts). */
   secim: HTMLElement;
   secimBaslik: HTMLElement;
@@ -114,6 +124,22 @@ const html = (m: Metinler): string => `
            oyunda devam etme sebebinin kendisi. -->
       <p class="ozet" id="ozet"></p>
       <p class="uyari" id="uyari"></p>
+
+      <!-- Panel düz bir listeydi ve 320 pikselde 1,47 ekran sürüyordu; fold altında
+           kalanlar "Nasıl oynanır", "Baştan başla" ve gizlilikti — yani küçük
+           telefonda yardım metnine giden tek yol görünmüyordu. Gruplama paneli 84
+           piksel uzatıyor (1,63 ekran) ama oyuncunun tekrar tekrar aradığı iki eylemi
+           fold üstüne çıkarıyor; fold altına itilen şey bir kez ayarlanıp unutulan
+           onay kutuları. Üçüncü grubun başlığı bilerek yok: ayırıcı çizgi yetiyor. -->
+      <h3 class="grupBaslik">${m.grupOyun}</h3>
+      <!-- Bölüm seçimi: bitirilen bir bölüme dönmenin tek yolu. Yıldız sisteminin
+           hedef olabilmesi buna bağlı (bkz. ui/secim.ts). Asıl giriş noktası
+           duraklatma örtüsünde; burası ikinci yol. -->
+      <button id="secimAc" type="button">${m.bolumSec}</button>
+      <small class="dugmeNot">${m.bolumSecAciklama}</small>
+      <button id="nasilAc" type="button">${m.nasilOynanir}</button>
+
+      <h3 class="grupBaslik">${m.grupGorunum}</h3>
       <label class="secenek">
         <input type="checkbox" id="desenKutu">
         <span><b>${m.desen.baslik}</b><small>${m.desen.aciklama}</small></span>
@@ -134,31 +160,44 @@ const html = (m: Metinler): string => `
         <span><b>${m.dil}</b></span>
         <select id="dilKutu"><!--DILLER--></select>
       </label>
-      <!-- Bölüm seçimi: bitirilen bir bölüme dönmenin tek yolu. Yıldız sisteminin
-           hedef olabilmesi buna bağlı (bkz. ui/secim.ts). -->
-      <button id="secimAc" type="button">${m.bolumSec}</button>
-      <small class="dugmeNot">${m.bolumSecAciklama}</small>
-      <button id="nasilAc" type="button">${m.nasilOynanir}</button>
+
+      <hr class="grupCizgi">
+      <!-- İlerleme kaydı tek bir tarayıcı profilinde duruyor; telefon değiştiren
+           oyuncunun onu kurtarmasının başka yolu yok. Mağaza sürümüne geçişte de
+           aynı: Capacitor içeriği başka bir origin'den sunar. -->
+      <button id="yedekAc" type="button">${m.yedek}</button>
+      <small class="dugmeNot">${m.yedekAciklama}</small>
       <!-- "Baştan başla" alt çubuktaydı: Level 1'e döndüren bir eylem, hızlı hızlı
-           dokunulan bir oyunda başparmağın durduğu sağ alt köşede duruyordu. Ekranın
-           tamamı dokunma alanı olunca oraya kazara basma riski arttı; seyrek ve geri
-           alınamaz bir eylem olduğu için ayarlara taşındı. -->
+           dokunulan bir oyunda başparmağın durduğu sağ alt köşede duruyordu. Seyrek
+           ve geri alınamaz olduğu için ayarlara taşındı. -->
       <button id="reset" type="button">${m.bastanBasla}</button>
       <small class="dugmeNot" id="resetNot">${m.bastanBaslaAciklama}</small>
       <!-- Gizlilik politikası her iki mağazanın da zorunlu tuttuğu bir bağlantı
            (Apple 5.1.1(i) uygulamanın İÇİNDE de ister). Sayfa uygulamayla birlikte
-           yayınlanır ve çevrimdışı da açılır: public/gizlilik.html -->
-      <!-- target="_blank" YOK: PWA ana ekrandan açıldığında yeni sekme, sayfayı
+           yayınlanır ve çevrimdışı da açılır: public/gizlilik.html
+           target="_blank" YOK: PWA ana ekrandan açıldığında yeni sekme, sayfayı
            uygulamanın DIŞINDA açar (iOS'ta Safari'ye atar) ve oyuncu kurulu
-           uygulamasına dönemez. Sayfa kapsam içi olduğu için aynı pencerede açmak
-           standalone'dan hiç çıkarmıyor; gizlilik sayfasının başında oyuna dönen
-           bir bağlantı var. Apple 5.1.1(i) "uygulama içinden erişilebilsin" şartı
-           ancak böyle tartışmasız karşılanıyor. -->
+           uygulamasına dönemez. -->
       <p class="gizlilikSatir"><a href="./gizlilik.html">${m.gizlilik}</a></p>
-      <!-- "Tamam" kendi yapışkan şeridinde: kutu kayabilir ve kısa ekranda panelden
-           çıkış yolu görünür kalmalı. Bu düğme görünmezken ekranda kalan son düğme
-           "Baştan başla" oluyordu (bkz. styles.css .kutu). -->
       <div class="kutuAlt"><button id="ayarKapat" type="button">${m.tamam}</button></div>
+    </div>
+  </div>
+
+  <div class="ortu" id="yedek" hidden role="dialog" aria-modal="true" aria-labelledby="yedekBaslik">
+    <div class="kutu yedekKutu">
+      <h2 id="yedekBaslik" tabindex="-1">${m.yedek}</h2>
+      <p>${m.yedekAciklama}</p>
+      <!-- Kod ham JSON: base64 hem %33 daha uzun olurdu hem de oyuncu ne
+           kopyaladığını göremezdi. -->
+      <label class="gizli" for="yedekKod">${m.yedek}</label>
+      <textarea id="yedekKod" class="yedekAlan" readonly rows="4"></textarea>
+      <button id="yedekKopyala" type="button">${m.yedekKopyala}</button>
+      <hr class="grupCizgi">
+      <label class="gizli" for="yedekGiris">${m.yedekYapistir}</label>
+      <textarea id="yedekGiris" class="yedekAlan" rows="4" placeholder="${m.yedekYapistir}"></textarea>
+      <button id="yedekYukle" type="button">${m.yedekYukle}</button>
+      <p class="uyari" id="yedekNot"></p>
+      <div class="kutuAlt"><button id="yedekKapat" type="button">${m.tamam}</button></div>
     </div>
   </div>
 
@@ -267,6 +306,15 @@ export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): 
     dilKutu: bul<HTMLSelectElement>(hedef, "dilKutu"),
     uyari: bul(hedef, "uyari"),
     ozet: bul(hedef, "ozet"),
+    yedek: bul(hedef, "yedek"),
+    yedekBaslik: bul(hedef, "yedekBaslik"),
+    yedekAc: bul<HTMLButtonElement>(hedef, "yedekAc"),
+    yedekKapat: bul<HTMLButtonElement>(hedef, "yedekKapat"),
+    yedekKod: bul<HTMLTextAreaElement>(hedef, "yedekKod"),
+    yedekKopyala: bul<HTMLButtonElement>(hedef, "yedekKopyala"),
+    yedekGiris: bul<HTMLTextAreaElement>(hedef, "yedekGiris"),
+    yedekYukle: bul<HTMLButtonElement>(hedef, "yedekYukle"),
+    yedekNot: bul(hedef, "yedekNot"),
     secim: bul(hedef, "secim"),
     secimBaslik: bul(hedef, "secimBaslik"),
     secimAc: bul<HTMLButtonElement>(hedef, "secimAc"),

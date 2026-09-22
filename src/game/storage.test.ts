@@ -21,7 +21,7 @@ class SahteDepo {
 const depo = new SahteDepo();
 Object.defineProperty(globalThis, "localStorage", { value: depo, configurable: true });
 
-const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, acikMi, tabloSurumuUygula } =
+const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, acikMi, tabloSurumuUygula, disaAktar, iceAktar } =
   await import("./storage.ts");
 const { LEVEL_COUNT } = await import("../core/index.ts");
 
@@ -256,4 +256,46 @@ test("damgasız tabloyla da oyun açılır", () => {
   rekorKaydet(k, 3, { s: 1, t: 9 });
   assert.equal(tabloSurumuUygula(k, undefined), 0);
   assert.equal(bitirilenLevel(k), 1);
+});
+
+// --- İlerlemeyi taşımak -------------------------------------------------------
+//
+// Kayıt tek bir tarayıcı profilinde duruyor. Telefon değiştiren oyuncu 412 bölümlük
+// ilerlemesini kaybediyor; mağaza sürümüne geçişte de aynı olacak, çünkü Capacitor
+// içeriği başka bir origin'den sunar ve localStorage origin'e bağlı.
+test("yedek gidip geri geliyor", () => {
+  depo.temizle();
+  const k = oku();
+  levelKaydet(k, 412);
+  rekorKaydet(k, 7, { s: 3, t: 5.25 });
+  rekorKaydet(k, 200, { s: 2, t: 9.5 });
+  tabloSurumuUygula(k, "surum1");
+
+  const geri = iceAktar(disaAktar(k));
+  assert.ok(geri, "yedek okunabilmeli");
+  assert.equal(geri.enUzak, 412);
+  assert.equal(geri.level, 412);
+  assert.equal(geri.tabloSurum, "surum1");
+  assert.deepEqual(geri.bests[7], { s: 3, t: 5.25 });
+  assert.equal(bitirilenLevel(geri), 2);
+});
+
+test("bozuk yedek reddedilir, kısmen yüklenmez", () => {
+  // Elle yapıştırılan bir metin güvenilmeyen girdidir ve ayıklama `oku()` ile AYNI
+  // yoldan geçer. Kısmi bir kayıt yüklemektense hiç yüklememek iyidir.
+  for (const bozuk of ["", "{}", "merhaba", '{"level":5}', '{"dnc":99,"enUzak":5}',
+                       '{"dnc":1,"enUzak":1,"bests":{}}']) {
+    assert.equal(iceAktar(bozuk), null, `reddedilmeliydi: ${bozuk}`);
+  }
+});
+
+test("yedekteki bozuk rekorlar ayıklanıyor", () => {
+  const metin = JSON.stringify({
+    dnc: 1, level: 10, enUzak: 10,
+    bests: { 5: { s: 2, t: 4 }, 6: { s: 9, t: 4 }, "__proto__": { s: 1, t: 1 }, 99999: { s: 1, t: 1 } }
+  });
+  const k = iceAktar(metin);
+  assert.ok(k);
+  assert.deepEqual(Object.keys(k.bests), ["5"], "yalnız geçerli rekor kalmalı");
+  assert.equal(({} as Record<string, unknown>).s, undefined, "prototip kirlenmemeli");
 });

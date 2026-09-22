@@ -70,6 +70,13 @@ export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
   };
 
   const gorunurluk = (): void => {
+    // Olaya DEĞİL gerçeğe bak. Önceki hâl yalnızca `blur`/`focus` olaylarının yazdığına
+    // güveniyordu; eşleşmeyen tek bir `blur` (bfcache dönüşü, IME paneli, bazı Android
+    // WebView'ları) kalıcı kilitlenme üretiyordu ve çıkış yolu YALNIZCA bir `focus`
+    // olayıydı — tıklamak bile temizlemiyordu. Tarayıcıda görüldü: oyun sessizce
+    // donuyor, ekranda hiç saymayan bir geri sayım rakamı kalıyor ve donmuş oyun ile
+    // başlamak üzere olan oyun ayırt edilemiyordu.
+    pencereDisinda = odaksizMi();
     gizli = document.hidden || pencereDisinda;
     // Geri dönüşte biriken süre atılır: oyuncu yokken geçen zaman levele yazılmaz.
     if (!gizli) { son = performance.now(); birikim = 0; }
@@ -79,8 +86,10 @@ export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
   const odaksizMi = (): boolean =>
     typeof document.hasFocus === "function" ? !document.hasFocus() : false;
 
-  const odakGitti = (): void => { pencereDisinda = true; gorunurluk(); };
-  const odakGeldi = (): void => { pencereDisinda = false; gorunurluk(); };
+  const odakGitti = (): void => { pencereDisinda = true; gizli = true; };
+  const odakGeldi = (): void => { gorunurluk(); };
+  /** Dokunuş her zaman çözer: oyuncu ekrana bastıysa oyun donuk kalmamalı. */
+  const dokunusla = (): void => { if (gizli) gorunurluk(); };
 
   return {
     basla() {
@@ -93,6 +102,7 @@ export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
       document.addEventListener("visibilitychange", gorunurluk);
       window.addEventListener("blur", odakGitti);
       window.addEventListener("focus", odakGeldi);
+      window.addEventListener("pointerdown", dokunusla, true);
       raf = requestAnimationFrame(kare);
     },
     dur() {
@@ -102,6 +112,7 @@ export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
       document.removeEventListener("visibilitychange", gorunurluk);
       window.removeEventListener("blur", odakGitti);
       window.removeEventListener("focus", odakGeldi);
+      window.removeEventListener("pointerdown", dokunusla, true);
     },
     duraklatildi: () => gizli
   };

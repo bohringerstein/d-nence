@@ -106,6 +106,48 @@ export function levelKaydet(k: Kayit, level: number): void {
 }
 
 /**
+ * Yedekleme biçiminin sürümü. Biçim değişirse bu artar ve eski yedekler reddedilir
+ * (sessizce yanlış okumaktansa açıkça reddetmek iyidir).
+ */
+const YEDEK_SURUM = 1;
+
+/**
+ * İlerlemeyi taşınabilir bir metne çevirir.
+ *
+ * Neden var: kayıt tek bir tarayıcı profilinin `localStorage`'ında ve onu kurtarmanın
+ * hiçbir yolu yok. Telefon değiştiren oyuncu 412 bölümlük ilerlemesini kaybediyor.
+ * Mağaza sürümüne geçişte de aynı şey olacak: Capacitor içeriği başka bir origin'den
+ * sunar (`capacitor://localhost`), yani kayıt görünmez. Bu, mağaza konuşulmasa bile
+ * bir açık.
+ *
+ * Biçim ham JSON: base64 hem %33 daha uzun olurdu hem de gözle incelenemezdi.
+ * Oyuncu ne kopyaladığını görebilmeli.
+ */
+export const disaAktar = (k: Kayit): string =>
+  JSON.stringify({ dnc: YEDEK_SURUM, level: k.level, enUzak: k.enUzak, tabloSurum: k.tabloSurum, bests: k.bests });
+
+/**
+ * Yedek metnini kayda çevirir. Geçersizse `null` — kısmi bir kayıt yüklemektense
+ * hiç yüklememek iyidir.
+ *
+ * Ayıklama `ayikla()` ile AYNI yoldan geçer: yedek de güvenilmeyen bir girdi, üstelik
+ * elle yapıştırılan bir metin.
+ */
+export function iceAktar(metin: string): Kayit | null {
+  let ham: unknown;
+  try { ham = JSON.parse(metin.trim()); } catch { return null; }
+  if (typeof ham !== "object" || ham === null) return null;
+  if ((ham as Record<string, unknown>).dnc !== YEDEK_SURUM) return null;
+  const k = ayikla(ham);
+  // Boş bir yedek, var olan ilerlemenin üstüne yazılmamalı.
+  if (k.enUzak <= 1 && Object.keys(k.bests).length === 0) return null;
+  return k;
+}
+
+/** Yedekten gelen kaydı diske yazar. */
+export function yedegiYukle(k: Kayit): void { yaz(k); }
+
+/**
  * Kaydı, yüklenen tablonun sürümüyle hizalar. Kaç rekorun silindiğini döner.
  *
  * Kural: alan YOKSA benimse (silme yok) — damgadan önceki kayıtlar cezalandırılmaz.

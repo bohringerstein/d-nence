@@ -150,6 +150,43 @@ test("odak kaybı da oyunu durduruyor", () => {
   assert.ok(/pencereDisinda/.test(loop), "döngü pencere odağını da izlemeli");
   assert.ok(/document\.hidden \|\| pencereDisinda/.test(loop),
     "gizli VEYA odaksız: ikisi de oyunu durdurmalı");
+  // Olaya değil GERÇEĞE bakmalı: eşleşmeyen tek bir blur kalıcı kilitlenme üretiyordu
+  // ve çıkış yolu yalnızca bir focus olayıydı. Tarayıcıda görüldü: ekranda hiç saymayan
+  // bir geri sayım rakamı kalıyor, donmuş oyun ile başlamak üzere olan oyun ayrılmıyor.
+  assert.ok(/pencereDisinda = odaksizMi\(\);/.test(loop),
+    "görünürlük her çağrıldığında odak yeniden ölçülmeli");
+  assert.ok(/addEventListener\("pointerdown", dokunusla/.test(loop),
+    "dokunuş da donmayı çözmeli: oyuncu ekrana bastıysa oyun donuk kalmamalı");
   assert.ok(/window\.addEventListener\("focus"/.test(main),
     "odak geri gelince geri sayım başlamalı");
+});
+
+// --- Güncellemenin uygulandığı an --------------------------------------------
+//
+// Bildirilen hata: "oyunu her güncellediğimizde daha önce oynamış kimseler hep eski
+// sürümü görüyor, sert yenileme yapmak gerekiyor." Sebep ölçüldü: `autoUpdate` modunun
+// ürettiği registerSW.js YALNIZCA kaydediyordu; yeni servis çalışanı devralıyor ama
+// çizilmiş sayfa eski varlıkları tutmaya devam ediyordu.
+test("yeni sürüm yalnızca GÜVENLİ anlarda uygulanıyor", () => {
+  assert.ok(/function guncellemeyiDene/.test(main), "güvenli an denetimi olmalı");
+  // Bölüm kazanıldıktan sonra: yenileme oyuncudan hiçbir şey götürmüyor.
+  const kazanma = main.slice(main.indexOf('if (sonraki.tip === "bitis")'));
+  assert.ok(kazanma.slice(0, 260).includes("guncellemeyiDene(sonraki.n)"),
+    "bölüm sınırında güncelleme denenmeli");
+  // Duraklatmadan dönerken: oyuncu zaten durmuş.
+  const devam = main.slice(main.indexOf("function duraklatmaKapat("));
+  assert.ok(devam.slice(0, 300).includes("guncellemeyiDene("),
+    "duraklatmadan dönerken güncelleme denenmeli");
+  // Oyun ORTASINDA uygulanmamalı: yenileme oyuncunun turunu keser.
+  const adim = main.slice(main.indexOf("function dokunusIsle("), main.indexOf("// ---- Döngü"));
+  assert.ok(!adim.includes("guncelleme"), "dokunuş işlenirken güncelleme uygulanmamalı");
+});
+
+test("güncelleme uygulanmadan önce ilerleme yazılıyor", () => {
+  // Yenileme sayfayı baştan yükler; kayıt yazılmazsa oyuncu bir bölüm geriden başlar.
+  const g = main.slice(main.indexOf("function guncellemeyiDene"), main.indexOf("// ---- Duraklatma"));
+  const kayitSira = g.indexOf("levelKaydet(");
+  const uygulaSira = g.indexOf("guncellemeyiUygula()");
+  assert.ok(kayitSira >= 0 && uygulaSira > kayitSira,
+    "önce ilerleme yazılmalı, sonra sayfa yenilenmeli");
 });
