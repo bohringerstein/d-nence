@@ -60,19 +60,37 @@ const RING_FIELDS: Array<[keyof RingDef, string]> = [
   ["flip", "number"], ["wobble", "boolean"], ["preLocked", "boolean"], ["start", "number"]
 ];
 
-/** Tabloyu biçim açısından denetler. Boş dizi dönerse tablo sağlam. */
-export function validateTable(data: LevelTable): string[] {
+/** Sonlu sayı mı? NaN ve Infinity `typeof x === "number"` denetiminden geçer. */
+const sayiMi = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
+
+/** Nesne mi? `typeof null === "object"` olduğu için ayrıca null elenir. */
+const nesneMi = (x: unknown): x is Record<string, unknown> =>
+  typeof x === "object" && x !== null;
+
+/**
+ * Tabloyu biçim açısından denetler. Boş dizi dönerse tablo sağlam.
+ *
+ * Girdi bilerek `unknown`: bu fonksiyonun işi zaten GÜVENİLMEYEN veriyi denetlemek.
+ * `LevelTable` tipiyle yazıldığında gövde, doğru biçimi varsaymakta serbest kalıyordu
+ * ve `null`, `levels: [null]` ya da `rings: [null]` gelen bir dosyada TypeError'la
+ * çöküyordu — yani koruma, var olma sebebi olan durumda kırılıyordu. Dosya diskten
+ * ya da ağdan gelir; tipi derleyicinin verdiği söz değildir.
+ */
+export function validateTable(data: unknown): string[] {
   const err: string[] = [];
-  if (typeof data.q3 !== "number" || typeof data.q2 !== "number") err.push("q3/q2 sayı değil");
+  if (!nesneMi(data)) return ["tablo bir JSON nesnesi değil"];
+  if (!sayiMi(data.q3) || !sayiMi(data.q2)) err.push("q3/q2 sayı değil");
   else if (!(data.q3 > data.q2)) err.push("q3, q2 değerinden büyük olmalı");
   if (!Array.isArray(data.levels) || data.levels.length !== LEVEL_COUNT) {
     err.push(LEVEL_COUNT + " level olmalı");
     return err;
   }
-  data.levels.forEach((l, i) => {
+  (data.levels as unknown[]).forEach((ham, i) => {
     const ad = "level " + (i + 1);
+    if (!nesneMi(ham)) { err.push(ad + ": bir nesne değil"); return; }
+    const l = ham as unknown as Level;
     if (l.n !== i + 1) err.push(ad + ": n alanı sırayla gitmiyor");
-    if (typeof l.limit !== "number" || l.limit <= 0) err.push(ad + ": limit geçersiz");
+    if (!sayiMi(l.limit) || l.limit <= 0) err.push(ad + ": limit geçersiz");
     // Patron anahtarı tanınmıyorsa oyun o bölümde adsız kalırdı; şemada yakala.
     if (l.boss !== null && !(PATRON_ANAHTARLARI as readonly string[]).includes(l.boss)) {
       err.push(ad + ": bilinmeyen patron anahtarı " + JSON.stringify(l.boss));
@@ -82,14 +100,18 @@ export function validateTable(data: LevelTable): string[] {
       err.push(ad + ": halka sayısı 2-6 dışında");
       return;
     }
-    if (!l.rings.some(r => !r.preLocked)) err.push(ad + ": tüm halkalar baştan kilitli");
+    if (!l.rings.some(r => nesneMi(r) && !r.preLocked)) err.push(ad + ": tüm halkalar baştan kilitli");
     const gorulen = new Set<string>();
-    l.rings.forEach((r, k) => {
+    (l.rings as unknown[]).forEach((hamHalka, k) => {
       const nerede = ad + " halka " + k + ": ";
-      const kayit = r as unknown as Record<string, unknown>;
+      if (!nesneMi(hamHalka)) { err.push(nerede + "bir nesne değil"); return; }
+      const kayit = hamHalka;
+      const r = hamHalka as unknown as RingDef;
       let tipTamam = true;
       for (const [alan, tur] of RING_FIELDS) {
-        if (typeof kayit[alan] !== tur) { err.push(nerede + alan + " " + tur + " olmalı"); tipTamam = false; }
+        const deger = kayit[alan];
+        const uygun = tur === "number" ? sayiMi(deger) : typeof deger === tur;
+        if (!uygun) { err.push(nerede + alan + " " + tur + " olmalı"); tipTamam = false; }
       }
       if (!tipTamam) return;
       if (r.gaps !== 1 && r.gaps !== 2) err.push(nerede + "gaps 1 veya 2 olmalı");

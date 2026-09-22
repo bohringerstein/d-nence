@@ -30,8 +30,16 @@ export interface Metinler {
   // ---- Ekran iskeleti ----
   oyunAlani: string;
   duraklatDugmesi: string;
-  /** Sayacın erişilebilir adında kullanılır; görünen rakam onun devamı olarak okunur. */
-  kalanSure: string;
+  /**
+   * Sayacın YANINDAKİ role="timer" öğesinin tam cümlesi.
+   *
+   * Kalan süre bilerek düğmenin DIŞINDA: düğmenin içinde olduğu sürece erişilebilir
+   * adın parçası olur ve ad her karede değişirdi ("Duraklat, kalan süre 17,4" →
+   * "…12,3"). aria-hidden'la gizlemek de çözmüyor, çünkü NVDA tarama kipi ve
+   * VoiceOver rotoru bir <button>'ı TEK öğe olarak sunar: içindeki metne ok tuşuyla
+   * girilemez, yani rakam düğmenin içinde kaldıkça hiç okunamaz.
+   */
+  kalanSureSesli: (saniye: string) => string;
   levelOneki: string;
   patronEki: string;
   ayarlar: string;
@@ -44,6 +52,18 @@ export interface Metinler {
   bastanBaslaOnay: (level: number) => string;
   anladim: string;
 
+  // ---- Bölüm seçimi ----
+  bolumSec: string;
+  /** Ayarlardaki düğmenin altındaki açıklama. */
+  bolumSecAciklama: string;
+  /** "101–200": sayfadaki bölüm aralığı. */
+  bolumAraligi: (bas: string, son: string) => string;
+  oncekiSayfa: string;
+  sonrakiSayfa: string;
+  /** Izgaradaki düğmenin erişilebilir adı. yildiz=0 ise "henüz açılmadı". */
+  bolumEtiketi: (n: number, yildiz: number) => string;
+  bolumKilitli: (n: number) => string;
+
   // ---- Ayarlar ----
   ilerlemeYok: string;
   ilerleme: (bolum: number, yildiz: number, enCok: number) => string;
@@ -52,6 +72,8 @@ export interface Metinler {
   ses: Secenek;
   titresim: Secenek;
   dil: string;
+  /** Ayarlardaki gizlilik politikası bağlantısı (public/gizlilik.html). */
+  gizlilik: string;
 
   // ---- Duraklatma ----
   duraklatildi: string;
@@ -82,6 +104,15 @@ export interface Metinler {
   // ---- Kazanma ----
   yildizEtiketi: Record<Stars, string>;
   sonucSatiri: (etiket: string, yildiz: string, sure: string) => string;
+  /**
+   * Kazanma satırının sonuna eklenen pay: "2,4° pay".
+   *
+   * Yıldız üç kovadır ve sıradan oyuncu bölümlerin %68'inde 1 yıldızda kalır —
+   * yani gelişmesi yıldıza yansımaz, oyuncu ilerlediğini göremez. Eşikleri
+   * sıkmak yerine ARA BASAMAK eklendi: kalan payın kendisi görünür oldu, böylece
+   * iki deneme arasındaki fark ölçülebilir hâle gelir.
+   */
+  payEki: (derece: string) => string;
   rekorEki: string;
 
   // ---- Patronlar ----
@@ -97,7 +128,14 @@ export interface Metinler {
     uyari: string;
   };
 
-  // ---- Hata ekranı (tablo bozuksa) ----
+  // ---- Hata ekranı ----
+  //
+  // İki ayrı hâl, iki ayrı çare: tablo İNMEDİYSE (bağlantı, sunucu, önbellek) çare
+  // oyuncudadır — tekrar denemek. Tablo indi ama BOZUKSA çare geliştiricidedir ve
+  // oyuncunun yapabileceği bir şey yoktur. Tek metin ikisini de yanlış anlatırdı.
+  tabloIndirilemediBaslik: string;
+  tabloIndirilemediMetin: string;
+  tekrarDene: string;
   tabloHatasiBaslik: string;
   tabloHatasiMetin: string;
 }

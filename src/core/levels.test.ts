@@ -115,3 +115,46 @@ test("son bölüm kapanış patronu", () => {
   const kacKez = data.levels.filter(l => l.boss === "sonKasa").length;
   assert.equal(kacKez, 1, `kapanış patronu yalnızca son bölümde olmalı, ${kacKez} yerde var`);
 });
+
+// --- validateTable bozuk veriyle ÇÖKMEMELİ --------------------------------
+//
+// Bu fonksiyonun tek işi güvenilmeyen veriyi denetlemek; girdisi diskten ya da ağdan
+// gelir. Eskiden `LevelTable` tipiyle yazılmıştı ve gövde doğru biçimi varsayıyordu:
+// `null`, `levels: [null]` ve `rings: [null]` geldiğinde TypeError'la çöküyordu — yani
+// koruma, var olma sebebi olan durumda kırılıyordu. NaN de `typeof x === "number"`
+// denetiminden geçip geçerli bir limit gibi davranıyordu.
+test("validateTable bozuk girdide çökmez, hata listesi döner", () => {
+  const bozuk: unknown[] = [
+    null, undefined, 7, "tablo", [],
+    { q3: 0.4, q2: 0.2, levels: null },
+    { q3: 0.4, q2: 0.2, levels: [null] },
+    { q3: NaN, q2: 0.2, levels: [] }
+  ];
+  for (const b of bozuk) {
+    const hatalar = C.validateTable(b);
+    assert.ok(Array.isArray(hatalar) && hatalar.length > 0,
+      `${JSON.stringify(b)} için hata beklenirdi`);
+  }
+});
+
+test("validateTable level ve halka yerine null gelince de dayanıyor", () => {
+  const tek = JSON.parse(JSON.stringify(data)) as LevelTable;
+  (tek.levels as unknown[])[5] = null;
+  assert.ok(C.validateTable(tek).some(x => x.includes("level 6")), "null level bildirilmeli");
+
+  const iki = JSON.parse(JSON.stringify(data)) as LevelTable;
+  (iki.levels[0].rings as unknown[])[0] = null;
+  assert.ok(C.validateTable(iki).some(x => x.includes("halka 0")), "null halka bildirilmeli");
+});
+
+test("NaN geçerli bir sayı sayılmıyor", () => {
+  // NaN her karşılaştırmayı false döndürür: `limit <= 0` denetiminden sessizce geçer
+  // ve oyunda süre sınırı hiç dolmayan bir bölüm olurdu.
+  const t = JSON.parse(JSON.stringify(data)) as LevelTable;
+  t.levels[0].limit = NaN;
+  assert.ok(C.validateTable(t).some(x => x.includes("limit")), "NaN limit yakalanmalı");
+
+  const u = JSON.parse(JSON.stringify(data)) as LevelTable;
+  u.levels[0].rings[0].speed = NaN;
+  assert.ok(C.validateTable(u).some(x => x.includes("speed")), "NaN speed yakalanmalı");
+});

@@ -175,12 +175,20 @@ oranı hedefte kalırken **zorluğun kaynağı** değişir.
 ```
 taban(n) = 0,94 − 0,59 · min(1, (n−1)/199)^0,45     // %94 → %35, 200. bölümde tabanda
 dalga(n) = 0,08 · sin(2π n / 24)                     // ±8 puan, 24 bölümlük salınım
-nefes(n) = (n mod 4 = 0 ve patron değilse) ? 0,12 : 0
-hedef(n) = clamp(taban + dalga + nefes, 0,25 , 0,95)
+nefes(n) = (n mod 7 ∈ {3, 0} ve patron değilse)       // 3-4 dönüşümlü aralık
+hedef(n) = clamp(nefes(n) ? taban + 0,12 : taban + dalga, 0,25 , 0,95)
 ```
 
 - **Üs 0,45**: iniş başta diktir. Oyuncu 11. bölümde %80'in, 39'da %60'ın altına düşer.
 - **Dalga**: 200. bölümden sonra eğri düz kalsaydı kalan 800 bölüm tek bir duvar olurdu.
+- **Nefes aralığı 3-4 dönüşümlü ve nefes dalgayı ezer.** İkisi birlikte bir tek soruna
+  cevap: sabit 4'te dalga (24), nefes (4), patron (10) ve arketip (8) periyotlarının
+  EKOK'u tam 120 oluyordu, yani oyun 120 bölümde bir kendini tekrar ediyordu (ölçülen
+  özilinti 0,41). Aralığı 7'ye çıkarmak tekrarı kırar ama aynı hizalanma nefesleri hep
+  uygun dalga evresinde tutuyordu: tek başına yapıldığında %40 altındaki en uzun seri
+  9'dan 10'a çıkıyor. Nefeste dalgayı uygulamamak ikisini birden verir.
+  Ölçülen: özilinti 0,41 → 0,18; en uzun zor seri 9 → 6; ortalama %41,3 → %41,8.
+  `npm run verify` her ikisini de denetler (`RITIM_TAVAN`, `ZOR_SERI_TAVAN`).
 - **Taban %35'in altına inmez.** %15 denendi: o hedefte boşluğun bir derece değişmesi
   kazanma oranını onlarca puan oynatıyor ve bölümlerin bir kısmı çözülemez kalıyordu.
 - **Patron hedefi** sabit puan farkı değil **orandır** (hedefin %75'i, en az %22).

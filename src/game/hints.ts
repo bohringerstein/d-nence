@@ -38,6 +38,23 @@ export function kayipYazisi(payDerece: number, m: Metinler): string {
   return m.darKaldi(payDerece < 1 ? sayi(m, payDerece, 1) : sayi(m, Math.round(payDerece), 0));
 }
 
+/**
+ * Kazanma satırının pay eki: " · 2,4° pay".
+ *
+ * Yıldız üç kovadan ibaret ve ölçüm şunu söylüyor: sıradan bir oyuncu bölümlerin
+ * %68'ini 1 yıldızla bitiriyor, 1000 bölümün 294'ünde 3 yıldız 60 denemede bir kez
+ * bile çıkmıyor. Yani oyuncunun gelişmesi ekranda görünmüyordu. Çözüm eşikleri
+ * sıkmak değil — o, oyunu yalnızca daha cezalı yapardı — ARA BASAMAK göstermek:
+ * kalan payın kendisi. İki deneme arasındaki küçük fark artık okunabilir.
+ *
+ * Bir ondalık, 10 derecenin üstünde tam sayı: 14,6 derecelik bir payda ondalık
+ * bilgi taşımaz, yalnızca satırı uzatır.
+ */
+export function payYazisi(payDerece: number, m: Metinler): string {
+  if (!Number.isFinite(payDerece) || payDerece < 0) return "";
+  return m.payEki(payDerece < 10 ? sayi(m, payDerece, 1) : sayi(m, Math.round(payDerece), 0));
+}
+
 /** Süre: ondalık ayırıcı dile göre değişir (Türkçe "8,0", İngilizce "8.0"). */
 export const sureYazisi = (t: number, m: Metinler): string => sayi(m, t, 1);
 

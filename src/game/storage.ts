@@ -12,13 +12,21 @@ const SURUM = 1;
 
 export interface Kayit {
   surum: number;
-  /** Son oynanan level. */
+  /** Son oynanan level. Bölüm seçiminden geriye dönünce bu küçülür. */
   level: number;
+  /**
+   * Ulaşılan EN UZAK bölüm; bölüm seçiminde buraya kadarı açıktır.
+   *
+   * `level`den ayrı tutulması şart: bölüm seçimi eklendiğinde 412. bölümdeki oyuncu
+   * 5. bölüme dönebiliyor ve tek alan olsaydı 412'yi kaybediyordu. İlerleme "en uzak"
+   * ile ölçülür, "şu an oynanan" ile değil.
+   */
+  enUzak: number;
   /** Level numarası -> en iyi sonuç. */
   bests: Record<number, Best>;
 }
 
-const bos = (): Kayit => ({ surum: SURUM, level: 1, bests: {} });
+const bos = (): Kayit => ({ surum: SURUM, level: 1, enUzak: 1, bests: {} });
 
 const gecerliYildiz = (s: unknown): s is Stars => s === 1 || s === 2 || s === 3;
 
@@ -31,6 +39,9 @@ function ayikla(ham: unknown): Kayit {
   if (typeof o.level === "number" && Number.isInteger(o.level) && o.level >= 1 && o.level <= LEVEL_COUNT) {
     k.level = o.level;
   }
+  const enUzakVar = typeof o.enUzak === "number" && Number.isInteger(o.enUzak) &&
+    o.enUzak >= 1 && o.enUzak <= LEVEL_COUNT;
+  if (enUzakVar) k.enUzak = o.enUzak as number;
   if (typeof o.bests === "object" && o.bests !== null) {
     for (const [anahtar, deger] of Object.entries(o.bests as Record<string, unknown>)) {
       const n = Number(anahtar);
@@ -41,6 +52,19 @@ function ayikla(ham: unknown): Kayit {
       if (typeof b.t !== "number" || !Number.isFinite(b.t) || b.t < 0) continue;
       k.bests[n] = { s: b.s, t: b.t };
     }
+  }
+  // Bu alan sonradan eklendi ve eski kayıtlarda YOK. O durumda türetilir: oynanmış en
+  // yüksek bölüm ile bitirilmiş en yüksek bölümün büyüğü. Böylece güncellemeyle birlikte
+  // kimse açtığı bölümleri kaybetmez.
+  //
+  // Alan VARSA rekorlardan türetilmez — bu ayrım şart: "Baştan başla" yıldızları
+  // koruyup açılan bölümleri kilitler, rekorlardan türetilseydi kilitleme anında geri
+  // alınırdı. Yalnızca `level` ile tutarlılık sağlanır; oynanan bölüm açık olmalıdır.
+  if (enUzakVar) {
+    k.enUzak = Math.max(k.enUzak, k.level);
+  } else {
+    const enYuksekBitirilen = Object.keys(k.bests).reduce((en, x) => Math.max(en, Number(x)), 0);
+    k.enUzak = Math.min(LEVEL_COUNT, Math.max(k.level, enYuksekBitirilen));
   }
   return k;
 }
@@ -65,8 +89,12 @@ function yaz(k: Kayit): void {
 
 export function levelKaydet(k: Kayit, level: number): void {
   k.level = level;
+  if (level > k.enUzak) k.enUzak = level;
   yaz(k);
 }
+
+/** Bölüm seçiminde oynanabilir mi? Ulaşılan en uzak bölüme kadar her şey açıktır. */
+export const acikMi = (k: Kayit, n: number): boolean => n >= 1 && n <= k.enUzak;
 
 /** Rekor kırıldıysa kaydeder ve true döner. */
 export function rekorKaydet(k: Kayit, level: number, yeni: Best): boolean {
@@ -76,9 +104,17 @@ export function rekorKaydet(k: Kayit, level: number, yeni: Best): boolean {
   return true;
 }
 
-/** "Baştan başla": Level 1'e döner ama rekorları silmez. */
+/**
+ * "Baştan başla": Level 1'e döner ve açılan bölümleri kilitler; rekorlar KALIR.
+ *
+ * `enUzak` da sıfırlanır, yoksa eylem geri alınabilir olurdu (oyuncu bölüm seçiminden
+ * hemen 412'ye dönerdi) ve iki aşamalı onayın bir anlamı kalmazdı. Bölümleri kaybetmeden
+ * baştan oynamanın yolu artık bölüm seçimi; bu düğme bilerek yıkıcı kalıyor.
+ */
 export function bastanBasla(k: Kayit): void {
-  levelKaydet(k, 1);
+  k.level = 1;
+  k.enUzak = 1;
+  yaz(k);
 }
 
 export const toplamYildiz = (k: Kayit): number =>

@@ -22,18 +22,38 @@ const main = fs.readFileSync(path.join(kok, "src", "main.ts"), "utf8");
 test("sayaç bir düğme ve duraklatma etiketi taşıyor", () => {
   // Ayrı bir duraklat düğmesi bilerek yok: ekranın tamamı dokunma alanı olduğu için
   // alt köşeye eklenen her düğme başparmağın durduğu yere ölü bölge açar.
-  const m = shell.match(/<button class="clock" id="clock"[^>]*>/);
+  const m = shell.match(/<button class="clock" id="clock"[^>]*>[\s\S]*?<\/button>/);
   assert.ok(m, "sayaç <button> olmalı");
-  // Erişilebilir ad aria-label DEĞİL, görsel olarak gizli bir metin olmalı.
-  // aria-label görünen rakamı EZER: ekran okuyucu sadece "Duraklat, düğme" der ve
-  // kalan süreyi hiç duymaz — oysa süre iki kayıp koşulundan biri. Ayrıca erişilebilir
-  // adın görünen metni içermemesi WCAG 2.5.3 (Label in Name) ihlalidir.
-  assert.ok(!/aria-label/.test(m[0]), "sayaçta aria-label olmamalı: görünen rakamı ezer");
-  assert.ok(shell.includes("{m.duraklatDugmesi}, ") && shell.includes("{m.kalanSure}"),
-    "gizli etiket duraklatma adını ve kalan süreyi birlikte söylemeli");
+  // Erişilebilir ad aria-label DEĞİL, görsel olarak gizli bir metin olmalı:
+  // aria-label görünen metni ezer ve WCAG 2.5.3 (Label in Name) ihlali doğurur.
+  assert.ok(!/aria-label/.test(m[0]), "sayaçta aria-label olmamalı");
+  assert.ok(/<span class="gizli">\$\{m\.duraklatDugmesi\}<\/span>/.test(m[0]),
+    "düğmenin erişilebilir adı yalnızca duraklatma olmalı");
   assert.ok(/\.gizli\s*\{/.test(css), "görsel gizleme sınıfı tanımlı olmalı");
   assert.equal(TR.duraklatDugmesi, "Duraklat");
-  assert.ok(shell.includes('id="clockSayi"'), "rakamlar ayrı bir öğede olmalı (simge kardeş öğe)");
+});
+
+test("kalan süre düğmenin DIŞINDA ve düğmenin adı sabit", () => {
+  // Regresyon: rakamlar düğmenin içindeydi ve erişilebilir adın parçası oluyordu,
+  // yani ad saniyede 60 kez değişiyordu ("Duraklat, kalan süre 17,4" -> "...12,3").
+  // aria-hidden tek başına yetmez: NVDA tarama kipi ve VoiceOver rotoru bir <button>'ı
+  // TEK öğe olarak sunar, içindeki metne ok tuşuyla girilemez — yani rakam düğmenin
+  // içinde kaldıkça ya adı bozuyor ya da hiç okunamıyordu. Çözüm onu dışarı almak.
+  const dugme = shell.match(/<button class="clock" id="clock"[^>]*>[\s\S]*?<\/button>/);
+  assert.ok(dugme, "sayaç düğmesi bulunamadı");
+  assert.ok(/id="clockSayi"[^>]*aria-hidden="true"/.test(dugme[0]),
+    "görünen rakamlar düğmenin adına karışmamalı: aria-hidden olmalı");
+  assert.ok(!/role="timer"/.test(dugme[0]), "sesli sayaç düğmenin İÇİNDE olmamalı");
+
+  const dis = shell.replace(dugme[0], "");
+  assert.ok(/<span class="gizli" id="clockSes" role="timer">/.test(dis),
+    "kalan süre düğmenin dışında, kendi role=\"timer\" öğesinde olmalı");
+  // aria-live BİLEREK yok: role="timer" varsayılan olarak "off" demektir. Canlı
+  // olsaydı ekran okuyucu her saniye kalan süreyi bağırırdı.
+  assert.ok(!/id="clockSes"[^>]*aria-live/.test(shell),
+    "sesli sayaç kendiliğinden okunmamalı");
+  // Süre saniyede bir yazılmalı, her karede değil.
+  assert.ok(/sonSesliSaniye/.test(main), "sesli sayaç tam saniyede bir güncellenmeli");
 });
 
 test("sayaç düğme gibi görünmüyor ama dokunma hedefi 44px", () => {
@@ -110,4 +130,26 @@ test("duraklatmak mesaj süresini yakmıyor", () => {
   // Oyuncu duraklatıp mesajı okuyabilmeli; kilit yalnızca oyun canlıyken işlemeli.
   assert.ok(/if \(!oyunDonuk\(\)\) ipucuKilidiIlerlet\(dt\)/.test(main),
     "ipucu kilidi oyun donukken de ilerliyor");
+});
+
+test("sayfa açılışı da geri sayımla başlıyor", () => {
+  // Canlı oyuna açılan son korumasız yol buydu. Dil değiştirmek sayfayı yeniden
+  // yüklüyor (bkz. main.ts dilKutu): oyuncu ayarlardan dili seçiyor, sayfa yenileniyor
+  // ve halkalar çoktan dönüyordu. Soğuk açılış da aynı durum.
+  assert.ok(/if \(!ayarlar\.uyariGoruldu\) nasilAc\(true\);\s*\n\s*else geriSayimBaslat\(\);/.test(main),
+    "açılışta 'nasıl oynanır' gösterilmiyorsa geri sayım başlamalı");
+});
+
+test("odak kaybı da oyunu durduruyor", () => {
+  // Sekme GÖRÜNÜR ama pencere odakta değilken tarayıcı kareyi saniyede bire kısıyor;
+  // document.hidden hâlâ false olduğu için oyun çalışmaya devam ediyordu. Her kare
+  // biriktiriciden 0,25 saniye aldığı için 60 saniyelik bir dalgınlık 15 saniyelik
+  // fizik demekti: bildirim paneli, bölünmüş ekran ya da üste gelen bir pencere
+  // bölümü yakıyordu.
+  const loop = fs.readFileSync(path.join(kok, "src", "game", "loop.ts"), "utf8");
+  assert.ok(/pencereDisinda/.test(loop), "döngü pencere odağını da izlemeli");
+  assert.ok(/document\.hidden \|\| pencereDisinda/.test(loop),
+    "gizli VEYA odaksız: ikisi de oyunu durdurmalı");
+  assert.ok(/window\.addEventListener\("focus"/.test(main),
+    "odak geri gelince geri sayım başlamalı");
 });

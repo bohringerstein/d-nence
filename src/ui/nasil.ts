@@ -36,7 +36,7 @@ export function nasilHtml(m: Metinler): string {
   }).join("\n  ");
 
   return `
-<h2 id="nasilBaslik">${m.nasil.baslik}</h2>
+<h2 id="nasilBaslik" tabindex="-1">${m.nasil.baslik}</h2>
 
 <p class="giris">${m.nasil.giris}</p>
 

@@ -1,9 +1,10 @@
 // İpucu önceliği (şartname 7. bölüm).
 import test from "node:test";
 import assert from "node:assert";
-import { ipucu, ogreticiTablosu, yildizYazisi, sureYazisi , kayipYazisi } from "./hints.ts";
+import { ipucu, ogreticiTablosu, yildizYazisi, sureYazisi, kayipYazisi, payYazisi } from "./hints.ts";
 import type { Level, Best } from "../core/index.ts";
 import { TR } from "../dil/tr.ts";
+import { EN } from "../dil/en.ts";
 
 const level = (o: Partial<Level> = {}): Level =>
   ({ n: 2, boss: null, limit: 9, rings: [], ...o });
@@ -112,4 +113,24 @@ test("patron bölümü bitirilmişse ipucu yerini rekora bırakır", () => {
   });
   assert.ok(!m.includes(TR.patron.ayna.ipucu), `rekor varken ipucu gösterilmemeli: "${m}"`);
   assert.ok(m.includes("en iyin"), m);
+});
+
+// --- Kazanma satırındaki pay -------------------------------------------------
+//
+// Yıldız üç kovadır ve ölçüm şunu gösterdi: sıradan bir oyuncu bölümlerin %68'ini
+// 1 yıldızla bitiriyor, 1000 bölümün 294'ünde 3 yıldız 60 denemede bir kez bile
+// çıkmıyor. Oyuncunun gelişmesi ekranda hiç görünmüyordu. Eşikleri sıkmak bunu
+// çözmez (oyun yalnızca daha cezalı olur); kalan payın SAYISINI göstermek çözer.
+test("pay eki payı okunur bir sayıya çeviriyor", () => {
+  assert.equal(payYazisi(2.43, TR), " · 2,4° pay");
+  assert.equal(payYazisi(2.43, EN), " · 2.4° margin");
+  // 10 derecenin üstünde ondalık bilgi taşımaz, yalnızca satırı uzatır.
+  assert.equal(payYazisi(14.62, TR), " · 15° pay");
+});
+
+test("geçersiz pay satırı kirletmez", () => {
+  // Kazanma satırı her hâlükârda okunabilir kalmalı; eksik bir sayı hiç yazılmasın.
+  assert.equal(payYazisi(NaN, TR), "");
+  assert.equal(payYazisi(-0.5, TR), "");
+  assert.equal(payYazisi(0, TR), " · 0,0° pay");
 });

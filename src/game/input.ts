@@ -56,6 +56,10 @@ export function girdiBagla(kok: HTMLElement): Girdi {
   const dokun = (e: PointerEvent): void => {
     // Çoklu dokunuş tek harekette iki halka kilitlemesin: yalnızca birincil işaretçi.
     if (!e.isPrimary) return;
+    // Yalnızca ASIL düğme. Masaüstünde sağ tık hem bağlam menüsünü açıyor hem de
+    // geri alınamaz bir kilit atıyordu; orta tık da öyle. Dokunmatikte ve kalemde
+    // button zaten 0'dır, yani bu denetim telefondaki oynanışa dokunmaz.
+    if (e.button !== 0) return;
     // Düğmeye basmak kilit değildir; örtü açıkken de ekran oyunun değildir.
     // preventDefault da yalnızca gerçek oyun dokunuşuna uygulanır, yoksa örtünün
     // içindeki kaydırma ve düğme tıklaması bozulur.

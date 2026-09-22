@@ -21,7 +21,7 @@ class SahteDepo {
 const depo = new SahteDepo();
 Object.defineProperty(globalThis, "localStorage", { value: depo, configurable: true });
 
-const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel } =
+const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, acikMi } =
   await import("./storage.ts");
 const { LEVEL_COUNT } = await import("../core/index.ts");
 
@@ -146,4 +146,60 @@ test("eski kayıt da doğrulamadan geçiyor", () => {
   const k = oku();
   assert.equal(k.level, 1, "aralık dışı level eski kayıtta da yok sayılmalı");
   assert.deepEqual(k.bests, {}, "geçersiz rekor eski kayıtta da elenmeli");
+});
+
+// --- Ulaşılan en uzak bölüm (bölüm seçimi) -----------------------------------
+//
+// `level` tek başına yetmiyor: bölüm seçimi eklendiğinde 412. bölümdeki oyuncu
+// 5. bölüme dönebiliyor ve tek alan olsaydı 412'yi kaybediyordu. İlerleme
+// "en uzak" ile ölçülür, "şu an oynanan" ile değil.
+test("geriye dönmek açılan bölümleri kapatmıyor", () => {
+  depo.temizle();
+  const k = oku();
+  levelKaydet(k, 412);
+  assert.equal(k.enUzak, 412);
+  levelKaydet(k, 5);
+  assert.equal(k.level, 5, "şu an oynanan bölüm geriye gitmeli");
+  assert.equal(k.enUzak, 412, "ulaşılan en uzak bölüm geriye GİTMEMELİ");
+  assert.ok(acikMi(k, 412) && acikMi(k, 1), "412'ye kadar her şey açık kalmalı");
+  assert.ok(!acikMi(k, 413), "ulaşılmamış bölüm kilitli olmalı");
+  // Diske de yazılmış olmalı: yeniden okuyunca kaybolmamalı.
+  assert.equal(oku().enUzak, 412);
+});
+
+test("alanı olmayan ESKİ kayıtlar açtıkları bölümleri kaybetmiyor", () => {
+  // Bu alan sonradan eklendi. Güncellemeyle birlikte herkesin ilerlemesi sıfırlansaydı
+  // en kötü türden bir veri kaybı olurdu: sessiz ve kullanıcının fark edemediği.
+  depo.temizle();
+  depo.setItem("donence:v1", JSON.stringify({
+    surum: 1, level: 318, bests: { 1: { s: 3, t: 4 }, 412: { s: 2, t: 8 } }
+  }));
+  const k = oku();
+  assert.equal(k.enUzak, 412, "bitirilmiş en yüksek bölüm de hesaba katılmalı");
+  assert.ok(acikMi(k, 318));
+});
+
+test("baştan başla açılan bölümleri de kilitliyor", () => {
+  // Bilerek yıkıcı: geri alınabilir olsaydı (bölüm seçiminden hemen 412'ye dönmek)
+  // iki aşamalı onayın bir anlamı kalmazdı. Bölümleri kaybetmeden baştan oynamanın
+  // yolu bölüm seçimi.
+  depo.temizle();
+  const k = oku();
+  levelKaydet(k, 412);
+  rekorKaydet(k, 7, { s: 3, t: 5 });
+  bastanBasla(k);
+  assert.equal(k.level, 1);
+  assert.equal(k.enUzak, 1);
+  assert.ok(!acikMi(k, 2), "açılan bölümler kilitlenmeli");
+  assert.equal(toplamYildiz(k), 3, "yıldızlar kalmalı");
+  assert.equal(oku().enUzak, 1, "diske yazılmalı");
+});
+
+test("bozuk enUzak değeri türetilerek düzeltiliyor", () => {
+  depo.temizle();
+  depo.setItem("donence:v1", JSON.stringify({ surum: 1, level: 50, enUzak: 99999, bests: {} }));
+  assert.equal(oku().enUzak, 50, "tablo dışı değer kabul edilmemeli");
+  depo.temizle();
+  depo.setItem("donence:v1", JSON.stringify({ surum: 1, level: 50, enUzak: 3, bests: {} }));
+  assert.equal(oku().enUzak, 50, "en uzak, oynanan bölümün gerisinde kalamaz");
 });

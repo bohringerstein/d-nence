@@ -7,7 +7,7 @@
 import test from "node:test";
 import assert from "node:assert";
 
-interface SahteOlay { isPrimary?: boolean; repeat?: boolean; code?: string; timeStamp: number; target?: unknown; preventDefault: () => void }
+interface SahteOlay { isPrimary?: boolean; button?: number; repeat?: boolean; code?: string; timeStamp: number; target?: unknown; preventDefault: () => void }
 type Dinleyici = (e: SahteOlay) => void;
 
 const dinleyiciler = new Map<string, Dinleyici[]>();
@@ -25,8 +25,8 @@ Object.defineProperty(globalThis, "performance", { value: { now: () => 0 }, conf
 const { girdiBagla } = await import("./input.ts");
 const girdi = girdiBagla(sahteEleman as unknown as HTMLCanvasElement);
 
-const dokun = (t: number): void => {
-  for (const f of dinleyiciler.get("pointerdown") ?? []) f({ isPrimary: true, timeStamp: t, target: null, preventDefault: () => {} });
+const dokun = (t: number, button = 0): void => {
+  for (const f of dinleyiciler.get("pointerdown") ?? []) f({ isPrimary: true, button, timeStamp: t, target: null, preventDefault: () => {} });
 };
 const tusla = (t: number, code = "Space"): void => {
   for (const f of dinleyiciler.get("keydown") ?? []) f({ code, repeat: false, timeStamp: t, target: null, preventDefault: () => {} });
@@ -98,8 +98,8 @@ test("GİRDİ KARE HIZINDAN BAĞIMSIZ", () => {
 test("çoklu dokunuşta yalnızca birincil işaretçi sayılır", () => {
   girdi.temizle();
   for (const f of dinleyiciler.get("pointerdown") ?? []) {
-    f({ isPrimary: true, timeStamp: 10, target: null, preventDefault: () => {} });
-    f({ isPrimary: false, timeStamp: 11, target: null, preventDefault: () => {} });
+    f({ isPrimary: true, button: 0, timeStamp: 10, target: null, preventDefault: () => {} });
+    f({ isPrimary: false, button: 0, timeStamp: 11, target: null, preventDefault: () => {} });
   }
   assert.equal(girdi.al(100), 1, "ikinci parmak ikinci kilit üretmemeli");
 });
@@ -129,7 +129,7 @@ test("temizle bekleyenleri atar", () => {
 
 test("damgası olmayan olay şimdiki zamana düşer", () => {
   girdi.temizle();
-  for (const f of dinleyiciler.get("pointerdown") ?? []) f({ isPrimary: true, timeStamp: 0, target: null, preventDefault: () => {} });
+  for (const f of dinleyiciler.get("pointerdown") ?? []) f({ isPrimary: true, button: 0, timeStamp: 0, target: null, preventDefault: () => {} });
   assert.equal(girdi.al(0), 1, "damga yoksa dokunuş kaybolmamalı");
 });
 
@@ -147,7 +147,7 @@ const hedef = (eslesen: string | null) =>
 
 const dokunHedefli = (t: number, hedefi: unknown): void => {
   for (const f of dinleyiciler.get("pointerdown") ?? []) {
-    f({ isPrimary: true, timeStamp: t, target: hedefi, preventDefault: () => {} });
+    f({ isPrimary: true, button: 0, timeStamp: t, target: hedefi, preventDefault: () => {} });
   }
 };
 
@@ -174,9 +174,21 @@ test("oyun dokunuşunda preventDefault çağrılır, düğmede çağrılmaz", ()
   girdi.temizle();
   let oyunda = false, dugmede = false;
   for (const f of dinleyiciler.get("pointerdown") ?? []) {
-    f({ isPrimary: true, timeStamp: 10, target: hedef(null), preventDefault: () => { oyunda = true; } });
+    f({ isPrimary: true, button: 0, timeStamp: 10, target: hedef(null), preventDefault: () => { oyunda = true; } });
     f({ isPrimary: true, timeStamp: 20, target: hedef("button"), preventDefault: () => { dugmede = true; } });
   }
   assert.ok(oyunda, "oyun dokunuşunda çift dokunuş yakınlaştırması engellenmeli");
   assert.ok(!dugmede, "düğmede preventDefault tıklamayı ve kaydırmayı bozar");
+});
+
+test("yalnızca asıl düğme halka kilitler", () => {
+  // Masaüstünde sağ tık hem bağlam menüsünü açıyor hem de geri alınamaz bir kilit
+  // atıyordu: tek kontrollü bir oyunda doğrudan haksız kayıp. Dokunmatikte ve kalemde
+  // button zaten 0'dır, yani bu denetim telefondaki oynanışa dokunmaz.
+  girdi.temizle();
+  dokun(100, 2);   // sağ tık
+  dokun(200, 1);   // orta tık
+  assert.equal(girdi.al(1000), 0, "sağ ve orta tık kilit üretmemeli");
+  dokun(300, 0);
+  assert.equal(girdi.al(1000), 1, "asıl düğme çalışmaya devam etmeli");
 });

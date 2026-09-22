@@ -323,15 +323,19 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
    *Neden:* tipik bir oyuncunun 60 ms'lik zamanlama sapması yaklaşık 1,5 rad/sn hızda 5°'ye denk gelir. Eski tabloda halka başına 3,7-4,4° kalan bölümler vardı; oralarda ilk dokunuş oyuncu ne olduğunu göremeden kaybettiriyordu.
    *Neden doğrusal değil:* korunmak istenen şey "hiç tepki veremeden ölmek"tir ve bu birinci dokunuşta olur; ilk halkaya tam pay, sonrakilere yarısı yeter. Doğrusal kural (kalan × 6°) 5 halkalı bir bölümde 30° pay şart koşuyor, boşluğu zorunlu olarak geniş bırakıyordu ve baştan kilitli halkası olan patronlar bu yüzden hedeflerinin 30-44 puan üstünde kalıyordu.
 
-8. **Zorluk ritmi: nefes levelleri.** Patron olmayan her 4. level hedef eğrinin **12 puan üstünde** tutulur ve monotonluk kısıtından muaftır (kendisi de sonraki levellerin tavanını yükseltmez).
-   *Neden:* sıradan oyuncuyu kaçıran şey tek bir zor level değil, zor levellerin arka arkaya gelmesidir. Test oyuncuları 44-57 arasında 12 levelin 9'unu "duvar" olarak işaretledi ve art arda 20-29 kayıp serileri yaşadı.
+8. **Zorluk ritmi: nefes levelleri.** Patron olmayan nefes levelleri hedef eğrinin **12 puan üstünde** tutulur ve monotonluk kısıtından muaftır (kendisi de sonraki levellerin tavanını yükseltmez). Nefes aralığı **3 ile 4 arasında dönüşümlüdür** (`n mod 7 ∈ {3, 0}`) ve nefes levelinde **dalga uygulanmaz**; nefes onun yerine geçer.
+   *Neden nefes:* sıradan oyuncuyu kaçıran şey tek bir zor level değil, zor levellerin arka arkaya gelmesidir. Test oyuncuları 44-57 arasında 12 levelin 9'unu "duvar" olarak işaretledi ve art arda 20-29 kayıp serileri yaşadı.
+   *Neden dönüşümlü aralık:* sabit 4'te dalga (24), nefes (4), patron (10) ve arketip (8) periyotlarının EKOK'u tam **120**'ydi — 1000 bölümlük oyun pratikte aynı 120 bölümün sekiz tekrarıydı (ölçülen 120 gecikmeli özilinti 0,41). Aralık 7 olunca EKOK 840'a çıkar.
+   *Neden dalgayı ezer:* hizalanma aynı zamanda nefesleri hep uygun dalga evresinde tutuyordu. Yalnızca aralığı değiştirmek nefeslerin bir kısmını dalga çukuruna düşürüyor ve %40 altındaki en uzun kesintisiz seriyi 9'dan 10'a çıkarıyordu — yani ritim kazanılırken güvence kaybediliyordu. Dalganın işi 24 bölümlük salınım, nefesin işi rahatlama; çakıştıklarında rahatlama kazanır.
+   *Ölçülen (1000 bölüm, kazanma oranları üzerinden):* 120 gecikmeli özilinti 0,41 → **0,18**; %40 altındaki en uzun seri 9 → **6**; ortalama kazanma oranı %41,3 → %41,8. `npm run verify` her iki ölçüyü de denetler ve eşikleri aşarsa başarısız olur.
 
 9. **Ayarlama ve zorluk eğrisi.** Her bölüm için tolerans süresi ikili aramayla ayarlanır, böylece kazanma oranı hedef eğriye oturur. Eğri üç parçadan oluşur:
 
    ```
    taban(n) = 0,94 − 0,59 × min(1, (n−1)/149)^0,45      // %94'ten %35'e, 150. bölümde tabanda
    dalga(n) = 0,08 × sin(2π n / 24)                      // ±8 puan, 24 bölümlük salınım
-   hedef(n) = taban(n) + dalga(n) + (nefes ? 0,12 : 0)   // %25 ile %95 arasına sıkıştırılır
+   nefes(n) = (n mod 7 ∈ {3, 0} ve patron değilse)        // 3-4 dönüşümlü aralık
+   hedef(n) = taban(n) + (nefes ? 0,12 : dalga(n))        // %25 ile %95 arasına sıkıştırılır
    ```
 
    **Üs 0,45**: iniş başta diktir. Oyuncu 11. bölümde %80'in, 39'da %60'ın altına düşer. Eski 60 bölümlük eğri %80'e ancak 21. bölümde iniyordu ve "zorluk çok yavaş artıyor" şikâyetinin sebebi buydu.

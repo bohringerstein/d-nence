@@ -400,17 +400,59 @@ const TABAN_KLAMP = 0.25;
 const egriTaban = (n: number): number =>
   0.94 - (0.94 - EN_ZOR) * Math.pow(Math.min(1, (n - 1) / (TABAN_BOLUM - 1)), 0.45);
 const egriDalga = (n: number): number => DALGA_GENLIK * Math.sin(2 * Math.PI * n / DALGA_PERIYOT);
-const egri = (n: number): number => egriTaban(n) + egriDalga(n);
-
 /**
- * Nefes levelleri: her 4. level (patronlar hariç) hedef eğrinin belirgin üstünde tutulur.
+ * Nefes levelleri: hedef eğrinin belirgin üstünde tutulan, patron olmayan bölümler.
  * Test oyuncuları 44-57 arasında 12 levelin 9'unu "duvar" olarak işaretledi ve art arda
  * 20-29 kayıp serileri yaşadı; sıradan oyuncuyu kaçıran şey tek bir zor level değil,
  * zor levellerin arka arkaya gelmesi.
+ *
+ * Aralık 4 DEĞİL, 3 ile 4 arasında dönüşümlü (3, 7, 10, 14, 17, 21, ...).
+ *
+ * Sebebi ritmin kendisi. Sabit 4'le oyunun bütün yapısal periyotları — dalga 24,
+ * nefes 4, patron 10, arketip 8 — 120 bölümde bir aynı hizaya geliyordu: EKOK tam
+ * 120. Ölçülen 120 gecikmeli özilinti 0,84, yani 1000 bölümlük oyun pratikte aynı
+ * 120 bölümün sekiz tekrarıydı. Aralık 7'ye çıkınca EKOK 840 oluyor ve özilinti
+ * 0,49'a iniyor. 3 ve 4'ün dönüşümlü olması şart: yalnızca 3 ya da yalnızca 4
+ * periyodu geri getirirdi, {3,4,5} ise en kötü "zor seri"yi 7 bölümden 9'a çıkarıyor
+ * — yani ritmi kazanmak için güvenceyi kaybettiriyordu. {3,4} ikisini birden tutuyor.
  */
-const NEFES_ARALIGI = 4;
+/**
+ * Ritim denetiminin eşikleri (bkz. doğrulamadaki "ritim:" satırı).
+ *
+ * RITIM_GECIKME neden 120: eski düzende dalga (24), nefes (4), patron (10) ve
+ * arketip (8) periyotlarının EKOK'u tam 120 idi.
+ */
+const RITIM_GECIKME = 120;
+const RITIM_TAVAN = 0.30;   // ölçülen: eski 0,41 -> yeni 0,18
+const ZOR_ESIGI = 0.40;
+const ZOR_SERI_TAVAN = 7;   // ölçülen: eski 9 -> yeni 6
+
 const NEFES_BONUS = 0.12;
-const nefesMi = (n: number): boolean => !bossMu(n) && n % NEFES_ARALIGI === 0;
+/** Dönüşümlü 3-4 aralığı: 7 bölümde iki nefes (n mod 7 ∈ {3, 0}). */
+const NEFES_PERIYOT = 7;
+const nefesMi = (n: number): boolean =>
+  !bossMu(n) && (n % NEFES_PERIYOT === 3 || n % NEFES_PERIYOT === 0);
+/**
+ * Nefes bölümlerinde dalga UYGULANMAZ; nefes onun yerine geçer.
+ *
+ * Bu, ritim düzeltmesinin ikinci yarısı ve olmazsa olmazı. Ölçüm şunu gösterdi:
+ * eski düzende dalga periyodu (24) nefes aralığının (4) tam katı olduğu için nefesler
+ * HER ZAMAN dalganın aynı evrelerine düşüyordu — 120 bölümlük tekrarın sebebi de,
+ * nefeslerin hep uygun evrede kalmasının sebebi de aynı hizalanmaydı. Aralığı 7'ye
+ * çıkarıp burayı dokunmadan bırakmak tekrarı kırıyor ama nefeslerin bir kısmını
+ * dalganın çukuruna düşürüyordu: %40 altında kalan en uzun seri 7'den 10'a çıkıyordu.
+ * Yani ritmi kazanıp güvenceyi kaybediyorduk.
+ *
+ * Dalgayı nefeste ezmek ikisini birden veriyor. Ölçülen: 120 gecikmeli özilinti
+ * 0,47 -> 0,20; en uzun zor seri %35'te 7 -> 6, %40'ta 7 -> 6, %45'te 15 -> 6.
+ * Ortalama zorluk neredeyse değişmiyor (0,402 -> 0,408).
+ *
+ * Kuralın kendisi de okunur: dalganın işi 24 bölümlük ritim, nefesin işi rahatlama.
+ * Çakıştıklarında rahatlama kazanır.
+ */
+const egri = (n: number): number =>
+  nefesMi(n) ? egriTaban(n) : egriTaban(n) + egriDalga(n);
+
 /**
  * Patron bölümlerinin hedefi.
  *
@@ -687,6 +729,40 @@ function verify(): number {
   console.log(`yıldız dağılımı (ustalık referansı): 3★ %${Math.round(pay[0] * 100)}  2★ %${Math.round(pay[1] * 100)}  1★ %${Math.round(pay[2] * 100)}`);
   console.log(`saate yenilmenin baskın olduğu bölüm: ${sureliler.length} / ${LEVEL_COUNT}`);
   console.log(`γ (halka başına izlenebilen tur): ortalama ${gOrt.toFixed(2)}, en yüksek ${Math.max(...gamalar).toFixed(2)}, tavan ${GAMA_TAVAN}`);
+
+  // ---- Ritim: oyun kendini tekrar ediyor mu? --------------------------------
+  //
+  // Eski düzende bütün yapısal periyotlar — dalga 24, nefes 4, patron 10, arketip 8 —
+  // EKOK'u tam 120 olacak şekilde hizalanıyordu: 1000 bölümlük oyun pratikte aynı
+  // 120 bölümün sekiz tekrarıydı. Ölçülen kazanma oranlarında 120 gecikmeli özilinti
+  // 0,41'di. Nefes aralığı 3-4 dönüşümlü yapılıp nefes dalgayı ezince 0,18'e indi.
+  //
+  // İkinci ölçü aynı düzeltmenin BEDELİNİ denetler: periyodikliği kırmanın kolay yolu
+  // nefesleri dalganın çukuruna düşürmektir ve o zaman "zor seri" uzar. İkisi birlikte
+  // denetlenmezse biri kazanılırken öbürü sessizce kaybedilir.
+  const ritimOrt = oranlar.reduce((a, b) => a + b, 0) / oranlar.length;
+  let ritimPay = 0, ritimPayda = 0;
+  for (let i = 0; i < oranlar.length; i++) {
+    ritimPayda += (oranlar[i] - ritimOrt) ** 2;
+    if (i + RITIM_GECIKME < oranlar.length) {
+      ritimPay += (oranlar[i] - ritimOrt) * (oranlar[i + RITIM_GECIKME] - ritimOrt);
+    }
+  }
+  const ozilinti = ritimPay / ritimPayda;
+  let enUzunZor = 0, ardisik = 0;
+  for (const o of oranlar) {
+    if (o < ZOR_ESIGI) { ardisik++; if (ardisik > enUzunZor) enUzunZor = ardisik; }
+    else ardisik = 0;
+  }
+  console.log(`ritim: ${RITIM_GECIKME} gecikmeli özilinti ${ozilinti.toFixed(2)} (tavan ${RITIM_TAVAN}), ` +
+    `en uzun zor seri ${enUzunZor} bölüm (tavan ${ZOR_SERI_TAVAN})`);
+  if (ozilinti > RITIM_TAVAN) {
+    sorunlar.push(`oyun ${RITIM_GECIKME} bölümde bir kendini tekrar ediyor: özilinti ${ozilinti.toFixed(2)}`);
+  }
+  if (enUzunZor > ZOR_SERI_TAVAN) {
+    sorunlar.push(`%${ZOR_ESIGI * 100} altında ${enUzunZor} bölümlük kesintisiz seri var: sıradan oyuncuyu ` +
+      `kaçıran şey tek bir zor bölüm değil, arka arkaya gelenler`);
+  }
 
   // Baştan kilitli halkalar kalan halkalara yeterli pay bırakıyor mu? (bkz. EN_AZ_PAY)
   for (const l of data.levels) {

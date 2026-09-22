@@ -242,18 +242,42 @@ button {
 }
 button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-/* Örtü: bitiş ekranı ve ayarlar paneli aynı kabuğu kullanır. */
+/* Örtü: bitiş ekranı ve ayarlar paneli aynı kabuğu kullanır.
+
+   Zemin OPAK. Eskiden %88'di ve arkada dönen halkalar metnin altından geçiyordu:
+   ayarlar panelinde ölçülen kontrast 3,87:1, yani WCAG'ın 4,5:1 eşiğinin altında.
+   "Nasıl oynanır" ekranı tek tek opak yapılmış, ayarlar paneli unutulmuştu — düzeltme
+   tek örtüye değil, ortak sınıfa ait. Duraklatma örtüsü BİLEREK saydam kalır (aşağıda):
+   orada arkadaki donmuş halkaları görmek, "kaldığım yer duruyor" bilgisinin kendisi. */
 .ortu {
   position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  background: var(--bg);
   padding: 24px;
   z-index: 10;
 }
 .ortu[hidden] { display: none; }
-.kutu { text-align: center; max-width: 22rem; width: 100%; }
+
+/* Kutu KAYABİLİR olmalı.
+
+   320x568 bir telefonda ayarlar kutusu 604 piksel yer istiyordu; ekran 568. Taşma
+   ayarı yoktu, zemine dokunmak kapatmıyordu, telefonda Escape yok — yani "Tamam"
+   düğmesi ekranın 60 piksel altında kalıyor ve panelden çıkış kalmıyordu. Ekranda
+   görünen son düğme ise "Baştan başla"ydı: oyundaki geri dönüşü olmayan tek eylem.
+   (WCAG 2.2 SC 1.4.10 Reflow ihlali; Apple 2.1 / Play "Broken Functionality".)
+
+   Taşma ayarı ".nasilKutu"ya verilmiş, düz ".kutu"ya verilmemişti — aynı kök sebep
+   üçüncü kez: ortak sınıf yerine tek bir örtü düzeltiliyor. Artık tabanda. */
+.kutu {
+  text-align: center;
+  max-width: 22rem;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .kutu h2 { font-size: 1.6rem; font-weight: 600; margin: 0 0 0.5rem; color: var(--ink); }
 .kutu p { margin: 0 0 1.25rem; color: var(--ink); line-height: 1.5; }
 .kutu button { color: var(--ink); padding: 8px 20px; margin-top: 0.5rem; }
@@ -283,17 +307,18 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 /* Ayar düğmesi ikincil: aynı yükseklikte ama daha küçük punto. */
 .ikon { padding: 4px 12px; font-size: 0.9rem; }
 
-/* "Nasıl oynanır" ekranı (src/ui/nasil.ts). Uzun olabilir: kutu kendi içinde kayar.
-   Örtü burada tam opak: hem arkada dönen halkalar küçük punto metnin okunurluğunu
-   düşürüyordu, hem de alttaki yapışkan şeridin zeminle aynı renk olması gerekiyor. */
-#nasil { background: var(--bg); }
+/* Duraklatma örtüsü tek istisna: donmuş halkalar arkadan görünmeli. */
+#duraklat { background: color-mix(in srgb, var(--bg) 88%, transparent); }
 
+/* "Nasıl oynanır" ekranı (src/ui/nasil.ts). Uzun olabilir; kayma ayarı artık .kutu'da.
+
+   Kutu esnek bir sütun: ilk açılış hali (.kisa) satır sırasını "order" ile değiştirir,
+   böylece DOM sırası — ve dolayısıyla TAM sürümün düzeni — olduğu gibi kalır. */
 .nasilKutu {
   max-width: 26rem;
   text-align: left;
-  max-height: min(80vh, 40rem);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
 }
 .nasilKutu h2 { text-align: center; }
 .nasilKutu .giris { font-size: 0.95rem; line-height: 1.55; margin: 0 0 1rem; }
@@ -311,6 +336,17 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   margin-top: 0.5rem;
 }
 .nasilAlt button { display: flex; margin: 0 auto; width: 100%; max-width: 14rem; }
+
+/* Ayarlar panelinin çıkış şeridi; .nasilAlt ile aynı iş, aynı görünüm. */
+.kutuAlt {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--track);
+  padding: 0.6rem 0 0.15rem;
+  margin-top: 0.75rem;
+}
+.kutuAlt button { display: flex; margin: 0 auto; width: 100%; max-width: 14rem; }
 
 .gosterge { list-style: none; margin: 0 0 1rem; padding: 0; }
 .gosterge li {
@@ -436,3 +472,97 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   display: none;
 }
 .nasilKutu.kisa .yildizNot { display: none; }
+
+/* Kısaltmanın YAN ETKİSİ: uyarı en altta olduğu için, satırlar gizlenince bile
+   320x568 bir telefonda görünen alanın altında kalıyordu (metin 529 pikselde
+   başlıyor, görünen alan 512'de bitiyor) — üstelik "Anladım" düğmesi görünüyordu.
+   Yani ışığa duyarlılık uyarısı hiç okunmadan kapatılabiliyordu.
+
+   Düzeltme DOM sırasını değil GÖRÜNTÜ sırasını değiştirir: tam sürümde uyarı yerinde
+   kalır (yukarı alınsaydı aranan simge listesi 130 piksel aşağı inerdi), kısa sürümde
+   girişin hemen altına gelir. Kutu bu yüzden esnek bir sütun (bkz. .nasilKutu). */
+.nasilKutu.kisa > h2 { order: 1; }
+.nasilKutu.kisa > .giris:not(.yildizNot) { order: 2; }
+.nasilKutu.kisa > .uyari { order: 3; margin-top: 0; margin-bottom: 1rem; }
+.nasilKutu.kisa > .gosterge { order: 4; }
+.nasilKutu.kisa > .nasilAlt { order: 5; }
+
+/* Açılış hatası ekranı (src/main.ts hataEkrani). Oyun hiç kurulmadan çizilir, o yüzden
+   kabuğun sınıflarına güvenemez: kendi ölçülerini taşır. */
+.hataEkrani {
+  max-width: 26rem;
+  margin: 0 auto;
+  padding: 24px;
+  text-align: left;
+  color: var(--ink);
+}
+.hataEkrani h1 { font-size: 1.5rem; margin: 0 0 1.5rem; }
+.hataEkrani h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+.hataEkrani p { color: var(--muted); line-height: 1.5; margin: 0 0 1.25rem; }
+.hataEkrani button { color: var(--ink); padding: 8px 20px; }
+.hataEkrani ul { color: var(--muted); font-size: 0.85rem; margin-top: 1.25rem; }
+
+/* Ayarlar panelindeki eylem düğmeleri alt alta ve tam genişlikte.
+   Yan yana dizildiklerinde altlarındaki açıklama hangi düğmeye ait olduğunu
+   söylemiyordu: "Level 1'e döner ve açtığın bölümler kilitlenir" cümlesi
+   "Nasıl oynanır"ın da altında duruyordu. */
+#ayarPanel .kutu > button {
+  display: flex;
+  width: 100%;
+  max-width: 14rem;
+  margin: 0.5rem auto 0;
+}
+
+/* Ayarlardaki gizlilik bağlantısı: sessiz bir metin bağlantısı, düğme değil. Seyrek
+   açılır ama her iki mağaza da uygulamanın içinde bulunmasını şart koşuyor. */
+.gizlilikSatir { margin: 1rem 0 0; font-size: 0.85rem; }
+.gizlilikSatir a { color: var(--muted); }
+.gizlilikSatir a:hover, .gizlilikSatir a:focus-visible { color: var(--ink); }
+
+/* Bölüm seçimi (src/ui/secim.ts). Yüz düğme birden çizilir; kutu kendi içinde kayar
+   (taşma ayarı .kutu tabanında). Sütun sayısı genişliğe göre kendiliğinden ayarlanır:
+   320 piksellik bir telefonda 4, geniş ekranda 6 sütun. */
+.secimKutu { max-width: 26rem; }
+.secimSayfa {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0.25rem 0 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.secimSayfa button { min-width: 44px; min-height: 44px; font-size: 1.2rem; }
+.secimSayfa button:disabled { opacity: 0.35; cursor: default; }
+
+.secimIzgara {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.1rem, 1fr));
+  gap: 6px;
+}
+.secimDugme {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  /* 44px dokunma hedefi: yüz küçük düğmenin yan yana durduğu tek ekran burası. */
+  min-height: 44px;
+  padding: 4px 2px;
+  /* Hap değil kare: ızgarada yan yana duran yüz öğenin hap olması onları düğmeden
+     çok etiket gibi gösteriyor ve sayılar dar kalıyordu. */
+  border-radius: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.secimDugme b { font-size: 0.95rem; font-weight: 600; }
+/* Yıldız satırı her zaman yer kaplar: boşken düğmeler zıplamasın. */
+.secimDugme i { font-size: 0.55rem; line-height: 1; font-style: normal; min-height: 0.7em; }
+.secimDugme.bitti { color: var(--ink); }
+/* Yıldızlar amber DEĞİL: 0,55 rem'lik bir glifte amber açık temada 1,97:1 okunur
+   (bkz. contrast.test.ts). Dolu/boş ayrımını zaten glifin kendisi taşıyor (★ / ☆),
+   ki bu renkten güçlü bir kanal. */
+.secimDugme:disabled { opacity: 0.4; cursor: default; }
+/* Şu an oynanan bölüm: kalın kenarlık. Renk tek başına işaret olarak kullanılmıyor,
+   aria-current de veriliyor (bkz. ui/secim.ts). */
+.secimDugme.simdiki { border-width: 2px; border-color: var(--ink); color: var(--ink); }

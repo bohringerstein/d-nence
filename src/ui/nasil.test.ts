@@ -5,8 +5,13 @@
 // mekaniği yalnızca ilk göründüğü levelde bir kez anlatıyordu.
 import test from "node:test";
 import assert from "node:assert";
+import fs from "node:fs";
+import path from "node:path";
 import { nasilHtml } from "./nasil.ts";
 import { TR } from "../dil/tr.ts";
+
+const css = fs.readFileSync(
+  path.join(import.meta.dirname, "..", "styles.css"), "utf8");
 
 /** Testler Türkçe metinle çalışır; İngilizce eksiksizliği dil.test.ts sınar. */
 const NASIL_HTML = nasilHtml(TR);
@@ -39,6 +44,30 @@ test("yıldızın hıza değil hassasiyete bağlı olduğu yazıyor", () => {
 test("ışığa duyarlılık notu ilk açılış ekranında", () => {
   assert.ok(NASIL_HTML.includes("epilepsi"), "uyarı metni eksik");
   assert.ok(NASIL_HTML.includes("Deseni yumuşat"), "ne yapılabileceği yazmalı");
+});
+
+test("kısa sürümde uyarı gösterge listesinin ÜSTÜNE alınıyor", () => {
+  // Kısaltma bu uyarıyı ekranın altına itmişti: 320x568'de metin 529 pikselde
+  // başlıyor, görünen alan 512'de bitiyordu — ama "Anladım" görünüyordu, yani uyarı
+  // okunmadan kapatılabiliyordu. Düzeltme DOM sırasını değil görüntü sırasını
+  // değiştirir ki TAM sürümün düzeni bozulmasın (bkz. styles.css .nasilKutu.kisa).
+  assert.ok(/\.nasilKutu\s*\{[^}]*flex-direction:\s*column/.test(css),
+    "sıra değiştirmek için kutu esnek sütun olmalı");
+  /** Seçicinin kuralındaki order değerini okur (düz metin araması, regex kurmadan). */
+  const sira = (secici: string): number => {
+    const i = css.indexOf(secici + " {");
+    assert.ok(i >= 0, "sıra kuralı yok: " + secici);
+    const m = css.slice(i, css.indexOf("}", i)).match(/order:\s*(\d+)/);
+    assert.ok(m, "order değeri yok: " + secici);
+    return Number(m[1]);
+  };
+  assert.ok(sira(".nasilKutu.kisa > .uyari") < sira(".nasilKutu.kisa > .gosterge"),
+    "kısa sürümde uyarı gösterge listesinden önce gelmeli");
+  assert.ok(sira(".nasilKutu.kisa > .giris:not(.yildizNot)") < sira(".nasilKutu.kisa > .uyari"),
+    "uyarı girişten sonra gelmeli");
+  // TAM sürümde sıra kuralı OLMAMALI: orada uyarı yerinde kalır.
+  assert.ok(!/\.nasilKutu\s*>\s*\.uyari\s*\{[^}]*order/.test(css),
+    "sıra değişikliği yalnızca .kisa hâline ait");
 });
 
 test("her gösterge satırının bir simgesi var", () => {

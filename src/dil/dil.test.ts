@@ -147,3 +147,13 @@ test("son bölümün kendi patronu var ve 'son' sözü tekrar etmiyor", () => {
       `${k}: tekrar eden patron metni "${sonSozu}" demememeli — 16 bölümde çıkıyor`);
   }
 });
+
+test("İngilizcede sayı 1 ise tekil", () => {
+  // "1 levels opened" küçük bir hata gibi görünür ama oyuncunun gördüğü ilk
+  // İngilizce cümlelerden biri ve çeviriyi baştan özensiz gösterir.
+  assert.ok(DILLER.en.ilerleme(1, 3, 3).startsWith("1 level opened"),
+    "tek bölümde tekil olmalı: " + DILLER.en.ilerleme(1, 3, 3));
+  assert.ok(DILLER.en.ilerleme(2, 5, 6).startsWith("2 levels opened"));
+  assert.ok(DILLER.en.bitisMetni(1000, 1, 3, 3).includes("across 1 level."),
+    "bitiş metninde de tekil olmalı: " + DILLER.en.bitisMetni(1000, 1, 3, 3));
+});

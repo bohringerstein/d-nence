@@ -9,6 +9,8 @@ export interface Kabuk {
   clock: HTMLButtonElement;
   /** Sayacın rakam kısmı; duraklat simgesi kardeş öğe olduğu için ayrı tutulur. */
   clockSayi: HTMLElement;
+  /** Kalan sürenin ekran okuyucuya açık hâli (role="timer"). Düğmenin dışındadır. */
+  clockSes: HTMLElement;
   bar: HTMLElement;
   barFill: HTMLElement;
   lvl: HTMLElement;
@@ -29,6 +31,8 @@ export interface Kabuk {
   devamDugme: HTMLButtonElement;
   ayarAc: HTMLButtonElement;
   ayarPanel: HTMLElement;
+  /** Panel başlığı; açılışta odak buraya verilir (bkz. markup). */
+  ayarBaslik: HTMLElement;
   ayarKapat: HTMLButtonElement;
   desenKutu: HTMLInputElement;
   hareketKutu: HTMLInputElement;
@@ -41,9 +45,20 @@ export interface Kabuk {
   uyari: HTMLElement;
   /** Ayarlar panelindeki ilerleme özeti (bölüm + yıldız). */
   ozet: HTMLElement;
+  /** Bölüm seçimi örtüsü ve parçaları (bkz. ui/secim.ts). */
+  secim: HTMLElement;
+  secimBaslik: HTMLElement;
+  secimAc: HTMLButtonElement;
+  secimKapat: HTMLButtonElement;
+  secimGeri: HTMLButtonElement;
+  secimIleri: HTMLButtonElement;
+  secimAralik: HTMLElement;
+  secimIzgara: HTMLElement;
   nasil: HTMLElement;
   nasilIcerik: HTMLElement;
   nasilKapat: HTMLButtonElement;
+  /** "Nasıl oynanır" başlığı; açılışta odak buraya verilir. */
+  nasilBaslik: HTMLElement;
   nasilAc: HTMLButtonElement;
   /** Örtü açıkken inert edilen arka plan öğeleri (üst çubuk, süre çubuğu, oyun alanı, alt çubuk). */
   arka: HTMLElement[];
@@ -58,8 +73,14 @@ const html = (m: Metinler): string => `
          durduğu yere ölü bölge açar. Sayaç ise üst çubukta ve eşleşme birebir:
          zamanı durdurmak için zamana dokun. -->
     <button class="clock" id="clock" type="button">
-      <i class="duraklatIm" aria-hidden="true"></i><span class="gizli">${m.duraklatDugmesi}, ${m.kalanSure}</span><span id="clockSayi">0,0</span>
+      <i class="duraklatIm" aria-hidden="true"></i><span id="clockSayi" aria-hidden="true">0,0</span><span class="gizli">${m.duraklatDugmesi}</span>
     </button>
+    <!-- Kalan süre düğmenin DIŞINDA, kendi role="timer" öğesinde. İçeride olduğunda
+         düğmenin erişilebilir adı her karede değişiyordu; aria-hidden da çözmüyor,
+         çünkü ekran okuyucular bir <button>'ı tek öğe olarak sunar ve içindeki metne
+         girilemez. Burada oyuncu istediğinde okuyabilir, kimse üstüne bağırmaz:
+         role="timer" varsayılan olarak aria-live="off" demektir. -->
+    <span class="gizli" id="clockSes" role="timer"></span>
     <div class="lvl">${m.levelOneki} <b id="lvl">1</b><small id="lvlToplam"></small></div>
   </header>
   <!-- Süre çubuğu sayacın görsel kopyası; ekran okuyucuya iki kez söylenmesin. -->
@@ -75,8 +96,11 @@ const html = (m: Metinler): string => `
   </footer>
 
   <div class="ortu" id="ayarPanel" hidden role="dialog" aria-modal="true" aria-labelledby="ayarBaslik">
+    <!-- tabindex="-1": panel açılınca odak BAŞLIĞA gider. Eskiden en alttaki
+         "Tamam" düğmesine gidiyordu ve klavyeyle gelen oyuncu bütün denetimlerin
+         arkasına düşüyordu; Tab ona hiçbirini göstermiyordu. -->
     <div class="kutu">
-      <h2 id="ayarBaslik">${m.ayarlar}</h2>
+      <h2 id="ayarBaslik" tabindex="-1">${m.ayarlar}</h2>
       <!-- Toplanan yıldız oyun boyunca hiçbir yerde görünmüyordu: yalnızca 1000. bölümü
            bitiren oyuncu toplamını öğreniyordu. Birikimin görünmesi, 1000 bölümlük bir
            oyunda devam etme sebebinin kendisi. -->
@@ -102,6 +126,10 @@ const html = (m: Metinler): string => `
         <span><b>${m.dil}</b></span>
         <select id="dilKutu"><!--DILLER--></select>
       </label>
+      <!-- Bölüm seçimi: bitirilen bir bölüme dönmenin tek yolu. Yıldız sisteminin
+           hedef olabilmesi buna bağlı (bkz. ui/secim.ts). -->
+      <button id="secimAc" type="button">${m.bolumSec}</button>
+      <small class="dugmeNot">${m.bolumSecAciklama}</small>
       <button id="nasilAc" type="button">${m.nasilOynanir}</button>
       <!-- "Baştan başla" alt çubuktaydı: Level 1'e döndüren bir eylem, hızlı hızlı
            dokunulan bir oyunda başparmağın durduğu sağ alt köşede duruyordu. Ekranın
@@ -109,7 +137,27 @@ const html = (m: Metinler): string => `
            alınamaz bir eylem olduğu için ayarlara taşındı. -->
       <button id="reset" type="button">${m.bastanBasla}</button>
       <small class="dugmeNot" id="resetNot">${m.bastanBaslaAciklama}</small>
-      <button id="ayarKapat" type="button">${m.tamam}</button>
+      <!-- Gizlilik politikası her iki mağazanın da zorunlu tuttuğu bir bağlantı
+           (Apple 5.1.1(i) uygulamanın İÇİNDE de ister). Sayfa uygulamayla birlikte
+           yayınlanır ve çevrimdışı da açılır: public/gizlilik.html -->
+      <p class="gizlilikSatir"><a href="./gizlilik.html" target="_blank" rel="noopener">${m.gizlilik}</a></p>
+      <!-- "Tamam" kendi yapışkan şeridinde: kutu kayabilir ve kısa ekranda panelden
+           çıkış yolu görünür kalmalı. Bu düğme görünmezken ekranda kalan son düğme
+           "Baştan başla" oluyordu (bkz. styles.css .kutu). -->
+      <div class="kutuAlt"><button id="ayarKapat" type="button">${m.tamam}</button></div>
+    </div>
+  </div>
+
+  <div class="ortu" id="secim" hidden role="dialog" aria-modal="true" aria-labelledby="secimBaslik">
+    <div class="kutu secimKutu">
+      <h2 id="secimBaslik" tabindex="-1">${m.bolumSec}</h2>
+      <div class="secimSayfa">
+        <button id="secimGeri" type="button" class="ikon" aria-label="${m.oncekiSayfa}">&lsaquo;</button>
+        <span id="secimAralik" aria-hidden="true"></span>
+        <button id="secimIleri" type="button" class="ikon" aria-label="${m.sonrakiSayfa}">&rsaquo;</button>
+      </div>
+      <div class="secimIzgara" id="secimIzgara"></div>
+      <div class="kutuAlt"><button id="secimKapat" type="button">${m.tamam}</button></div>
     </div>
   </div>
 
@@ -159,6 +207,7 @@ export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): 
     kok: hedef,
     clock: bul<HTMLButtonElement>(hedef, "clock"),
     clockSayi: bul(hedef, "clockSayi"),
+    clockSes: bul(hedef, "clockSes"),
     bar: bul(hedef, "bar"),
     barFill: bul(hedef, "barFill"),
     lvl: bul(hedef, "lvl"),
@@ -177,6 +226,7 @@ export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): 
     devamDugme: bul<HTMLButtonElement>(hedef, "devamDugme"),
     ayarAc: bul<HTMLButtonElement>(hedef, "ayarAc"),
     ayarPanel: bul(hedef, "ayarPanel"),
+    ayarBaslik: bul(hedef, "ayarBaslik"),
     ayarKapat: bul<HTMLButtonElement>(hedef, "ayarKapat"),
     desenKutu: bul<HTMLInputElement>(hedef, "desenKutu"),
     hareketKutu: bul<HTMLInputElement>(hedef, "hareketKutu"),
@@ -187,9 +237,18 @@ export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): 
     dilKutu: bul<HTMLSelectElement>(hedef, "dilKutu"),
     uyari: bul(hedef, "uyari"),
     ozet: bul(hedef, "ozet"),
+    secim: bul(hedef, "secim"),
+    secimBaslik: bul(hedef, "secimBaslik"),
+    secimAc: bul<HTMLButtonElement>(hedef, "secimAc"),
+    secimKapat: bul<HTMLButtonElement>(hedef, "secimKapat"),
+    secimGeri: bul<HTMLButtonElement>(hedef, "secimGeri"),
+    secimIleri: bul<HTMLButtonElement>(hedef, "secimIleri"),
+    secimAralik: bul(hedef, "secimAralik"),
+    secimIzgara: bul(hedef, "secimIzgara"),
     nasil: bul(hedef, "nasil"),
     nasilIcerik: bul(hedef, "nasilIcerik"),
     nasilKapat: bul<HTMLButtonElement>(hedef, "nasilKapat"),
+    nasilBaslik: bul(hedef, "nasilBaslik"),
     nasilAc: bul<HTMLButtonElement>(hedef, "nasilAc")
   };
 }

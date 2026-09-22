@@ -10,6 +10,9 @@ import path from "node:path";
 import { solve, LEVEL_COUNT } from "../core/index.ts";
 import type { LevelTable, Level } from "../core/index.ts";
 import { createLevel, tap, step, decay, kalanSure, HEPSI, YOK } from "./state.ts";
+import { yildizYazisi, sureYazisi, payYazisi } from "./hints.ts";
+import { TR } from "../dil/tr.ts";
+import { DEG } from "../core/index.ts";
 import type { TapSonuc } from "./state.ts";
 
 const ADIM = 1 / 120;
@@ -260,4 +263,39 @@ test("yeni level payı sıfırlıyor", () => {
   assert.equal(s.crashPay, -1);
   assert.equal(s.crashRing, YOK);
   assert.equal(s.asama, "idle");
+});
+
+// --- Kazanma satırının TAMAMI -------------------------------------------------
+//
+// Parçalar ayrı ayrı sınanıyor; burada sınanan şey oyuncunun gerçekten gördüğü cümle.
+// Gerçek bir bölüm, gerçek çözücüyle, oyunun kendi döngüsünden bitiriliyor ve satır
+// main.ts'teki sırayla kuruluyor.
+test("kasa açılınca görünen satır yıldızı, süreyi ve payı birlikte söylüyor", () => {
+  const level = tablo.levels[0];
+  const c = solve(level.rings);
+  assert.ok(c, "referans çözücü 1. bölümü bitirmeli");
+  const s = createLevel(level, 1);
+  let k = 0;
+  let sonuc: TapSonuc | null = null;
+  for (let adim = 0; adim < 120 * 120 && !sonuc; adim++) {
+    while (k < c.kilitler.length && s.levelTime >= c.kilitler[k].t - 1e-9) {
+      const r = tap(s, tablo.q3, tablo.q2);
+      k++;
+      if (r.tip === "acildi" || r.tip === "kayip") { sonuc = r; break; }
+    }
+    if (!sonuc) step(s, ADIM);
+  }
+  assert.ok(sonuc && sonuc.tip === "acildi", "bölüm bitirilemedi: " + sonuc?.tip);
+  if (sonuc.tip !== "acildi") return;
+
+  // main.ts ile AYNI sıra: sonuç satırı + pay eki + rekor eki.
+  const satir = TR.sonucSatiri(TR.yildizEtiketi[sonuc.yildiz], yildizYazisi(sonuc.yildiz),
+    sureYazisi(sonuc.sure, TR)) + payYazisi(sonuc.pay / DEG, TR);
+  assert.match(satir, /★/, "yıldız görünmeli");
+  assert.match(satir, /sn/, "süre görünmeli");
+  assert.match(satir, /° pay$/, "pay en sonda olmalı");
+  // Alt çubuk iki satır yer ayırıyor (320 pikselde üç): satır oraya sığmalı.
+  assert.ok(satir.length <= 48, `sonuç satırı ${satir.length} karakter, alt çubuğa sığmaz: ${satir}`);
+  // Pay pozitif olmalı: kazanmak, geçiş eşiğini geçmek demek.
+  assert.ok(sonuc.pay > 0, "kazanılan bölümde pay pozitif olmalı");
 });

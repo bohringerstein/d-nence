@@ -40,6 +40,16 @@ export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
   let birikim = 0;
   let calisiyor = false;
   let gizli = false;
+  /**
+   * Pencere odakta değil (başka bir uygulama üstte, bölünmüş ekran, bildirim paneli).
+   *
+   * `document.hidden` bunu YAKALAMAZ: sekme hâlâ "görünür"dür. Ama tarayıcı kareyi
+   * saniyede bire kısar ve her kare biriktiriciden EN_COK_BIRIKME (0,25 sn) alır —
+   * yani 60 saniyelik bir dalgınlık 15 saniyelik fizik demekti. Medyan bir bölümü
+   * tamamen yakmak için 43,6 saniye örtülü kalmak yetiyordu ve bu, kaldırmak için
+   * emek harcadığımız kayıp türünü (süreye yenilme) arka kapıdan geri getiriyordu.
+   */
+  let pencereDisinda = false;
 
   const kare = (now: number): void => {
     raf = requestAnimationFrame(kare);
@@ -60,21 +70,29 @@ export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
   };
 
   const gorunurluk = (): void => {
-    gizli = document.hidden;
+    gizli = document.hidden || pencereDisinda;
     // Geri dönüşte biriken süre atılır: oyuncu yokken geçen zaman levele yazılmaz.
     if (!gizli) { son = performance.now(); birikim = 0; }
   };
+
+  /** Başlangıç durumu; hasFocus her ortamda tanımlı değil. */
+  const odaksizMi = (): boolean =>
+    typeof document.hasFocus === "function" ? !document.hasFocus() : false;
+
+  const odakGitti = (): void => { pencereDisinda = true; gorunurluk(); };
+  const odakGeldi = (): void => { pencereDisinda = false; gorunurluk(); };
 
   return {
     basla() {
       if (calisiyor) return;
       calisiyor = true;
-      gizli = document.hidden;
+      pencereDisinda = odaksizMi();
+      gizli = document.hidden || pencereDisinda;
       son = performance.now();
       birikim = 0;
       document.addEventListener("visibilitychange", gorunurluk);
-      window.addEventListener("blur", gorunurluk);
-      window.addEventListener("focus", gorunurluk);
+      window.addEventListener("blur", odakGitti);
+      window.addEventListener("focus", odakGeldi);
       raf = requestAnimationFrame(kare);
     },
     dur() {
@@ -82,8 +100,8 @@ export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
       calisiyor = false;
       cancelAnimationFrame(raf);
       document.removeEventListener("visibilitychange", gorunurluk);
-      window.removeEventListener("blur", gorunurluk);
-      window.removeEventListener("focus", gorunurluk);
+      window.removeEventListener("blur", odakGitti);
+      window.removeEventListener("focus", odakGeldi);
     },
     duraklatildi: () => gizli
   };

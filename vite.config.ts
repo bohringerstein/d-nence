@@ -51,24 +51,11 @@ export default defineConfig({
         // 1000 bölümlük tablo 643 KB; varsayılan 2 MB sınırı yeter ama açıkça yazalım.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // Oyun tamamen statik: her şey önbelleğe alınır, çevrimdışı tam çalışır.
-        cleanupOutdatedCaches: true,
-        runtimeCaching: [
-          {
-            // Fredoka Google Fonts'tan geliyor; çevrimdışıyken de doğru yazı tipi görünsün.
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\//,
-            handler: "StaleWhileRevalidate",
-            options: { cacheName: "google-fonts-stil" }
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\//,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "google-fonts-dosya",
-              expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] }
-            }
-          }
-        ]
+        cleanupOutdatedCaches: true
+        // runtimeCaching YOK ve olmamalı: oyun hiçbir dış adrese istek atmaz.
+        // Yazı tipi projeye gömülü (src/fonts/), tablo kendi dosyamız. Buraya bir
+        // kural eklemek, gizlilik politikasının "başka hiçbir alan adına istek
+        // atılmaz" cümlesini çürütmek demektir (public/gizlilik.html).
       },
       devOptions: {
         // Geliştirme sırasında servis çalışanı kapalı kalsın: önbellek, değişiklikleri gizler.

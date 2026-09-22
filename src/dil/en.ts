@@ -8,6 +8,9 @@
 // kama = wedge, kanal/yol = path, kilitlemek = lock, deneme = try.
 import type { Metinler } from "./tipler.ts";
 
+/** "1 levels opened" olmasın diye: İngilizcede sayı 1 ise tekil. */
+const cogul = (n: number, tekil: string, coklu: string): string => `${n} ${n === 1 ? tekil : coklu}`;
+
 export const EN: Metinler = {
   kod: "en",
   yerel: "en-GB",
@@ -15,24 +18,35 @@ export const EN: Metinler = {
 
   oyunAlani: "Play area. Tap to lock the next ring.",
   duraklatDugmesi: "Pause",
-  kalanSure: "time left",
+  kalanSureSesli: saniye => `${saniye} seconds left`,
   levelOneki: "Level",
   patronEki: ", boss",
   ayarlar: "Settings",
   tamam: "Done",
   nasilOynanir: "How to play",
   bastanBasla: "Start over",
-  bastanBaslaAciklama: "Goes back to level 1. Your stars stay.",
+  bastanBaslaAciklama: "Goes back to level 1 and locks the levels you opened. Your stars stay.",
   bastanBaslaOnay: level => `Are you sure? You will lose level ${level}`,
   anladim: "Got it",
 
+  bolumSec: "Choose a level",
+  bolumSecAciklama: "You can go back to any level you have opened. Your progress stays.",
+  bolumAraligi: (bas, son) => `${bas}–${son}`,
+  oncekiSayfa: "Previous hundred levels",
+  sonrakiSayfa: "Next hundred levels",
+  bolumEtiketi: (n, yildiz) =>
+    yildiz > 0 ? `Level ${n}, ${cogul(yildiz, "star", "stars")}` : `Level ${n}, not finished yet`,
+  bolumKilitli: n => `Level ${n}, locked`,
+
   ilerlemeYok: "No levels opened yet.",
-  ilerleme: (bolum, yildiz, enCok) => `${bolum} levels opened · ${yildiz} / ${enCok} stars`,
+  ilerleme: (bolum, yildiz, enCok) =>
+    `${cogul(bolum, "level", "levels")} opened · ${yildiz} / ${enCok} stars`,
   desen: { baslik: "Soften the pattern", aciklama: "Unlocked rings are drawn fainter." },
   hareket: { baslik: "Reduce motion", aciklama: "Turns off the shake and screen flash on a loss." },
   ses: { baslik: "Sound", aciklama: "A short note on each lock; the pitch rises as the path narrows." },
   titresim: { baslik: "Vibration", aciklama: "The phone vibrates on a lock and on a loss." },
   dil: "Language",
+  gizlilik: "Privacy policy",
 
   duraklatildi: "Paused",
   duraklatAciklama: kalan => `${kalan} seconds left. The rings are waiting exactly where you stopped them.`,
@@ -40,7 +54,8 @@ export const EN: Metinler = {
 
   kasaAcildi: "Vault opened",
   bitisMetni: (toplam, bolum, yildiz, enCok) =>
-    `You opened all ${toplam} vaults. You collected ${yildiz} stars across ${bolum} levels` +
+    `You opened all ${toplam} vaults. You collected ${yildiz} stars across ` +
+    `${cogul(bolum, "level", "levels")}` +
     (yildiz < enCok ? `; for all ${enCok} you will need to open them cleaner.` : ". Every one of them clean."),
   bastanOyna: "Play again",
 
@@ -70,6 +85,7 @@ export const EN: Metinler = {
 
   yildizEtiketi: { 3: "Clean open", 2: "Good open", 1: "By a hair" },
   sonucSatiri: (etiket, yildiz, sure) => `${etiket} ${yildiz} ${sure} s`,
+  payEki: derece => ` · ${derece}° margin`,
   rekorEki: ", record",
 
   patron: {
@@ -122,6 +138,9 @@ or a history of discomfort from patterns, you can turn on &ldquo;Soften the patt
 <b>Settings</b> and take breaks while you play.`
   },
 
+  tabloIndirilemediBaslik: "Could not load the levels",
+  tabloIndirilemediMetin: "Check your connection and try again. Once the game has opened, it works offline too.",
+  tekrarDene: "Try again",
   tabloHatasiBaslik: "Could not read the level table",
   tabloHatasiMetin: "For the developer: run <code>npm run verify</code>."
 };

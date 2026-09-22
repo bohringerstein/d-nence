@@ -8,16 +8,25 @@ export const TR: Metinler = {
 
   oyunAlani: "Oyun alanı. Dokunarak sıradaki halkayı kilitle.",
   duraklatDugmesi: "Duraklat",
-  kalanSure: "kalan süre",
+  kalanSureSesli: saniye => `Kalan süre ${saniye} saniye`,
   levelOneki: "Level",
   patronEki: ", patron",
   ayarlar: "Ayarlar",
   tamam: "Tamam",
   nasilOynanir: "Nasıl oynanır",
   bastanBasla: "Baştan başla",
-  bastanBaslaAciklama: "Level 1'e döner. Yıldızların kalır.",
+  bastanBaslaAciklama: "Level 1'e döner ve açtığın bölümler kilitlenir. Yıldızların kalır.",
   bastanBaslaOnay: level => `Emin misin? Level ${level} kaybolur`,
   anladim: "Anladım",
+
+  bolumSec: "Bölüm seç",
+  bolumSecAciklama: "Açtığın her bölüme dönebilirsin. İlerlemen bozulmaz.",
+  bolumAraligi: (bas, son) => `${bas}–${son}`,
+  oncekiSayfa: "Önceki yüz bölüm",
+  sonrakiSayfa: "Sonraki yüz bölüm",
+  bolumEtiketi: (n, yildiz) =>
+    yildiz > 0 ? `Level ${n}, ${yildiz} yıldız` : `Level ${n}, henüz bitirilmedi`,
+  bolumKilitli: n => `Level ${n}, kilitli`,
 
   ilerlemeYok: "Henüz bölüm açılmadı.",
   ilerleme: (bolum, yildiz, enCok) => `${bolum} bölüm açıldı · ${yildiz} / ${enCok} yıldız`,
@@ -26,6 +35,7 @@ export const TR: Metinler = {
   ses: { baslik: "Ses", aciklama: "Kilitte kısa bir nota; kanal daraldıkça perde yükselir." },
   titresim: { baslik: "Titreşim", aciklama: "Kilitte ve kayıpta telefon titreşir." },
   dil: "Dil",
+  gizlilik: "Gizlilik politikası",
 
   duraklatildi: "Duraklatıldı",
   duraklatAciklama: kalan => `${kalan} saniyen kaldı. Halkalar tam durduğun yerde bekliyor.`,
@@ -63,6 +73,7 @@ export const TR: Metinler = {
 
   yildizEtiketi: { 3: "Temiz açılış", 2: "İyi açılış", 1: "Kıl payı" },
   sonucSatiri: (etiket, yildiz, sure) => `${etiket} ${yildiz} ${sure} sn`,
+  payEki: derece => ` · ${derece}° pay`,
   rekorEki: ", rekor",
 
   patron: {
@@ -115,6 +126,9 @@ rahatsız olma geçmişin varsa, <b>Ayarlar</b>'dan &ldquo;Deseni yumuşat&rdquo
 ve ara vererek oynayabilirsin.`
   },
 
+  tabloIndirilemediBaslik: "Leveller indirilemedi",
+  tabloIndirilemediMetin: "Bağlantını kontrol edip tekrar dene. Oyun bir kez açıldıktan sonra çevrimdışı da çalışır.",
+  tekrarDene: "Tekrar dene",
   tabloHatasiBaslik: "Level tablosu okunamadı",
   tabloHatasiMetin: "Geliştirici için: <code>npm run verify</code> çalıştırın."
 };
