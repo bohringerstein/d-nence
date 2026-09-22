@@ -56,16 +56,42 @@ test("zemine dokunmak yıkıcı olmayan örtüleri kapatır", () => {
   }
 });
 
+test("örtüler tek bir açma/kapama deseni kullanıyor", () => {
+  // Beş ayrı çağrı yerinde elle dizilen beş satır vardı ve hepsinde aynı hata:
+  // önce gizle, sonra başka bir öğeye blur(). Odak o sırada örtünün İÇİNDEYDİ, yani
+  // gizlenen ağacın içinde kalıyordu — body'ye bile düşmüyordu (tarayıcıda ölçüldü).
+  // Sonraki Tab görünmez bir noktadan başlıyordu: WCAG 2.2 SC 2.4.3 ihlali.
+  assert.ok(/import \{ ortuAc, ortuKapat \}/.test(main), "örtü deseni içe aktarılmalı");
+  for (const id of ["ayarPanel", "secim", "nasil", "duraklat", "bitis"]) {
+    assert.ok(main.includes(`ortuAc(ui.${id}, `), id + " ortuAc ile açılmalı");
+    assert.ok(main.includes(`ortuKapat(ui.${id}, `), id + " ortuKapat ile kapanmalı");
+  }
+  // Eski desenin kalıntısı kalmamalı.
+  assert.ok(!/ui\.\w+\.blur\(\)/.test(main), "kapatmada blur() kalmamalı: yerine açık bir focus() var");
+});
+
+test("kapanışta odak OYUN ALANINA döner, düğmeye değil", () => {
+  // Bu oyunun tek kontrolü boşluk/Enter. Odağı açan düğmeye geri vermek, oyuncunun
+  // bir sonraki boşluk tuşunun o düğmeyi çalıştırması demek olurdu — ayarları
+  // kapatıp boşluğa basan oyuncu ayarları yeniden açardı.
+  const kapatmalar = main.match(/ortuKapat\(ui\.\w+, [^)]+\)/g) ?? [];
+  assert.ok(kapatmalar.length >= 5, "beş örtünün de kapanışı olmalı");
+  for (const k of kapatmalar) {
+    assert.ok(k.endsWith("ui.canvas)"), "odak oyun alanına dönmeli: " + k);
+  }
+  assert.ok(/<canvas id="c" tabindex="0"/.test(shell), "oyun alanı odaklanabilir olmalı");
+});
+
 test("panel açılınca odak BAŞLIĞA gider, en alttaki düğmeye değil", () => {
   // Odak "Tamam"a veriliyordu; o düğme kutunun en altında olduğu için klavyeyle gelen
   // oyuncu bütün denetimlerin arkasına düşüyor ve Tab ona ne ayarları, ne dili, ne de
   // "Nasıl oynanır"ı gösteriyordu. Başlık odakta olunca ekran okuyucu panelin adını
   // okur ve gezinme baştan başlar.
   assert.ok(/id="ayarBaslik" tabindex="-1"/.test(shell), "ayarlar başlığı odaklanabilir olmalı");
-  assert.ok(/ui\.ayarBaslik\.focus/.test(main), "ayarlar açılınca odak başlığa gitmeli");
-  assert.ok(!/ui\.ayarKapat\.focus/.test(main), "odak kapatma düğmesine verilmemeli");
-  assert.ok(/ui\.nasilBaslik\.focus/.test(main), "nasıl oynanır açılınca odak başlığa gitmeli");
-  assert.ok(!/ui\.nasilKapat\.focus/.test(main), "odak kapatma düğmesine verilmemeli");
+  assert.ok(/ortuAc\(ui\.ayarPanel, ui\.ayarBaslik\)/.test(main), "ayarlar açılınca odak başlığa gitmeli");
+  assert.ok(!/ortuAc\(ui\.ayarPanel, ui\.ayarKapat\)/.test(main), "odak kapatma düğmesine verilmemeli");
+  assert.ok(/ortuAc\(ui\.nasil, ui\.nasilBaslik\)/.test(main), "nasıl oynanır açılınca odak başlığa gitmeli");
+  assert.ok(!/ortuAc\(ui\.nasil, ui\.nasilKapat\)/.test(main), "odak kapatma düğmesine verilmemeli");
 });
 
 test("bölüm seçimi örtüsü tam takım: Escape, çıkış şeridi, sayfalama", () => {
@@ -87,4 +113,20 @@ test("bölüm seçiminden çıkış da geri sayımla oluyor", () => {
   assert.ok(izgara.slice(0, 700).includes("geriSayimBaslat()"), "bölüm seçmek de geri sayımla başlamalı");
   assert.ok(izgara.slice(0, 700).includes("ipucuKilidiSifirla()"),
     "eski bölümün sonuç mesajı yeni bölüme taşmamalı");
+});
+
+test("bölüm seçiminde sayfa değişimi duyuruluyor", () => {
+  // 100 düğme sessizce değişiyordu; hangi yüzlük dilimde olunduğunu söyleyen tek öğe
+  // aria-hidden'dı. WCAG 2.2, SC 4.1.3 Durum Mesajları.
+  assert.ok(/id="secimAralik" role="status"/.test(shell), "aralık yazısı canlı bölge olmalı");
+  assert.ok(!/id="secimAralik"[^>]*aria-hidden/.test(shell), "aralık yazısı gizlenmemeli");
+});
+
+test("bölüm seçimi doğru YERDE açılıyor ve sayfa değişiminde başa sarıyor", () => {
+  assert.ok(/\.simdiki"\)\?\.scrollIntoView/.test(main),
+    "panel açılınca oyuncunun kendi bölümüne sarmalı");
+  assert.ok(/function secimSayfaDegistir/.test(main) && /\.kutu"\)\?\.scrollTo/.test(main),
+    "sayfa değişiminde kutu başa sarmalı");
+  // Kaydıran öğe .secimIzgara DEĞİL; ona yazmak ölü satırdı.
+  assert.ok(!/secimIzgara\.scrollTop/.test(main), "secimIzgara kaydırıcı değil");
 });

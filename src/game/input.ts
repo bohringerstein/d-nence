@@ -71,7 +71,10 @@ export function girdiBagla(kok: HTMLElement): Girdi {
   const tus = (e: KeyboardEvent): void => {
     if (e.code !== "Space" && e.code !== "Enter") return;
     if (e.repeat) return;              // basılı tutmak seri kilit üretmesin
-    if (etkilesimliMi(e.target)) return;
+    // Örtü denetimi işaretçi yolunda vardı, tuş yolunda YOKTU. Panel açılışında odak
+    // artık <h2> başlığa gidiyor ve h2 "etkileşimli" sayılmadığı için boşluk tuşu
+    // oyuna sızıyor, üstelik preventDefault ile yutulup paneli kaydırmıyordu.
+    if (etkilesimliMi(e.target) || ortudeMi(e.target)) return;
     e.preventDefault();
     kuyruk.push(damga(e));
   };

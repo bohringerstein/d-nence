@@ -73,3 +73,56 @@ test("sayfa sınırları dışına taşmıyor", () => {
   assert.ok(!son.includes('data-n="1001"'), "tablonun dışına çıkılmamalı");
   assert.equal((son.match(/data-n=/g) ?? []).length, 100);
 });
+
+// --- Altı durum, dört kanal ---------------------------------------------------
+//
+// Ölçüm: ızgarada altı durum vardı (kilitli / açık-oynanmamış / 1★ / 2★ / 3★ / şu anki)
+// ama pratikte yalnız İKİSİ ayrışıyordu — soluk ve koyu. Sebep bir CSS özgüllük
+// çakışmasıydı: `.kutu button` (0-1-1) `.secimDugme` (0-1-0) renklerini eziyordu, yani
+// yazılmış üç renk kararı da aynı piksele çıkıyordu. Geriye tek kanal olarak 8,8
+// pikselik yıldız glifi kalmıştı.
+test("her durum kendi sınıfını taşıyor", () => {
+  const h = izgaraHtml({
+    m: TR, sayfa: 0, toplam: 1000, enUzak: 12,
+    bests: { 1: { s: 3, t: 4 }, 10: { s: 1, t: 9 } }, simdiki: 7
+  });
+  const dugme = (n: number): string => {
+    const m = h.match(new RegExp('<button[^>]*data-n="' + n + '"[^>]*>'));
+    assert.ok(m, "düğme yok: " + n);
+    return m[0];
+  };
+  assert.ok(dugme(1).includes("bitti"), "bitirilmiş bölüm işaretli olmalı");
+  assert.ok(!dugme(2).includes("bitti"), "oynanmamış bölüm 'bitti' olmamalı");
+  assert.ok(dugme(7).includes("simdiki"), "şu anki bölüm işaretli olmalı");
+  assert.ok(dugme(13).includes("disabled"), "kilitli bölüm kapalı olmalı");
+});
+
+test("patron bölümleri ızgarada da işaretli", () => {
+  // Her 10 bölümde bir gelen ritim, 100 düğmelik bir sayfada göz için çapa.
+  const h = izgaraHtml({ m: TR, sayfa: 0, toplam: 1000, enUzak: 1000, bests: {}, simdiki: 1 });
+  const patron = (h.match(/class="[^"]*patron[^"]*"/g) ?? []).length;
+  assert.equal(patron, 10, "bir sayfada on patron olmalı");
+  assert.ok(/data-n="10"[^>]*aria-label/.test(h.replace(/\n/g, "")), "10. bölüm çizilmeli");
+});
+
+test("ızgara bir LİSTE: ekran okuyucu konum bilgisi verebilsin", () => {
+  // Düz bir <div>'de okuyucu ne "100 öğeli liste" ne de "12 / 100" diyebiliyor.
+  const h = izgaraHtml({ m: TR, sayfa: 0, toplam: 1000, enUzak: 5, bests: {}, simdiki: 1 });
+  assert.equal((h.match(/<li>/g) ?? []).length, 100, "her düğme bir liste öğesinde olmalı");
+});
+
+test("bölüm numarası binlik ayırıcı ALMIYOR", () => {
+  // "1.000" bir sayı değil etiket; ondalık gibi okunuyordu.
+  const h = izgaraHtml({ m: TR, sayfa: 9, toplam: 1000, enUzak: 1000, bests: {}, simdiki: 1 });
+  assert.ok(h.includes("<b aria-hidden=\"true\">1000</b>"), "etiket gruplamasız olmalı");
+  assert.ok(!h.includes("1.000"), "binlik ayırıcı olmamalı");
+});
+
+test("kilitli düğmede yıldız glifi yok", () => {
+  // Kilit işareti CSS ile çizilir; glif alanı boş bırakılır ki 100 satır inline SVG
+  // sayfanın HTML'ini iki katına çıkarmasın.
+  const h = izgaraHtml({ m: TR, sayfa: 0, toplam: 1000, enUzak: 3, bests: {}, simdiki: 1 });
+  const kilitli = h.match(/<button[^>]*data-n="50"[\s\S]*?<\/button>/);
+  assert.ok(kilitli, "50. düğme bulunamadı");
+  assert.ok(kilitli[0].includes('<i aria-hidden="true"></i>'), "kilitlide glif boş olmalı");
+});

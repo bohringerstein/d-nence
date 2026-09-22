@@ -21,7 +21,7 @@ class SahteDepo {
 const depo = new SahteDepo();
 Object.defineProperty(globalThis, "localStorage", { value: depo, configurable: true });
 
-const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, acikMi } =
+const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, acikMi, tabloSurumuUygula } =
   await import("./storage.ts");
 const { LEVEL_COUNT } = await import("../core/index.ts");
 
@@ -202,4 +202,58 @@ test("bozuk enUzak değeri türetilerek düzeltiliyor", () => {
   depo.temizle();
   depo.setItem("donence:v1", JSON.stringify({ surum: 1, level: 50, enUzak: 3, bests: {} }));
   assert.equal(oku().enUzak, 50, "en uzak, oynanan bölümün gerisinde kalamaz");
+});
+
+// --- Tablo sürümü ------------------------------------------------------------
+//
+// Kayıt bölümleri NUMARAYLA saklıyor. Tablo bir kez yeniden üretildi ve ölçüldü:
+// 1000 bölümün 966'sının tanımı, 761'inin süre sınırı değişti; 303 bölümde kayıtlı
+// rekor yeni sınırı aşıyordu, yani oyuncuya ulaşılamaz bir hedef gösteriliyordu.
+// Kayıtta bir `surum` alanı vardı ama hiç okunmuyordu.
+test("damgadan ÖNCEKİ kayıtlar cezalandırılmaz: benimser, silmez", () => {
+  depo.temizle();
+  const k = oku();
+  levelKaydet(k, 412);
+  rekorKaydet(k, 7, { s: 3, t: 5 });
+  assert.equal(k.tabloSurum, undefined, "eski kayıtta alan yok");
+  const silinen = tabloSurumuUygula(k, "abc123");
+  assert.equal(silinen, 0, "alan yoksa silme yapılmamalı");
+  assert.equal(k.tabloSurum, "abc123");
+  assert.equal(bitirilenLevel(k), 1, "rekor korunmalı");
+  assert.equal(oku().tabloSurum, "abc123", "diske yazılmalı");
+});
+
+test("tablo değişince YALNIZ rekorlar silinir, ilerleme korunur", () => {
+  // Yanlış bir rekoru taşımakla 412 bölümlük ilerlemeyi silmek arasında seçim
+  // yapmak gerekmiyor: üçüncü yol var ve doğru olan o.
+  depo.temizle();
+  const k = oku();
+  levelKaydet(k, 412);
+  rekorKaydet(k, 7, { s: 3, t: 5 });
+  rekorKaydet(k, 9, { s: 2, t: 8 });
+  tabloSurumuUygula(k, "surum1");
+  const silinen = tabloSurumuUygula(k, "surum2");
+  assert.equal(silinen, 2, "iki rekor silinmeliydi");
+  assert.deepEqual(k.bests, {});
+  assert.equal(k.enUzak, 412, "açılan bölümler KORUNMALI");
+  assert.equal(k.level, 412, "kaldığı yer korunmalı");
+  assert.equal(k.tabloSurum, "surum2");
+});
+
+test("aynı sürümde hiçbir şey olmuyor", () => {
+  depo.temizle();
+  const k = oku();
+  rekorKaydet(k, 3, { s: 1, t: 9 });
+  tabloSurumuUygula(k, "aynı");
+  assert.equal(tabloSurumuUygula(k, "aynı"), 0);
+  assert.equal(bitirilenLevel(k), 1, "rekor durmalı");
+});
+
+test("damgasız tabloyla da oyun açılır", () => {
+  // Damgadan önce üretilmiş bir tablo hâlâ okunabilmeli.
+  depo.temizle();
+  const k = oku();
+  rekorKaydet(k, 3, { s: 1, t: 9 });
+  assert.equal(tabloSurumuUygula(k, undefined), 0);
+  assert.equal(bitirilenLevel(k), 1);
 });

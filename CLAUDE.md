@@ -30,6 +30,7 @@ Hedef platformu Kader'e sor. Cevap yoksa varsayılan: **web + PWA** (telefona "a
 - Halka hareketi, geometri ve açıklık hesabı tek bir çekirdek modülde yaşar; oyun da level üretici de onu kullanır. Mantığı kopyalama.
 - Fizik güncellemesi sabit 1/120 sn adımla yapılır.
 - Oyun içinde rastgele level üretme; `data/levels.json`'u oku.
+- **Tabloyu yeniden üretmek kurulu oyuncuların rekorlarını geçersiz kılar.** Kayıt bölümleri numarayla saklıyor; tablo değişince "47. bölümde 2 yıldız" başka bir bulmacaya ait oluyor. Bir kez yaşandı: 966 bölümün tanımı değişti ve 303 bölümde gösterilen rekor ulaşılamaz hâle geldi. `data/levels.json` artık bir `v` damgası taşıyor ve damga eşleşmeyince yalnız rekorlar silinir (ilerleme korunur) — ama bu, yeniden üretmeyi ucuz yapmaz. Yayından sonra tabloyu etkileyen bütün değişiklikler **toplanıp tek seferde** yapılmalı, yoksa oyuncu her dağıtımda yıldızlarını kaybeder.
 - Çekirdek kurallarda her değişiklikten sonra tabloyu yeniden üret (`npm run gen`) ve **`npm run check`** çalıştır (tip denetimi + testler + tablo denetimi + prototip güncelliği). Geçmezse işi bitmiş sayma.
 - `reference/donence.html` içindeki çekirdek ve level blokları elle düzenlenmez; `npm run sync` çekirdeği `src/core/` dizininden esbuild ile paketleyip gömer.
 - Açıklık maskesi, en büyük açıklık, geçiş eşiği (`NEED_PASS`) ve yıldız kuralının ikinci bir kopyası hiçbir yerde olmayacak.

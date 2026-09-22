@@ -3,6 +3,7 @@
 //   npm run verify        -> mevcut tabloyu denetler
 //   npm run verify:full   -> üstüne determinizmi de sınar
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import {
   TAU, DEG, NEED_PASS, SOLVER_MARGIN, REACT, GAP_MAX_DEG, LEVEL_COUNT, BOSS_ARALIGI, bossMu,
@@ -288,9 +289,28 @@ const BOSSES: Record<number, Boss | undefined> = {
     rings: () => [1.2, -1.5, 1.3, -1.1, 1.6].map(s => mk({ speed: s, gaps: 2, gapOffset: 150 + R() * 30, start: R() * TAU })) },
   50: { anahtar: 'tavsanKaplumbaga', tol: 0.11,
     rings: () => [0.5, -2.4, 0.6, -2.5, 0.5, -2.3].map(s => mk({ speed: s, start: R() * TAU })) },
+  /**
+   * Hızlar 1,6 KATINA çıkarıldı (eski küme: 1 / -1,9 / 1,6 / -1,4 / 2,1 / -1,7).
+   *
+   * Ölçüm: bu tasarımın 16 örneğinden dördünde ve kapanış bölümünde denemelerin
+   * yarıdan fazlası "süre doldu" ile bitiyordu — 1000. bölümde %77. Yani 1000
+   * bölümlük oyunun son anısı hassasiyet değil sabır sınavıydı.
+   *
+   * Ve süre kolu ÖLÜYDÜ: 200 denemeyle ölçüldü, limiti 22,6 sn'den 33,9 sn'ye
+   * çıkarmak kazanma oranını bir puan bile değiştirmedi (%22 → %22, süre kaybı
+   * %77 → %77). Fırsat geç gelmiyor, HİÇ gelmiyor: ters yönlü + iki flip'li altı
+   * halkanın ortak açıklığının geçiş eşiğini aşma sıklığı neredeyse sıfır.
+   * Boşluğu daraltmak durumu kötüleştiriyor (%94 saat), çünkü darlık fırsat
+   * sıklığını da düşürüyor.
+   *
+   * Doğru kol HIZ: fırsatı sıklaştırıyor. Ölçülen: hızlar ×1,6 ile süre kaybı
+   * %77 → %1, kazanma %22 → %84, çözücü 14,1 sn → 6,4 sn. Kaybedilen zorluğu
+   * ayarlayıcı boşluğu daraltarak geri alır — o zaman zorluk hassasiyetten gelir,
+   * saatten değil. 240 (%56→%4) ve 420 (%64→%0) için de aynı.
+   */
   60: { anahtar: 'buyukKasa', tol: 0.11,
-    rings: () => [mk({ speed: 1, preLocked: true, start: A }), mk({ speed: -1.9, flip: 2.1, start: R() * TAU }), mk({ speed: 1.6, gaps: 2, gapOffset: 165, start: R() * TAU }),
-      mk({ speed: -1.4, wobble: true, start: R() * TAU }), mk({ speed: 2.1, flip: 1.7, start: R() * TAU }), mk({ speed: -1.7, start: R() * TAU })] }
+    rings: () => [mk({ speed: 1.6, preLocked: true, start: A }), mk({ speed: -3.04, flip: 2.1, start: R() * TAU }), mk({ speed: 2.56, gaps: 2, gapOffset: 165, start: R() * TAU }),
+      mk({ speed: -2.24, wobble: true, start: R() * TAU }), mk({ speed: 3.36, flip: 1.7, start: R() * TAU }), mk({ speed: -2.72, start: R() * TAU })] }
 };
 
 function finalize(rings: RawRing[], n: number): Finalized | null {
@@ -401,37 +421,87 @@ const egriTaban = (n: number): number =>
   0.94 - (0.94 - EN_ZOR) * Math.pow(Math.min(1, (n - 1) / (TABAN_BOLUM - 1)), 0.45);
 const egriDalga = (n: number): number => DALGA_GENLIK * Math.sin(2 * Math.PI * n / DALGA_PERIYOT);
 /**
+ * Ritim denetiminin ayarları.
+ *
+ * Bu denetimin ilk hâli iki kat kusurluydu ve "düzeldi" diye rapor veriyordu:
+ *   1. TEK bir gecikmeye (120) bakıyordu — yani düzeltmenin terk ettiği periyoda.
+ *      Tepe 70'e taşındığında denetim bunu göremedi.
+ *   2. Özilintiyi eğilimden arındırmadan hesaplıyor ve payı `N−lag`, paydayı `N`
+ *      terim üzerinden alıyordu. Bu taraflı tahminci uzun gecikmeleri YAPISAL olarak
+ *      küçültür; lag 840'ta yalnız 160 terim kalır ve sonuç kaçınılmaz olarak ~0
+ *      çıkar. Yani metrik uzun periyotları prensip olarak bulamıyordu.
+ *
+ * Şimdi: 25 pencereli ortalanmış hareketli ortalamayla eğilim çıkarılır, tarafsız
+ * tahminci kullanılır ve 15-336 arası BÜTÜN gecikmeler taranır; rapor tepenin
+ * hangi gecikmede olduğunu da yazar.
+ *
+ * Tavan 0,60: bu, dalga (24) ile patron (10) periyotlarının kendi hizalanmasından
+ * gelen tabanı kabul eder. Nefes tarafında yapılabileceğin sonu orasıdır; daha
+ * aşağısı için patron aralığını sabit 10 olmaktan çıkarmak gerekir — ayrı iş.
+ * Eşiği ölçüme göre AYARLAMAK yasak: ilk hâlinde 0,30 yazılmıştı ve o değer
+ * hiçbir varyantla ulaşılamıyordu, yani denetim baştan anlamsızdı.
+ */
+const RITIM_TARAMA_ALT = 15;
+const RITIM_TARAMA_UST = 336;
+const RITIM_EGILIM_PENCERE = 25;
+const RITIM_TAVAN = 0.60;
+
+/**
+ * "Zor seri" tek eşikle ölçülemez: oyuncu "%40 altı" diye bir sınır hissetmez.
+ * Art arda 12 bölüm %45'in altında kalıyorsa o da duvardır. Üç eşik, üç tavan.
+ */
+const ZOR_ESIKLERI: Array<[number, number]> = [[0.35, 5], [0.40, 7], [0.45, 14]];
+
+/** Bir bölümde denemelerin en çok bu kadarı saate yenilebilir (bkz. doğrulama). */
+const SURE_KAYBI_SIDDET = 0.30;
+
+/**
  * Nefes levelleri: hedef eğrinin belirgin üstünde tutulan, patron olmayan bölümler.
  * Test oyuncuları 44-57 arasında 12 levelin 9'unu "duvar" olarak işaretledi ve art arda
  * 20-29 kayıp serileri yaşadı; sıradan oyuncuyu kaçıran şey tek bir zor level değil,
  * zor levellerin arka arkaya gelmesi.
  *
- * Aralık 4 DEĞİL, 3 ile 4 arasında dönüşümlü (3, 7, 10, 14, 17, 21, ...).
+ * Konumlar MODÜLER BİR DESENDEN GELMİYOR; `n`'in karıştırıcısıyla seçilen 3 ya da 4
+ * aralıklarla yürüyerek üretiliyor. Sebebi ölçülmüş bir başarısızlık:
  *
- * Sebebi ritmin kendisi. Sabit 4'le oyunun bütün yapısal periyotları — dalga 24,
- * nefes 4, patron 10, arketip 8 — 120 bölümde bir aynı hizaya geliyordu: EKOK tam
- * 120. Ölçülen 120 gecikmeli özilinti 0,84, yani 1000 bölümlük oyun pratikte aynı
- * 120 bölümün sekiz tekrarıydı. Aralık 7'ye çıkınca EKOK 840 oluyor ve özilinti
- * 0,49'a iniyor. 3 ve 4'ün dönüşümlü olması şart: yalnızca 3 ya da yalnızca 4
- * periyodu geri getirirdi, {3,4,5} ise en kötü "zor seri"yi 7 bölümden 9'a çıkarıyor
- * — yani ritmi kazanmak için güvenceyi kaybettiriyordu. {3,4} ikisini birden tutuyor.
- */
-/**
- * Ritim denetiminin eşikleri (bkz. doğrulamadaki "ritim:" satırı).
+ *   sabit 4      -> dalga(24) × nefes(4) × patron(10) × arketip(8), EKOK tam 120;
+ *                   1000 bölüm pratikte aynı 120 bölümün sekiz tekrarıydı.
+ *   mod 7 (3-4)  -> 120'deki tekrar gerçekten kırıldı (0,84 -> 0,26) ama tepe
+ *                   YOK OLMADI, 70'e taşındı (0,75) — yani daha SIK tekrar.
+ *                   Sebep: EKOK(nefes 7, patron 10) = 70.
+ *   hash{3,4}    -> hiçbir EKOK doğmuyor; ölçülen tepe 0,94 -> 0,50.
  *
- * RITIM_GECIKME neden 120: eski düzende dalga (24), nefes (4), patron (10) ve
- * arketip (8) periyotlarının EKOK'u tam 120 idi.
+ * Patronla çakışan nefes İPTAL EDİLMEZ, `n+1`'e kaydırılır. İptal etmek, nefesi
+ * patronun fonksiyonu yapıyordu: mod-10 deseni nefes desenine geri giriyor ve
+ * periyodu diriltiyordu. Üstelik kural kendi amacına ters çalışıyordu — rahatlamayı
+ * tam da en zor bölümün bulunduğu yerde iptal ediyordu. Kaydırma hem periyodu
+ * temiz bırakıyor hem "zirve → boşalma" ritmini veriyor: ölçülen en uzun zor seri
+ * %35/%40/%45 eşiklerinin üçünde de 6 -> 4.
  */
-const RITIM_GECIKME = 120;
-const RITIM_TAVAN = 0.30;   // ölçülen: eski 0,41 -> yeni 0,18
-const ZOR_ESIGI = 0.40;
-const ZOR_SERI_TAVAN = 7;   // ölçülen: eski 9 -> yeni 6
-
 const NEFES_BONUS = 0.12;
-/** Dönüşümlü 3-4 aralığı: 7 bölümde iki nefes (n mod 7 ∈ {3, 0}). */
-const NEFES_PERIYOT = 7;
-const nefesMi = (n: number): boolean =>
-  !bossMu(n) && (n % NEFES_PERIYOT === 3 || n % NEFES_PERIYOT === 0);
+/**
+ * Nefes konumları. Aralık {3, 4}, seçim `n`'in karıştırıcısıyla — deterministik ama
+ * periyodik değil. Tablo üretimi sabit tohumla çalıştığı için bu küme her çalıştırmada
+ * aynıdır (bkz. `npm run verify -- --deterministic`).
+ */
+const nefesKumesi = ((): Set<number> => {
+  const karistir = (i: number): number => {
+    let x = (i * 2654435761) >>> 0;
+    x ^= x >>> 15; x = (x * 2246822519) >>> 0; x ^= x >>> 13;
+    return x >>> 0;
+  };
+  const küme = new Set<number>();
+  let n = 1, i = 0;
+  while (n <= LEVEL_COUNT) { küme.add(n); n += (karistir(i++) % 2) ? 3 : 4; }
+  return küme;
+})();
+
+const nefesMi = (n: number): boolean => {
+  if (bossMu(n)) return false;                 // patron bölümü nefes olamaz
+  if (nefesKumesi.has(n)) return true;
+  // Patrona denk gelen nefes iptal edilmez, buraya kayar.
+  return bossMu(n - 1) && nefesKumesi.has(n - 1);
+};
 /**
  * Nefes bölümlerinde dalga UYGULANMAZ; nefes onun yerine geçer.
  *
@@ -613,7 +683,25 @@ function generate(log: Log = () => {}): LevelTable {
 }
 
 // data/levels.json biçimi: her level tek satır, okunabilir kalsın diye elle diziliyor.
-const serialize = (o: LevelTable): string => '{"q3":' + o.q3 + ',"q2":' + o.q2 + ',"levels":[\n' + o.levels.map(l => JSON.stringify(l)).join(',\n') + '\n]}\n';
+/**
+ * Tablonun sürüm damgası: bölümlerin ve yıldız eşiklerinin özeti.
+ *
+ * Neden var: kayıt, bölümleri NUMARAYLA saklıyor (`bests: { "47": {...} }`). Tablo
+ * yeniden üretildiğinde o numara başka bir bulmacaya ait oluyor. Bir kez yaşandı ve
+ * ölçüldü: 1000 bölümün 966'sının tanımı, 761'inin süre sınırı değişti; 303 bölümde
+ * kayıtlı rekor yeni sınırı aşıyordu, yani oyuncuya ulaşılamaz bir hedef gösteriliyordu.
+ * Kayıtta bir `surum` alanı vardı ama hiç okunmuyordu — ölü alandı.
+ *
+ * Damga sayesinde oyun, elindeki kaydın hangi tabloya ait olduğunu bilir.
+ */
+const damga = (o: LevelTable): string =>
+  crypto.createHash("sha256")
+    .update(o.q3 + "|" + o.q2 + "|" + o.levels.map(l => JSON.stringify(l)).join(""))
+    .digest("hex").slice(0, 12);
+
+const serialize = (o: LevelTable): string =>
+  '{"v":"' + damga(o) + '","q3":' + o.q3 + ',"q2":' + o.q2 + ',"levels":[\n' +
+  o.levels.map(l => JSON.stringify(l)).join(',\n') + '\n]}\n';
 
 // ===== Doğrulama =====
 // Eski --verify yalnızca "kazanma oranı %20'nin üstünde mi" diye bakıyordu; oysa üretim
@@ -652,6 +740,8 @@ function verify(): number {
   // bekleyebildiği bölümler (bkz. GAMA_TAVAN). İkisi karşıt hatalardır, ayrı sayılır.
   const gevsekler: string[] = [];
   const gamalar: number[] = [];
+  /** Bölüm başına süre kaybı oranı; şiddet tavanı için (bkz. SURE_KAYBI_SIDDET). */
+  const sureKayiplari: number[] = [];
 
   for (const l of data.levels) {
     const ad = `${l.n}${l.boss ? "*" : ""}`;
@@ -672,6 +762,7 @@ function verify(): number {
     const g = gamaHesapla(l.rings, l.limit);
     gamalar.push(g);
     if (g > GAMA_TAVAN + 0.05) gevsekler.push(`${ad}: γ ${g.toFixed(2)}`);
+    sureKayiplari.push(ev.sureKaybi);
     if (ev.sureKaybi > SURE_KAYBI_VERIFY) sureliler.push(`${ad}: denemelerin %${Math.round(ev.sureKaybi * 100)}'i süre dolmasıyla bitiyor`);
     oranlar.push(ev.win);
     rows.push(`${ad}:${Math.round(ev.win * 100)}%`);
@@ -732,36 +823,62 @@ function verify(): number {
 
   // ---- Ritim: oyun kendini tekrar ediyor mu? --------------------------------
   //
-  // Eski düzende bütün yapısal periyotlar — dalga 24, nefes 4, patron 10, arketip 8 —
-  // EKOK'u tam 120 olacak şekilde hizalanıyordu: 1000 bölümlük oyun pratikte aynı
-  // 120 bölümün sekiz tekrarıydı. Ölçülen kazanma oranlarında 120 gecikmeli özilinti
-  // 0,41'di. Nefes aralığı 3-4 dönüşümlü yapılıp nefes dalgayı ezince 0,18'e indi.
-  //
-  // İkinci ölçü aynı düzeltmenin BEDELİNİ denetler: periyodikliği kırmanın kolay yolu
-  // nefesleri dalganın çukuruna düşürmektir ve o zaman "zor seri" uzar. İkisi birlikte
-  // denetlenmezse biri kazanılırken öbürü sessizce kaybedilir.
-  const ritimOrt = oranlar.reduce((a, b) => a + b, 0) / oranlar.length;
-  let ritimPay = 0, ritimPayda = 0;
-  for (let i = 0; i < oranlar.length; i++) {
-    ritimPayda += (oranlar[i] - ritimOrt) ** 2;
-    if (i + RITIM_GECIKME < oranlar.length) {
-      ritimPay += (oranlar[i] - ritimOrt) * (oranlar[i + RITIM_GECIKME] - ritimOrt);
+  // Eğilimden arındırılmış seride BÜTÜN gecikmeler taranır (bkz. RITIM_TAVAN).
+  // İkinci ölçü aynı düzeltmenin BEDELİNİ denetler: periyodikliği kırmanın kolay
+  // yolu nefesleri dalganın çukuruna düşürmektir ve o zaman "zor seri" uzar.
+  // İkisi birlikte denetlenmezse biri kazanılırken öbürü sessizce kaybedilir.
+  const yari = (RITIM_EGILIM_PENCERE - 1) / 2;
+  const kalinti = oranlar.map((_, i) => {
+    const a = Math.max(0, i - yari), b = Math.min(oranlar.length, i + yari + 1);
+    let t = 0; for (let k = a; k < b; k++) t += oranlar[k];
+    return oranlar[i] - t / (b - a);
+  });
+  const ortKalinti = kalinti.reduce((a, b) => a + b, 0) / kalinti.length;
+  let toplamKare = 0;
+  for (const x of kalinti) toplamKare += (x - ortKalinti) ** 2;
+  /** Tarafsız özilinti: payda da `N−lag` terim üzerinden normalize edilir. */
+  const ozilinti = (lag: number): number => {
+    const n = kalinti.length - lag;
+    let p = 0;
+    for (let i = 0; i < n; i++) p += (kalinti[i] - ortKalinti) * (kalinti[i + lag] - ortKalinti);
+    return p / (toplamKare * n / kalinti.length);
+  };
+  let tepeLag = RITIM_TARAMA_ALT, tepe = -Infinity;
+  for (let lag = RITIM_TARAMA_ALT; lag <= RITIM_TARAMA_UST; lag++) {
+    const c = ozilinti(lag);
+    if (c > tepe) { tepe = c; tepeLag = lag; }
+  }
+  const seriler = ZOR_ESIKLERI.map(([esik, tavan]) => {
+    let en = 0, ardisik = 0;
+    for (const o of oranlar) {
+      if (o < esik) { ardisik++; if (ardisik > en) en = ardisik; } else ardisik = 0;
+    }
+    return { esik, tavan, en };
+  });
+  console.log(`ritim: en güçlü tekrar lag ${tepeLag} = ${tepe.toFixed(2)} (tavan ${RITIM_TAVAN}); ` +
+    `zor seri ` + seriler.map(x => `<%${x.esik * 100}: ${x.en}/${x.tavan}`).join("  "));
+  if (tepe > RITIM_TAVAN) {
+    sorunlar.push(`oyun ${tepeLag} bölümde bir kendini tekrar ediyor: özilinti ${tepe.toFixed(2)}`);
+  }
+  for (const x of seriler) {
+    if (x.en > x.tavan) {
+      sorunlar.push(`%${x.esik * 100} altında ${x.en} bölümlük kesintisiz seri var (en çok ${x.tavan}): ` +
+        `sıradan oyuncuyu kaçıran şey tek bir zor bölüm değil, arka arkaya gelenler`);
     }
   }
-  const ozilinti = ritimPay / ritimPayda;
-  let enUzunZor = 0, ardisik = 0;
-  for (const o of oranlar) {
-    if (o < ZOR_ESIGI) { ardisik++; if (ardisik > enUzunZor) enUzunZor = ardisik; }
-    else ardisik = 0;
-  }
-  console.log(`ritim: ${RITIM_GECIKME} gecikmeli özilinti ${ozilinti.toFixed(2)} (tavan ${RITIM_TAVAN}), ` +
-    `en uzun zor seri ${enUzunZor} bölüm (tavan ${ZOR_SERI_TAVAN})`);
-  if (ozilinti > RITIM_TAVAN) {
-    sorunlar.push(`oyun ${RITIM_GECIKME} bölümde bir kendini tekrar ediyor: özilinti ${ozilinti.toFixed(2)}`);
-  }
-  if (enUzunZor > ZOR_SERI_TAVAN) {
-    sorunlar.push(`%${ZOR_ESIGI * 100} altında ${enUzunZor} bölümlük kesintisiz seri var: sıradan oyuncuyu ` +
-      `kaçıran şey tek bir zor bölüm değil, arka arkaya gelenler`);
+
+  // ---- Süre kaybının ŞİDDETİ ------------------------------------------------
+  //
+  // Sayı tavanı (SURELI_TAVAN) kaç bölümün saate yenildiğini sınırlıyor ama
+  // şiddetini sınırlamıyordu: %26 ile %70 aynı kovadaydı. Ölçüldü, bozuk olan tek
+  // bir arketipti — büyükKasa ve onun kapanış sürümü.
+  const siddetliler = data.levels
+    .map((l, i) => ({ n: l.n, k: sureKayiplari[i] }))
+    .filter(x => x.k > SURE_KAYBI_SIDDET);
+  if (siddetliler.length) {
+    sorunlar.push(`${siddetliler.length} bölümde denemelerin %${SURE_KAYBI_SIDDET * 100}'inden fazlası ` +
+      `saate yeniliyor: ` + siddetliler.slice(0, 6).map(x => `${x.n} (%${Math.round(x.k * 100)})`).join("; ") +
+      (siddetliler.length > 6 ? " …" : ""));
   }
 
   // Baştan kilitli halkalar kalan halkalara yeterli pay bırakıyor mu? (bkz. EN_AZ_PAY)

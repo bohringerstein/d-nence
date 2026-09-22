@@ -25,6 +25,11 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["apple-touch-icon.png", "icon.svg"],
       manifest: {
+        // id BUGÜN örtük olarak start_url'den ("/") türetiliyor; açıkça yazmak
+        // davranışı hiç değiştirmiyor ama yarın base ya da start_url değiştirilirse
+        // kurulu uygulamaların kopmasını önlüyor. Kurulu kitle büyümeden yazılmalı:
+        // sonradan FARKLI bir değer vermek kurulu uygulamaları ikiye böler.
+        id: "/",
         name: "Dönence",
         short_name: "Dönence",
         description: "A one-tap vault-cracking game: lock the spinning rings and keep the ball a way out.",
@@ -48,8 +53,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg,json,webmanifest,woff2}"],
-        // 1000 bölümlük tablo 643 KB; varsayılan 2 MB sınırı yeter ama açıkça yazalım.
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        // 1000 bölümlük tablo 643 KB. Sınır 1 MB: tablo sessizce şişerse derleme
+        // uyarı versin. 4 MB "geniş" bir ayardı, doğru bir ayar değil.
+        maximumFileSizeToCacheInBytes: 1024 * 1024,
         // Oyun tamamen statik: her şey önbelleğe alınır, çevrimdışı tam çalışır.
         cleanupOutdatedCaches: true
         // runtimeCaching YOK ve olmamalı: oyun hiçbir dış adrese istek atmaz.

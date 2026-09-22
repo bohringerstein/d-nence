@@ -85,7 +85,7 @@ export const EN: Metinler = {
 
   yildizEtiketi: { 3: "Clean open", 2: "Good open", 1: "By a hair" },
   sonucSatiri: (etiket, yildiz, sure) => `${etiket} ${yildiz} ${sure} s`,
-  payEki: derece => ` · ${derece}° margin`,
+  yildizaKalan: (yildiz, yuzde) => ` · ${yuzde}% from ${yildiz} stars`,
   rekorEki: ", record",
 
   patron: {
@@ -138,6 +138,8 @@ or a history of discomfort from patterns, you can turn on &ldquo;Soften the patt
 <b>Settings</b> and take breaks while you play.`
   },
 
+  rekorlarYenilendi: "Levels were rebuilt, records reset",
+  yukleniyor: "Loading levels…",
   tabloIndirilemediBaslik: "Could not load the levels",
   tabloIndirilemediMetin: "Check your connection and try again. Once the game has opened, it works offline too.",
   tekrarDene: "Try again",

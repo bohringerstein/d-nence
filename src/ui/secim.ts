@@ -9,8 +9,8 @@
 // Sayfalama şart: 1000 düğmeyi birden çizmek hem telefonu yorar hem de içinde
 // kaybolunur. Sayfa boyu 100 çünkü oyuncunun zihnindeki birim de yüzlük dilim.
 import type { Metinler } from "../dil/index.ts";
-import { sayi } from "../dil/index.ts";
 import type { Best } from "../core/index.ts";
+import { bossMu } from "../core/index.ts";
 
 export const SAYFA_BOYU = 100;
 
@@ -46,6 +46,18 @@ const yildizlar = (b: Best | undefined): string =>
  *
  * Kilitli bölümler `disabled`: görünmeleri "burada devamı var" demek, tıklanabilmeleri
  * ise ilerlemeyi anlamsız kılardı.
+ *
+ * Izgara bir LİSTE (`<ul>/<li>`): ekran okuyucu tarama kipinde "100 öğeli liste" ve
+ * "12 / 100" bilgisini verir; düz bir `<div>`'de ikisi de yok. `role="grid"` + ok
+ * tuşu gezinmesi bilerek seçilmedi — o, "satır 3, sütun 4" der, oysa oyuncu bölüm
+ * numarasıyla düşünür ve sütun sayısı genişliğe göre değiştiği için ızgara koordinatı
+ * kararsızdır.
+ *
+ * Altı durum, dört kanal: ŞEKİL (patron kare, öbürleri yuvarlak), KENARLIK (kesikli =
+ * kilitli, ince = açık, kalın = şu anki), DOLGU (yalnız bitirilmiş bölümde) ve GLİF
+ * (yıldız sayısı / kilit). Eskiden altı durumun yalnız ikisi ayrışıyordu, çünkü
+ * `.kutu button` kuralı `.secimDugme` renklerini özgüllükle eziyordu ve geriye tek
+ * kanal olarak 8,8 pikselik yıldız glifi kalıyordu.
  */
 export function izgaraHtml(g: IzgaraGirdi): string {
   const [bas, son] = aralik(g.sayfa, g.toplam);
@@ -56,16 +68,19 @@ export function izgaraHtml(g: IzgaraGirdi): string {
     const sinif = ["secimDugme"];
     if (n === g.simdiki) sinif.push("simdiki");
     if (b) sinif.push("bitti");
-    const etiket = acik
-      ? g.m.bolumEtiketi(n, b ? b.s : 0)
-      : g.m.bolumKilitli(n);
+    // Patron her 10 bölümde bir; ızgarada da öyle görünsün. Oyuncunun zaten hissettiği
+    // ritim, 100 düğmelik bir sayfada göz için çapa olur.
+    if (bossMu(n)) sinif.push("patron");
+    const etiket = acik ? g.m.bolumEtiketi(n, b ? b.s : 0) : g.m.bolumKilitli(n);
     parca.push(
-      `<button type="button" class="${sinif.join(" ")}" data-n="${n}"` +
+      `<li><button type="button" class="${sinif.join(" ")}" data-n="${n}"` +
       `${acik ? "" : " disabled"}${n === g.simdiki ? ' aria-current="true"' : ""}` +
       ` aria-label="${etiket}">` +
-      `<b aria-hidden="true">${sayi(g.m, n, 0)}</b>` +
-      `<i aria-hidden="true">${acik ? yildizlar(b) : "·"}</i>` +
-      `</button>`);
+      `<b aria-hidden="true">${n}</b>` +
+      // Kilitli düğmenin glifi CSS ile çizilir (styles.css .secimDugme:disabled i):
+      // 100 satır inline SVG, sayfanın HTML'ini iki katına çıkarırdı.
+      `<i aria-hidden="true">${acik ? yildizlar(b) : ""}</i>` +
+      `</button></li>`);
   }
   return parca.join("");
 }

@@ -10,9 +10,8 @@ import path from "node:path";
 import { solve, LEVEL_COUNT } from "../core/index.ts";
 import type { LevelTable, Level } from "../core/index.ts";
 import { createLevel, tap, step, decay, kalanSure, HEPSI, YOK } from "./state.ts";
-import { yildizYazisi, sureYazisi, payYazisi } from "./hints.ts";
+import { yildizYazisi, sureYazisi, kalanYazisi } from "./hints.ts";
 import { TR } from "../dil/tr.ts";
-import { DEG } from "../core/index.ts";
 import type { TapSonuc } from "./state.ts";
 
 const ADIM = 1 / 120;
@@ -290,12 +289,12 @@ test("kasa açılınca görünen satır yıldızı, süreyi ve payı birlikte s�
 
   // main.ts ile AYNI sıra: sonuç satırı + pay eki + rekor eki.
   const satir = TR.sonucSatiri(TR.yildizEtiketi[sonuc.yildiz], yildizYazisi(sonuc.yildiz),
-    sureYazisi(sonuc.sure, TR)) + payYazisi(sonuc.pay / DEG, TR);
+    sureYazisi(sonuc.sure, TR)) + kalanYazisi(sonuc.q, tablo.q3, tablo.q2, TR);
   assert.match(satir, /★/, "yıldız görünmeli");
   assert.match(satir, /sn/, "süre görünmeli");
-  assert.match(satir, /° pay$/, "pay en sonda olmalı");
+  if (sonuc.q < tablo.q3) assert.match(satir, /kaldı$/, "kalan mesafe en sonda olmalı");
   // Alt çubuk iki satır yer ayırıyor (320 pikselde üç): satır oraya sığmalı.
   assert.ok(satir.length <= 48, `sonuç satırı ${satir.length} karakter, alt çubuğa sığmaz: ${satir}`);
-  // Pay pozitif olmalı: kazanmak, geçiş eşiğini geçmek demek.
-  assert.ok(sonuc.pay > 0, "kazanılan bölümde pay pozitif olmalı");
+  // q pozitif olmalı: kazanmak, geçiş eşiğini geçmek demek.
+  assert.ok(sonuc.q > 0, "kazanılan bölümde q pozitif olmalı");
 });

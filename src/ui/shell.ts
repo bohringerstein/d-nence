@@ -23,12 +23,16 @@ export interface Kabuk {
   bitis: HTMLElement;
   bitisMetin: HTMLElement;
   bitisDugme: HTMLButtonElement;
+  /** Bitiş ekranından bölüm seçimine giden ikinci çıkış. */
+  bitisSecim: HTMLButtonElement;
   flas: HTMLElement;
   /** Devam ederken çalışan 3-2-1 sayacı. */
   gerisayim: HTMLElement;
   duraklat: HTMLElement;
   duraklatMetin: HTMLElement;
   devamDugme: HTMLButtonElement;
+  /** Duraklatma örtüsünden bölüm seçimine giden düğme. */
+  duraklatSecim: HTMLButtonElement;
   ayarAc: HTMLButtonElement;
   ayarPanel: HTMLElement;
   /** Panel başlığı; açılışta odak buraya verilir (bkz. markup). */
@@ -86,7 +90,11 @@ const html = (m: Metinler): string => `
   <!-- Süre çubuğu sayacın görsel kopyası; ekran okuyucuya iki kez söylenmesin. -->
   <div class="bar" id="bar" aria-hidden="true"><i id="barFill"></i></div>
   <div class="alan">
-    <canvas id="c" aria-label="${m.oyunAlani}"></canvas>
+    <!-- tabindex="0": oyun alanı odaklanabilir. Bu oyunun tek kontrolü boşluk/Enter,
+         yani örtü kapanınca odağın gidebileceği doğru yer burası — bir düğme olsaydı
+         oyuncunun bir sonraki boşluk tuşu o düğmeyi çalıştırırdı. Ekran okuyucu da
+         menüden çıkınca "Oyun alanı. Dokunarak sıradaki halkayı kilitle." okur. -->
+    <canvas id="c" tabindex="0" aria-label="${m.oyunAlani}"></canvas>
     <div class="flas" id="flas" aria-hidden="true"></div>
     <div class="gerisayim" id="gerisayim" aria-hidden="true"></div>
   </div>
@@ -140,7 +148,13 @@ const html = (m: Metinler): string => `
       <!-- Gizlilik politikası her iki mağazanın da zorunlu tuttuğu bir bağlantı
            (Apple 5.1.1(i) uygulamanın İÇİNDE de ister). Sayfa uygulamayla birlikte
            yayınlanır ve çevrimdışı da açılır: public/gizlilik.html -->
-      <p class="gizlilikSatir"><a href="./gizlilik.html" target="_blank" rel="noopener">${m.gizlilik}</a></p>
+      <!-- target="_blank" YOK: PWA ana ekrandan açıldığında yeni sekme, sayfayı
+           uygulamanın DIŞINDA açar (iOS'ta Safari'ye atar) ve oyuncu kurulu
+           uygulamasına dönemez. Sayfa kapsam içi olduğu için aynı pencerede açmak
+           standalone'dan hiç çıkarmıyor; gizlilik sayfasının başında oyuna dönen
+           bir bağlantı var. Apple 5.1.1(i) "uygulama içinden erişilebilsin" şartı
+           ancak böyle tartışmasız karşılanıyor. -->
+      <p class="gizlilikSatir"><a href="./gizlilik.html">${m.gizlilik}</a></p>
       <!-- "Tamam" kendi yapışkan şeridinde: kutu kayabilir ve kısa ekranda panelden
            çıkış yolu görünür kalmalı. Bu düğme görünmezken ekranda kalan son düğme
            "Baştan başla" oluyordu (bkz. styles.css .kutu). -->
@@ -153,10 +167,14 @@ const html = (m: Metinler): string => `
       <h2 id="secimBaslik" tabindex="-1">${m.bolumSec}</h2>
       <div class="secimSayfa">
         <button id="secimGeri" type="button" class="ikon" aria-label="${m.oncekiSayfa}">&lsaquo;</button>
-        <span id="secimAralik" aria-hidden="true"></span>
+        <!-- role="status": sayfa oklarına basınca 100 düğme sessizce değişiyordu ve
+             hangi yüzlük dilimde olunduğunu söyleyen tek öğe bu yazıydı — üstelik
+             aria-hidden'dı. Ekran okuyucuyla bölüm seçimi kullanılamaz durumdaydı
+             (WCAG 2.2, SC 4.1.3 Durum Mesajları). -->
+        <span id="secimAralik" role="status"></span>
         <button id="secimIleri" type="button" class="ikon" aria-label="${m.sonrakiSayfa}">&rsaquo;</button>
       </div>
-      <div class="secimIzgara" id="secimIzgara"></div>
+      <ul class="secimIzgara" id="secimIzgara"></ul>
       <div class="kutuAlt"><button id="secimKapat" type="button">${m.tamam}</button></div>
     </div>
   </div>
@@ -171,6 +189,13 @@ const html = (m: Metinler): string => `
       <h2 id="duraklatBaslik">${m.duraklatildi}</h2>
       <p id="duraklatMetin"></p>
       <button id="devamDugme" type="button">${m.devamEt}</button>
+      <!-- Bölüm seçiminin ikinci ve asıl giriş noktası. Üst çubuktaki bölüm numarasını
+           düğme yapmak denendi ve elendi: orası CANLI dokunma yüzeyi (dinleyici kökte,
+           bkz. game/input.ts), yani hızlı dokunan oyuncunun parmağı oyun ortasında
+           modal açardı. Duraklatma örtüsünün maliyeti sıfır — örtü açıkken dokunuşlar
+           zaten süzülüyor — ve niyet yolu doğru: bölüm değiştirmek isteyen oyuncu
+           zaten duraklatmış oyuncudur. -->
+      <button id="duraklatSecim" type="button">${m.bolumSec}</button>
     </div>
   </div>
   <div class="ortu" id="bitis" hidden role="dialog" aria-modal="true" aria-labelledby="bitisBaslik">
@@ -178,6 +203,9 @@ const html = (m: Metinler): string => `
       <h2 id="bitisBaslik">${m.kasaAcildi}</h2>
       <p id="bitisMetin"></p>
       <button id="bitisDugme" type="button">${m.bastanOyna}</button>
+      <!-- İkinci çıkış: 1000 bölümü bitiren oyuncunun eksik yıldızları olabilir.
+           Tek düğmeli bir bitiş ekranı onu tek bir yola mahkûm ediyordu. -->
+      <button id="bitisSecim" type="button">${m.bolumSec}</button>
     </div>
   </div>
 </div>`;
@@ -219,11 +247,13 @@ export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): 
     bitis: bul(hedef, "bitis"),
     bitisMetin: bul(hedef, "bitisMetin"),
     bitisDugme: bul<HTMLButtonElement>(hedef, "bitisDugme"),
+    bitisSecim: bul<HTMLButtonElement>(hedef, "bitisSecim"),
     flas: bul(hedef, "flas"),
     gerisayim: bul(hedef, "gerisayim"),
     duraklat: bul(hedef, "duraklat"),
     duraklatMetin: bul(hedef, "duraklatMetin"),
     devamDugme: bul<HTMLButtonElement>(hedef, "devamDugme"),
+    duraklatSecim: bul<HTMLButtonElement>(hedef, "duraklatSecim"),
     ayarAc: bul<HTMLButtonElement>(hedef, "ayarAc"),
     ayarPanel: bul(hedef, "ayarPanel"),
     ayarBaslik: bul(hedef, "ayarBaslik"),

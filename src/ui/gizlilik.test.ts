@@ -13,11 +13,15 @@ import type { DilKodu } from "../dil/index.ts";
 
 const kok = path.join(import.meta.dirname, "..", "..");
 const sayfa = fs.readFileSync(path.join(kok, "public", "gizlilik.html"), "utf8");
-const shell = fs.readFileSync(path.join(kok, "src", "ui", "shell.ts"), "utf8");
+const shellHam = fs.readFileSync(path.join(kok, "src", "ui", "shell.ts"), "utf8");
+/** Yorumlar elenir: bir kuralın NEDEN böyle olduğunu anlatan yorum, kuralın
+    kendisi sanılmasın. (Bu dosyadaki testlerden biri tam olarak buna takıldı.) */
+const shell = shellHam.replace(/<!--[\s\S]*?-->/g, "");
 
 test("sayfa uygulamayla birlikte yayınlanıyor ve ayarlardan açılıyor", () => {
   assert.ok(shell.includes('href="./gizlilik.html"'), "ayarlarda bağlantı olmalı");
-  assert.ok(shell.includes('rel="noopener"'), "yeni sekme noopener ile açılmalı");
+  assert.ok(!shell.includes('target="_blank"'),
+    "gizlilik bağlantısı yeni sekmede açılmamalı: PWA'da uygulamadan çıkarıyor");
   for (const k of Object.keys(DILLER) as DilKodu[]) {
     assert.ok(DILLER[k].gizlilik.trim().length > 0, `${k}: bağlantı metni eksik`);
   }
@@ -46,13 +50,31 @@ test("uygulama da dış adrese istek atmıyor", () => {
     "servis çalışanına dış adres kuralı eklenmiş: gizlilik metni de güncellenmeli");
 });
 
-test("iletişim adresi doldurulmayı bekliyor uyarısı", () => {
-  // Yer tutucu bilerek duruyor: kimseye ait bir e-posta adresini sormadan yayınlamayız.
-  // Mağazaya çıkmadan ÖNCE doldurulmalı; bu test onun unutulmadığını hatırlatır.
-  const yerTutucu = sayfa.includes("[İLETİŞİM E-POSTASI]") || sayfa.includes("[CONTACT EMAIL]");
-  if (yerTutucu) {
-    assert.ok(true, "yer tutucu duruyor: mağazaya çıkmadan önce doldurulmalı");
-  } else {
-    assert.ok(/[\w.+-]+@[\w-]+\.[\w.]+/.test(sayfa), "iletişim adresi eksik");
+test("yayıncı kimliği ve iletişim adresi", { todo: "mağazaya çıkmadan önce doldurulmalı" }, () => {
+  // Yer tutucu BİLEREK duruyor (Kader'in kararı): kimseye ait bir adı ya da e-postayı
+  // sormadan yayınlamayız. Ama testin "hatırlatması" için DÜŞEBİLİR olması şart —
+  // önceki hâli `assert.ok(true)` idi, yani hiçbir şey yazmadan geçiyordu ve
+  // hatırlatmıyordu. `todo` işaretiyle her çalıştırmada görünür bir satır bırakır.
+  //
+  // Apple 5.1.1(i) ve Play User Data Policy ikisini de zorunlu tutuyor: politika,
+  // veri sorumlusunun kim olduğunu ve bir iletişim yolunu içermek zorunda — veri
+  // toplanmasa bile.
+  for (const yerTutucu of ["[YAYINCI ADI]", "[PUBLISHER NAME]", "[İLETİŞİM E-POSTASI]", "[CONTACT EMAIL]"]) {
+    assert.ok(!sayfa.includes(yerTutucu), "doldurulmamış alan: " + yerTutucu);
   }
+  assert.ok(/[\w.+-]+@[\w-]+\.[\w.]+/.test(sayfa), "iletişim adresi eksik");
+});
+
+test("politika iki dil parçasını işaretliyor", () => {
+  // Sayfa <html lang="tr"> ve içinde tam bir İngilizce bölüm var; işaretlenmezse
+  // ekran okuyucu onu Türkçe sesiyle okur (WCAG 2.2, SC 3.1.2 Parçaların Dili).
+  assert.ok(/<section lang="tr">/.test(sayfa), "Türkçe bölüm işaretlenmeli");
+  assert.ok(/<section lang="en">/.test(sayfa), "İngilizce bölüm işaretlenmeli");
+});
+
+test("gizlilik sayfasından oyuna dönüş yolu BAŞTA da var", () => {
+  // Sayfa 390 px'te ~3800 piksel; tek dönüş bağlantısı en alttaydı. Ayrıca bağlantı
+  // artık yeni sekmede açılmıyor (bkz. ui/shell.ts), yani dönüş yolu şart.
+  const bas = sayfa.slice(0, sayfa.indexOf("<h1>"));
+  assert.ok(/href="\.\/"/.test(bas), "sayfanın başında oyuna dönüş bağlantısı olmalı");
 });

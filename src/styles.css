@@ -137,9 +137,12 @@ button.clock {
   flex: 0 0 auto;
   width: 0.34em;
   height: 0.46em;
-  border-left: 0.11em solid currentColor;
-  border-right: 0.11em solid currentColor;
-  opacity: 0.5;
+  /* Renk `currentColor` + opacity:0.5 DEĞİL, doğrudan token. Opaklıkla açık temada
+     ölçülen kontrast 2,78:1'di (SC 1.4.11 eşiği 3:1). Opaklığı 0,62'ye çekmek 3,0-3,2
+     verir — eşiğin tam üstünde, yani `--bg`'de ileride yapılacak herhangi bir ayar
+     onu altına düşürür. Token kararlı (4,56:1) ve testle bağlanabilir. */
+  border-left: 0.11em solid var(--muted);
+  border-right: 0.11em solid var(--muted);
 }
 
 .lvl { font-size: 1.1rem; color: var(--muted); white-space: nowrap; }
@@ -241,6 +244,9 @@ button {
   flex: 0 0 auto;
 }
 button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* Oyun alanı odaklanabilir (bkz. ui/shell.ts). Halka kenardan İÇERİ çizilir, yoksa
+   tuvalin dışına taşıp üst/alt çubuğun altında kalırdı. */
+canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 
 /* Örtü: bitiş ekranı ve ayarlar paneli aynı kabuğu kullanır.
 
@@ -501,6 +507,141 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .hataEkrani p { color: var(--muted); line-height: 1.5; margin: 0 0 1.25rem; }
 .hataEkrani button { color: var(--ink); padding: 8px 20px; }
 .hataEkrani ul { color: var(--muted); font-size: 0.85rem; margin-top: 1.25rem; }
+
+/* Ayarlar panelindeki eylem düğmeleri alt alta ve tam genişlikte.
+   Yan yana dizildiklerinde altlarındaki açıklama hangi düğmeye ait olduğunu
+   söylemiyordu: "Level 1'e döner ve açtığın bölümler kilitlenir" cümlesi
+   "Nasıl oynanır"ın da altında duruyordu. */
+#ayarPanel .kutu > button {
+  display: flex;
+  width: 100%;
+  max-width: 14rem;
+  margin: 0.5rem auto 0;
+}
+
+/* Ayarlardaki gizlilik bağlantısı: sessiz bir metin bağlantısı, düğme değil. Seyrek
+   açılır ama her iki mağaza da uygulamanın içinde bulunmasını şart koşuyor. */
+.gizlilikSatir { margin: 1rem 0 0; font-size: 0.85rem; }
+.gizlilikSatir a { color: var(--muted); }
+.gizlilikSatir a:hover, .gizlilikSatir a:focus-visible { color: var(--ink); }
+
+/* Bölüm seçimi (src/ui/secim.ts). Yüz düğme birden çizilir; kutu kendi içinde kayar
+   (taşma ayarı .kutu tabanında).
+
+   ÖZGÜLLÜK NOTU: bütün düğme kuralları ".kutu .secimDugme" (0-2-0) ile yazılır, çünkü
+   ".kutu button" (0-1-1) tek başına ".secimDugme"yi (0-1-0) eziyordu. Sonuç sinsiydi:
+   renk kararlarının üçü de aynı piksele çıkıyor, "bitirildi" ile "oynanmadı" birebir
+   aynı görünüyordu — yazılmış ama hiç uygulanmamış CSS. */
+.secimKutu { max-width: 26rem; }
+.secimSayfa {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0.25rem 0 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.secimSayfa button { min-width: 44px; min-height: 44px; font-size: 1.2rem; }
+.secimSayfa button:disabled { opacity: 0.35; cursor: default; }
+
+/* 2,8 rem alt sınır 320 pikselde tam 5 sütun verir (hücre 46,6 px, dokunma eşiğinin
+   üstünde); 4 sütunla ızgara 1.661 px, 5 sütunla 1.192 px — 3,2 ekran yerine 2,3.
+   Geniş ekranda auto-fill kendiliğinden 7 sütuna çıkar. */
+.secimIzgara {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.8rem, 1fr));
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.secimIzgara > li { display: contents; }
+
+.kutu .secimDugme {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 100%;
+  /* 44px dokunma hedefi: yüz küçük düğmenin yan yana durduğu tek ekran burası. */
+  min-height: 46px;
+  padding: 4px 2px;
+  margin-top: 0;
+  border-radius: 10px;
+  border-color: var(--muted);
+  /* Açık ama henüz oynanmamış bölüm: kenarlık soluk, sayı okunur. */
+  color: var(--ink);
+  background: none;
+  font-variant-numeric: tabular-nums;
+}
+.kutu .secimDugme b { font-size: 0.95rem; font-weight: 600; }
+/* Glif satırı her zaman yer kaplar: boşken düğmeler zıplamasın. */
+.kutu .secimDugme i {
+  font-size: 0.7rem;
+  line-height: 1;
+  font-style: normal;
+  min-height: 0.8em;
+  display: flex;
+  align-items: center;
+}
+
+/* BİTİRİLDİ: dolgu + koyu kenarlık. Dolgu, "oynanmadı"dan ayıran ikinci kanal;
+   yıldız sayısı üçüncüsü. */
+.kutu .secimDugme.bitti {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  border-color: var(--ink);
+}
+
+/* PATRON: kare köşe. Her 10 bölümde bir gelen ritmi ızgarada da görünür kılar ve
+   "kasa" metaforuna uyar. Renk kullanılmıyor; şekil tek başına yeterli. */
+.kutu .secimDugme.patron { border-radius: 3px; }
+
+/* ŞU ANKİ: kalın kenarlık + amber vurgu dolgusu. Tek başına 0,8 pikselik bir kenarlık
+   farkı görünmüyordu. Ağırlık kanal olarak KULLANILAMAZ: gömülü yazı tipi 300-600
+   aralığında, 700 istemek tarayıcıya sahte kalın çizdirir (bkz. ui/fonts.test.ts).
+   Amber yalnız DOLGU olarak kullanılıyor, metin rengi olarak değil — küçük puntoda
+   amber metin açık temada 1,97:1 okunur (bkz. ui/contrast.test.ts). */
+.kutu .secimDugme.simdiki {
+  border-width: 2px;
+  border-color: var(--ink);
+  background: color-mix(in srgb, var(--ball) 22%, transparent);
+}
+
+/* KİLİTLİ: kesikli kenarlık + kilit çizimi + soluk. Üç kanal, hiçbiri tek başına
+   yük taşımıyor. Opaklık 0,4 yerine 0,65: 0,4'te kontrast 2,19:1 ile sayı
+   okunmuyordu, 0,65'te ~4,6:1. (Etkin olmayan bileşen 1.4.3'ten muaf, ama
+   okunmayan bir sayının orada durmasının bir anlamı yok.) */
+.kutu .secimDugme:disabled {
+  opacity: 0.65;
+  cursor: default;
+  border-style: dashed;
+  border-color: var(--muted);
+  color: var(--muted);
+  background: none;
+}
+/* Kilit, CSS ile çizilir: 100 satırlık inline SVG sayfanın HTML'ini iki katına çıkarırdı. */
+.kutu .secimDugme:disabled i {
+  width: 8px;
+  height: 6px;
+  min-height: 6px;
+  margin-top: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  position: relative;
+}
+.kutu .secimDugme:disabled i::before {
+  content: "";
+  position: absolute;
+  left: 1.4px;
+  bottom: 5px;
+  width: 2.4px;
+  height: 2.4px;
+  border: 1.2px solid currentColor;
+  border-bottom: 0;
+  border-radius: 3px 3px 0 0;
+}
 
 /* Ayarlar panelindeki eylem düğmeleri alt alta ve tam genişlikte.
    Yan yana dizildiklerinde altlarındaki açıklama hangi düğmeye ait olduğunu

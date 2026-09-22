@@ -89,14 +89,7 @@ export type TapSonuc =
   | { tip: "yok" }
   | { tip: "kilit"; aciklik: number }
   | { tip: "kayip"; sebep: "aciklik"; pay: number }
-  /**
-   * `pay`: kasa açıldığında yolun geçiş eşiğinden NE KADAR geniş kaldığı (radyan).
-   *
-   * Yıldız üç kovadan biridir ve sıradan oyuncunun bölümlerin %68'i 1 yıldızla
-   * bitiyor: iki denemenin arasındaki fark yıldıza yansımıyor, yani oyuncu
-   * ilerlediğini göremiyor. Pay o sürekli büyüklüğün kendisi.
-   */
-  | { tip: "acildi"; yildiz: Stars; q: number; pay: number; sure: number };
+  | { tip: "acildi"; yildiz: Stars; q: number; sure: number };
 
 /**
  * Kanalın ne kadar ferah kaldığı: 1 = levelin en dar boşluğu kadar geniş, 0 = eşikte.
@@ -149,7 +142,7 @@ export function tap(s: LevelState, q3: number, q2: number): TapSonuc {
 
   const minGap = Math.min(...s.level.rings.map(x => x.gap)) * DEG;
   const q = starRatio(en.w, minGap);
-  return { tip: "acildi", yildiz: starCount(q, q3, q2), q, pay: en.w - NEED_PASS, sure: s.finishTime };
+  return { tip: "acildi", yildiz: starCount(q, q3, q2), q, sure: s.finishTime };
 }
 
 export type AdimSonuc = { tip: "yok" } | { tip: "sureDoldu" } | { tip: "bitti" };

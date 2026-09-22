@@ -22,6 +22,17 @@ export interface Kayit {
    * ile ölçülür, "şu an oynanan" ile değil.
    */
   enUzak: number;
+  /**
+   * Rekorların ait olduğu TABLO sürümü (bkz. core/levels.ts `v`).
+   *
+   * Bölümler numarayla saklanıyor; tablo yeniden üretildiğinde "47. bölümde 2 yıldız"
+   * kaydı başka bir bulmacaya ait oluyor. Bir kez yaşandı: 966 bölümün tanımı değişti
+   * ve 303 bölümde gösterilen rekor ulaşılamaz bir hedef hâline geldi.
+   *
+   * Alan YOKSA kayıt damgadan önceki dönemden gelir ve mevcut tabloyu benimser —
+   * silme yapılmaz. Alan VARSA ve eşleşmezse yalnız `bests` temizlenir.
+   */
+  tabloSurum?: string;
   /** Level numarası -> en iyi sonuç. */
   bests: Record<number, Best>;
 }
@@ -39,6 +50,7 @@ function ayikla(ham: unknown): Kayit {
   if (typeof o.level === "number" && Number.isInteger(o.level) && o.level >= 1 && o.level <= LEVEL_COUNT) {
     k.level = o.level;
   }
+  if (typeof o.tabloSurum === "string" && o.tabloSurum.length <= 64) k.tabloSurum = o.tabloSurum;
   const enUzakVar = typeof o.enUzak === "number" && Number.isInteger(o.enUzak) &&
     o.enUzak >= 1 && o.enUzak <= LEVEL_COUNT;
   if (enUzakVar) k.enUzak = o.enUzak as number;
@@ -91,6 +103,23 @@ export function levelKaydet(k: Kayit, level: number): void {
   k.level = level;
   if (level > k.enUzak) k.enUzak = level;
   yaz(k);
+}
+
+/**
+ * Kaydı, yüklenen tablonun sürümüyle hizalar. Kaç rekorun silindiğini döner.
+ *
+ * Kural: alan YOKSA benimse (silme yok) — damgadan önceki kayıtlar cezalandırılmaz.
+ * Alan VARSA ve eşleşmiyorsa yalnız `bests` temizlenir; `level` ve `enUzak` KORUNUR.
+ * Yani oyuncu yıldızlarını kaybeder ama 412 bölümlük ilerlemesini kaybetmez — yanlış
+ * bir rekoru taşımakla bütün ilerlemeyi silmek arasında seçim yapmak gerekmiyor.
+ */
+export function tabloSurumuUygula(k: Kayit, surum: string | undefined): number {
+  if (!surum || k.tabloSurum === surum) return 0;
+  const silinen = k.tabloSurum === undefined ? 0 : Object.keys(k.bests).length;
+  if (k.tabloSurum !== undefined) k.bests = {};
+  k.tabloSurum = surum;
+  yaz(k);
+  return silinen;
 }
 
 /** Bölüm seçiminde oynanabilir mi? Ulaşılan en uzak bölüme kadar her şey açıktır. */

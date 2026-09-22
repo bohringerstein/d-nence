@@ -175,25 +175,34 @@ oranı hedefte kalırken **zorluğun kaynağı** değişir.
 ```
 taban(n) = 0,94 − 0,59 · min(1, (n−1)/199)^0,45     // %94 → %35, 200. bölümde tabanda
 dalga(n) = 0,08 · sin(2π n / 24)                     // ±8 puan, 24 bölümlük salınım
-nefes(n) = (n mod 7 ∈ {3, 0} ve patron değilse)       // 3-4 dönüşümlü aralık
+nefes(n) = hash ile seçilen {3,4} aralıklarla yürüyen küme; patrona
+           denk gelen nefes n+1'e KAYDIRILIR (iptal edilmez)
 hedef(n) = clamp(nefes(n) ? taban + 0,12 : taban + dalga, 0,25 , 0,95)
 ```
 
 - **Üs 0,45**: iniş başta diktir. Oyuncu 11. bölümde %80'in, 39'da %60'ın altına düşer.
 - **Dalga**: 200. bölümden sonra eğri düz kalsaydı kalan 800 bölüm tek bir duvar olurdu.
-- **Nefes aralığı 3-4 dönüşümlü ve nefes dalgayı ezer.** İkisi birlikte bir tek soruna
-  cevap: sabit 4'te dalga (24), nefes (4), patron (10) ve arketip (8) periyotlarının
-  EKOK'u tam 120 oluyordu, yani oyun 120 bölümde bir kendini tekrar ediyordu (ölçülen
-  özilinti 0,41). Aralığı 7'ye çıkarmak tekrarı kırar ama aynı hizalanma nefesleri hep
-  uygun dalga evresinde tutuyordu: tek başına yapıldığında %40 altındaki en uzun seri
-  9'dan 10'a çıkıyor. Nefeste dalgayı uygulamamak ikisini birden verir.
-  Ölçülen: özilinti 0,41 → 0,18; en uzun zor seri 9 → 6; ortalama %41,3 → %41,8.
-  `npm run verify` her ikisini de denetler (`RITIM_TAVAN`, `ZOR_SERI_TAVAN`).
-- **Taban %35'in altına inmez.** %15 denendi: o hedefte boşluğun bir derece değişmesi
-  kazanma oranını onlarca puan oynatıyor ve bölümlerin bir kısmı çözülemez kalıyordu.
-- **Patron hedefi** sabit puan farkı değil **orandır** (hedefin %75'i, en az %22).
-  Patronların halka sayıları ve hızları sabit olduğu için ayarlayıcının elinde yalnızca
-  boşluk genişliği vardır; sabit puanlı bir hedefi eğrinin dibinde tutturamıyorlardı.
+- **Nefes konumları modüler bir desenden gelmez ve nefes dalgayı ezer.** İkisi birlikte
+  tek bir soruna cevap: sabit 4'te dalga (24), nefes (4), patron (10) ve arketip (8)
+  periyotlarının EKOK'u tam 120 oluyordu, yani oyun 120 bölümde bir kendini tekrar
+  ediyordu. Üç aşamada ölçüldü (eğilimden arındırılmış seri, tarafsız tahminci,
+  15-336 arası TAM tarama):
+
+  | nefes kuralı | en güçlü tekrar | en uzun zor seri <%45/<%40/<%35 |
+  |---|---|---|
+  | sabit 4 | lag **120** = 0,84 | 19 / 9 / 7 |
+  | mod 7 (3-4) | lag **70** = 0,75 | 17 / 6 / 6 |
+  | **hash{3,4} + kaydırma** | lag **240** = 0,49 | **12 / 4 / 4** |
+
+  Mod 7 tekrarı 120'de gerçekten kırdı ama yok etmedi: tepe 70'e taşındı, çünkü
+  EKOK(nefes 7, patron 10) = 70 — yani tekrar daha SIK geliyordu. Hash'le yürüyen
+  küme hiçbir EKOK doğurmuyor. Kalan 0,49'luk tepe lag 240'ta ve dalga (24) ile
+  patron (10) periyotlarının kendi hizalanmasından geliyor (2 × EKOK(24,10)); nefes
+  tarafında yapılabileceğin sonu orası.
+- **Patrona denk gelen nefes iptal edilmez, kaydırılır.** İptal etmek nefesi patronun
+  fonksiyonu yapıyor ve mod-10 desenini nefes desenine geri sokuyordu. Üstelik kural
+  kendi amacına ters çalışıyordu: rahatlamayı tam da en zor bölümün bulunduğu yerde
+  iptal ediyordu. Kaydırma "zirve → boşalma" ritmini veriyor.
 
 **Katı monotonluk yoktur** — eğri dalgalıdır. `npm run verify` bunun yerine 20 bölümlük
 hareketli ortalamanın düştüğünü ve hiçbir yerde belirgin geri gitmediğini denetler.

@@ -105,14 +105,14 @@ export interface Metinler {
   yildizEtiketi: Record<Stars, string>;
   sonucSatiri: (etiket: string, yildiz: string, sure: string) => string;
   /**
-   * Kazanma satırının sonuna eklenen pay: "2,4° pay".
+   * Kazanma satırının eki: bir üst yıldıza kalan mesafe ("· 3 yıldıza %9 kaldı").
    *
-   * Yıldız üç kovadır ve sıradan oyuncu bölümlerin %68'inde 1 yıldızda kalır —
-   * yani gelişmesi yıldıza yansımaz, oyuncu ilerlediğini göremez. Eşikleri
-   * sıkmak yerine ARA BASAMAK eklendi: kalan payın kendisi görünür oldu, böylece
-   * iki deneme arasındaki fark ölçülebilir hâle gelir.
+   * Yıldız üç kovadır ve sıradan oyuncu bölümlerin %68'inde 1 yıldızda kalır — yani
+   * gelişmesi yıldıza yansımaz. Eşikleri sıkmak yerine ARA BASAMAK eklendi. Ölçü
+   * DERECE değil YÜZDE: 3 yıldız eşiğinin derece karşılığı bölümden bölüme 13,5 kat
+   * değişiyor, yani derece hiçbir şey öğretmiyordu (bkz. game/hints.ts kalanYazisi).
    */
-  payEki: (derece: string) => string;
+  yildizaKalan: (yildiz: number, yuzde: string) => string;
   rekorEki: string;
 
   // ---- Patronlar ----
@@ -133,6 +133,10 @@ export interface Metinler {
   // İki ayrı hâl, iki ayrı çare: tablo İNMEDİYSE (bağlantı, sunucu, önbellek) çare
   // oyuncudadır — tekrar denemek. Tablo indi ama BOZUKSA çare geliştiricidedir ve
   // oyuncunun yapabileceği bir şey yoktur. Tek metin ikisini de yanlış anlatırdı.
+  /** Tablo yeniden üretildiği için rekorlar sıfırlandığında alt çubuğa yazılır. */
+  rekorlarYenilendi: string;
+  /** Tablo inerken, birkaç saniye sonra ekranda beliren yazı. */
+  yukleniyor: string;
   tabloIndirilemediBaslik: string;
   tabloIndirilemediMetin: string;
   tekrarDene: string;

@@ -73,7 +73,7 @@ export const TR: Metinler = {
 
   yildizEtiketi: { 3: "Temiz açılış", 2: "İyi açılış", 1: "Kıl payı" },
   sonucSatiri: (etiket, yildiz, sure) => `${etiket} ${yildiz} ${sure} sn`,
-  payEki: derece => ` · ${derece}° pay`,
+  yildizaKalan: (yildiz, yuzde) => ` · ${yildiz} yıldıza %${yuzde} kaldı`,
   rekorEki: ", rekor",
 
   patron: {
@@ -126,6 +126,8 @@ rahatsız olma geçmişin varsa, <b>Ayarlar</b>'dan &ldquo;Deseni yumuşat&rdquo
 ve ara vererek oynayabilirsin.`
   },
 
+  rekorlarYenilendi: "Bölümler yenilendi, rekorlar sıfırlandı",
+  yukleniyor: "Leveller indiriliyor…",
   tabloIndirilemediBaslik: "Leveller indirilemedi",
   tabloIndirilemediMetin: "Bağlantını kontrol edip tekrar dene. Oyun bir kez açıldıktan sonra çevrimdışı da çalışır.",
   tekrarDene: "Tekrar dene",

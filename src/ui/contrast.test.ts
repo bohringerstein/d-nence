@@ -156,3 +156,21 @@ test("amber arayüz öğelerinde kullanılmıyor", () => {
   const bulunan = [...css.matchAll(yasak)].map(m => m[0].trim());
   assert.deepEqual(bulunan, [], "arayüzde var(--ball): " + bulunan.join(" | "));
 });
+
+test("duraklatma simgesi arayüz bileşeni eşiğini geçiyor (3:1)", () => {
+  // Sayaç `border:none; background:none` ile çiziliyor; bu iki çubuk onun bir DENETİM
+  // olduğunu söyleyen tek görsel işaret (SC 1.4.11 Metin Dışı Kontrast). Eskiden
+  // `currentColor` + `opacity:0.5` ile çiziliyordu ve açık temada 2,78:1 ölçülüyordu.
+  // Opaklık kanalı bilerek terk edildi: değeri arkasındaki her neyse onunla harmanlanır,
+  // yani kararsızdır ve teste bağlanamaz. Token kararlıdır.
+  // Yorumlar elenir: aksi hâlde kuralın NEDEN böyle olduğunu anlatan yorum,
+  // kuralın kendisi sanılır. (Bu testin ilk hâli tam olarak buna takıldı.)
+  const kodu = (blok: string): string => blok.replace(/\/\*[\s\S]*?\*\//g, "");
+  const blok = kodu(css.slice(css.indexOf(".duraklatIm {"), css.indexOf("}", css.indexOf(".duraklatIm {"))));
+  assert.ok(!/opacity/.test(blok), "opaklık kanalı kullanılmamalı: değeri kararsız ve ölçülemez");
+  assert.ok(/border-left:[^;]*var\(--muted\)/.test(blok), "simge --muted token'ını kullanmalı");
+  for (const [ad, t] of temalar) {
+    const o = kontrast(t.muted, t.bg);
+    assert.ok(o >= 3, `${ad} temada duraklatma simgesi ${o.toFixed(2)}:1, 3:1 gerek`);
+  }
+});

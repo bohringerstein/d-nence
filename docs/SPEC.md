@@ -209,7 +209,7 @@ Süre çubuğunun oluğu iki temada da zeminden ayrılmalıdır (açık 1,42:1, 
 
 **"Nasıl oynanır" ilk açılışta kısadır.** Altı gösterge satırından dördü (kırmızı nokta, küçük kare, iki boşluk, değişken hız) oyuncunun **onlarca bölüm boyunca göremeyeceği** mekanikleri anlatıyordu ve ekran 320 pikselde 2,9 ekran kaydırma tutuyordu. Oyun bu mekanikleri zaten ilk göründükleri bölümde alt çubukta tek satırla tanıtır; ilk açılışta tekrar etmenin tek etkisi metin duvarıdır. İlk açılışta yalnızca giriş, "Sarı kama", "Duraklat" ve **ışığa duyarlılık uyarısı** gösterilir — tek ekrana sığar, kaydırma gerekmez. Tamamı Ayarlar'dan okunur.
 
-**"Baştan başla" iki aşamalıdır.** Oyundaki geri dönüşü olmayan tek eylem budur: Level 1'e döndürür ve bölüm seçimi olmadığı için 412. bölümdeki oyuncu 411 bölümü yeniden oynamak zorunda kalır. Üstelik paneldeki en sık basılan düğmenin ("Tamam") hemen üstünde durur. İlk basış düğmeyi uyarıya çevirir ("Emin misin? Level 412 kaybolur"), ikincisi çalıştırır; panel kapanıp açılınca uyarı hali sıfırlanır. Altında ne yaptığını söyleyen bir açıklama da vardır — paneldeki diğer dört kontrolün hepsinde vardı, yalnızca bunda yoktu.
+**"Baştan başla" iki aşamalıdır.** Oyundaki geri dönüşü olmayan tek eylem budur: Level 1'e döndürür ve `enUzak`ı sıfırlayarak açılan bütün bölümleri kilitler. Onay metni **kaybedilecek** bölümü söyler (`enUzak`), oynananı değil — bölüm seçiminden 5. bölüme dönmüş 412'lik bir oyuncuya "Level 5 kaybolur" demek, eylemi 80 kat küçük gösteriyordu. Üstelik paneldeki en sık basılan düğmenin ("Tamam") hemen üstünde durur. İlk basış düğmeyi uyarıya çevirir ("Emin misin? Level 412 kaybolur"), ikincisi çalıştırır; panel kapanıp açılınca uyarı hali sıfırlanır. Altında ne yaptığını söyleyen bir açıklama da vardır — paneldeki diğer dört kontrolün hepsinde vardı, yalnızca bunda yoktu.
 *Bu, "her dokunuş kalıcıdır" ilkesiyle çelişmez: o ilke halka kilitlerine aittir, menüdeki yıkıcı bir eyleme değil.*
 
 **Birikimin görünmesi.** Ayarlar paneli ilerleme özetini gösterir: kaç bölüm açıldığı ve toplanan yıldız ("312 bölüm açıldı · 714 / 936 yıldız"). Toplanan yıldız eskiden oyun boyunca hiçbir yerde görünmüyordu; yalnızca 1000. bölümü bitiren oyuncu toplamını öğreniyordu. 1000 bölümlük bir oyunda devam etme sebebinin kendisi birikimin görünmesidir.
@@ -323,18 +323,19 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
    *Neden:* tipik bir oyuncunun 60 ms'lik zamanlama sapması yaklaşık 1,5 rad/sn hızda 5°'ye denk gelir. Eski tabloda halka başına 3,7-4,4° kalan bölümler vardı; oralarda ilk dokunuş oyuncu ne olduğunu göremeden kaybettiriyordu.
    *Neden doğrusal değil:* korunmak istenen şey "hiç tepki veremeden ölmek"tir ve bu birinci dokunuşta olur; ilk halkaya tam pay, sonrakilere yarısı yeter. Doğrusal kural (kalan × 6°) 5 halkalı bir bölümde 30° pay şart koşuyor, boşluğu zorunlu olarak geniş bırakıyordu ve baştan kilitli halkası olan patronlar bu yüzden hedeflerinin 30-44 puan üstünde kalıyordu.
 
-8. **Zorluk ritmi: nefes levelleri.** Patron olmayan nefes levelleri hedef eğrinin **12 puan üstünde** tutulur ve monotonluk kısıtından muaftır (kendisi de sonraki levellerin tavanını yükseltmez). Nefes aralığı **3 ile 4 arasında dönüşümlüdür** (`n mod 7 ∈ {3, 0}`) ve nefes levelinde **dalga uygulanmaz**; nefes onun yerine geçer.
-   *Neden nefes:* sıradan oyuncuyu kaçıran şey tek bir zor level değil, zor levellerin arka arkaya gelmesidir. Test oyuncuları 44-57 arasında 12 levelin 9'unu "duvar" olarak işaretledi ve art arda 20-29 kayıp serileri yaşadı.
-   *Neden dönüşümlü aralık:* sabit 4'te dalga (24), nefes (4), patron (10) ve arketip (8) periyotlarının EKOK'u tam **120**'ydi — 1000 bölümlük oyun pratikte aynı 120 bölümün sekiz tekrarıydı (ölçülen 120 gecikmeli özilinti 0,41). Aralık 7 olunca EKOK 840'a çıkar.
-   *Neden dalgayı ezer:* hizalanma aynı zamanda nefesleri hep uygun dalga evresinde tutuyordu. Yalnızca aralığı değiştirmek nefeslerin bir kısmını dalga çukuruna düşürüyor ve %40 altındaki en uzun kesintisiz seriyi 9'dan 10'a çıkarıyordu — yani ritim kazanılırken güvence kaybediliyordu. Dalganın işi 24 bölümlük salınım, nefesin işi rahatlama; çakıştıklarında rahatlama kazanır.
-   *Ölçülen (1000 bölüm, kazanma oranları üzerinden):* 120 gecikmeli özilinti 0,41 → **0,18**; %40 altındaki en uzun seri 9 → **6**; ortalama kazanma oranı %41,3 → %41,8. `npm run verify` her iki ölçüyü de denetler ve eşikleri aşarsa başarısız olur.
+8. **Zorluk ritmi: nefes levelleri.** Patron olmayan nefes levelleri hedef eğrinin **12 puan üstünde** tutulur ve monotonluk kısıtından muaftır. Nefes konumları **modüler bir desenden gelmez**: `n`'in karıştırıcısıyla seçilen 3 ya da 4 aralıklarla yürüyen deterministik bir kümedir. Nefes levelinde **dalga uygulanmaz** (nefes onun yerine geçer) ve **patrona denk gelen nefes iptal edilmez, `n+1`'e kaydırılır**.
+   *Neden nefes:* sıradan oyuncuyu kaçıran şey tek bir zor level değil, zor levellerin arka arkaya gelmesidir.
+   *Neden modüler desen değil:* sabit 4'te dalga (24), nefes (4), patron (10) ve arketip (8) periyotlarının EKOK'u tam **120**'ydi — 1000 bölümlük oyun pratikte aynı 120 bölümün sekiz tekrarıydı. Aralığı 7'ye çıkarmak tekrarı 120'de kırdı ama yok etmedi: tepe **70**'e taşındı (EKOK(7,10)), yani tekrar daha SIK geliyordu. Hash'le yürüyen küme hiçbir EKOK doğurmaz.
+   *Neden kaydırma:* iptal etmek nefesi patronun fonksiyonu yapıp mod-10 desenini geri sokuyordu; ayrıca rahatlamayı tam da en zor bölümün olduğu yerde iptal ediyordu.
+   *Neden dalgayı ezer:* hizalanma nefesleri hep uygun dalga evresinde tutuyordu; yalnız aralığı değiştirmek bir kısmını dalga çukuruna düşürüyor ve zor seriyi uzatıyordu.
+   *Ölçülen (1000 bölüm, kazanma oranları, eğilimden arındırılmış, tam tarama):* en güçlü tekrar 0,84 (lag 120) → **0,49 (lag 240)**; en uzun zor seri %45 altında 19 → **12**, %40 altında 9 → **4**, %35 altında 7 → **4**. `npm run verify` bütün gecikmeleri tarar ve üç eşikte seri uzunluğunu denetler.
 
 9. **Ayarlama ve zorluk eğrisi.** Her bölüm için tolerans süresi ikili aramayla ayarlanır, böylece kazanma oranı hedef eğriye oturur. Eğri üç parçadan oluşur:
 
    ```
    taban(n) = 0,94 − 0,59 × min(1, (n−1)/149)^0,45      // %94'ten %35'e, 150. bölümde tabanda
    dalga(n) = 0,08 × sin(2π n / 24)                      // ±8 puan, 24 bölümlük salınım
-   nefes(n) = (n mod 7 ∈ {3, 0} ve patron değilse)        // 3-4 dönüşümlü aralık
+   nefes(n) = hash{3,4} yürüyüşü, patronda n+1'e kaydırılır
    hedef(n) = taban(n) + (nefes ? 0,12 : dalga(n))        // %25 ile %95 arasına sıkıştırılır
    ```
 
@@ -378,7 +379,11 @@ Cihazda yerel olarak saklanır:
 - Son oynanan level.
 - Her level için en iyi `{ yıldız, süre }`.
 
-Kayıt okunamazsa oyun hata vermeden Level 1'den başlar. "Baştan başla" düğmesi Level 1'e döner ama rekorları silmez.
+Kayıt okunamazsa oyun hata vermeden Level 1'den başlar. "Baştan başla" Level 1'e döner, **açılan bölümleri kilitler** (`enUzak` da sıfırlanır) ama rekorları silmez — bölümleri kaybetmeden baştan oynamanın yolu bölüm seçimidir.
+
+**Kayıt şeması** (`donence:v1`): `level` (son oynanan), `enUzak` (ulaşılan en uzak bölüm; bölüm seçiminde buraya kadarı açıktır ve **soğuk açılışın çıpası budur**), `tabloSurum` (rekorların ait olduğu tablo damgası), `bests` (level -> {yıldız, süre}).
+
+**Tablo damgası.** `data/levels.json` bir `v` alanı taşır: bölümlerin ve yıldız eşiklerinin özeti. Kayıt bölümleri numarayla sakladığı için tablo yeniden üretildiğinde "47. bölümde 2 yıldız" kaydı başka bir bulmacaya ait olur; bir kez yaşandı ve ölçüldü (966 bölümün tanımı değişti, 303 bölümde gösterilen rekor ulaşılamaz hâle geldi). Damga eşleşmezse **yalnız `bests` temizlenir**; `level` ve `enUzak` korunur. Damgadan önce yazılmış kayıtlarda alan yoktur ve o kayıtlar cezalandırılmaz: mevcut tabloyu benimserler.
 
 ## 10. Kabul ölçütleri
 
@@ -409,7 +414,7 @@ Mağaza sürümü istenirse ileride Capacitor ile paketlenir; çekirdek kurallar
 Bunlar ilk sürümde yapılmaz, ancak mimari bunlara engel olmamalıdır:
 - Level seçim ekranı ve yıldız özeti.
 - *(Ses ve titreşim 7. bölümde uygulandı.)*
-- **Bölüm seçimi / bölüm haritası.** Yıldızlar toplanıyor ve toplamı ayarlarda görünüyor, ama toplandığı bölüme geri dönülemiyor: 47. bölümde 1 yıldız aldıysan bir daha oraya gidemezsin. Bu türde yıldız sistemi asıl tutundurma motorudur; 1000 bölümlük bir oyunda eksikliği en çok burada hissedilir. Kayıt şemasına "ulaşılan en yüksek bölüm" eklenmesini gerektirir, yoksa geri dönmek ilerlemeyi geri alır.
+- ~~**Bölüm seçimi / bölüm haritası.**~~ **Yapıldı** (`src/ui/secim.ts`): yüzerlik sayfalar, kilitli bölümler kapalı, oyuncunun bulunduğu sayfayla ve kendi bölümüne sarılmış olarak açılır. Giriş noktaları: duraklatma örtüsü ve ayarlar paneli. Kayıt şemasına `enUzak` eklendi, yani geri dönmek ilerlemeyi geri almıyor.
 - Uygulama mağazası paketi (Capacitor).
 - Günlük meydan okuma leveli.
 - Oynanış istatistikleri (hangi levelde kaç deneme). Bu veri, simülasyondaki insan modelinin gerçek oyuncularla kalibre edilmesine yarar.

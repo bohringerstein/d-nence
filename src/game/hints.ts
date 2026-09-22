@@ -39,20 +39,32 @@ export function kayipYazisi(payDerece: number, m: Metinler): string {
 }
 
 /**
- * Kazanma satırının pay eki: " · 2,4° pay".
+ * Kazanma satırının eki: bir üst yıldıza ne kadar kaldı?
  *
- * Yıldız üç kovadan ibaret ve ölçüm şunu söylüyor: sıradan bir oyuncu bölümlerin
- * %68'ini 1 yıldızla bitiriyor, 1000 bölümün 294'ünde 3 yıldız 60 denemede bir kez
- * bile çıkmıyor. Yani oyuncunun gelişmesi ekranda görünmüyordu. Çözüm eşikleri
- * sıkmak değil — o, oyunu yalnızca daha cezalı yapardı — ARA BASAMAK göstermek:
- * kalan payın kendisi. İki deneme arasındaki küçük fark artık okunabilir.
+ * Önce DERECE yazılıyordu ("· 2,4° pay") ve bu ölçeksizdi: 3 yıldız eşiğinin derece
+ * karşılığı bölümden bölüme 3,32° ile 44,89° arasında, yani 13,5 kat değişiyor.
+ * Ölçüldü: "5,0° pay" 39 bölümde 3 yıldız, 797 bölümde 1 yıldız demek. Oyuncu sayıya
+ * bakıp bir şey öğrenemiyordu — daha kötüsü, YANLIŞ öğreniyordu.
  *
- * Bir ondalık, 10 derecenin üstünde tam sayı: 14,6 derecelik bir payda ondalık
- * bilgi taşımaz, yalnızca satırı uzatır.
+ * `q` ise her bölümde aynı ölçekte (0 = kıl payı, 1 = boşluk hiç daralmadı), çünkü
+ * bölümün kendi en dar boşluğuna göre normalize edilmiş. Eşiğe olan uzaklığı yüzde
+ * olarak yazmak iki şeyi birden veriyor: ölçek her bölümde aynı, ve sayı bir HEDEFE
+ * bağlı — "bir üst basamak var, mesafe şu kadar, kapatılabilir".
+ *
+ * 3 yıldızda ek yok: "Temiz açılış ★★★" zaten üst basamakta olunduğunu söylüyor.
+ *
+ * Kayıp mesajındaki derece (bkz. kayipYazisi) BİLEREK derece kalıyor: onun referansı
+ * bölümün boşluğu değil, her bölümde aynı olan geçiş eşiği (NEED_PASS = 18°). "3° dar
+ * kaldı" her bölümde aynı şeyi anlatır.
  */
-export function payYazisi(payDerece: number, m: Metinler): string {
-  if (!Number.isFinite(payDerece) || payDerece < 0) return "";
-  return m.payEki(payDerece < 10 ? sayi(m, payDerece, 1) : sayi(m, Math.round(payDerece), 0));
+export function kalanYazisi(q: number, q3: number, q2: number, m: Metinler): string {
+  if (!Number.isFinite(q)) return "";
+  if (q >= q3) return "";
+  const hedefYildiz = q >= q2 ? 3 : 2;
+  const esik = q >= q2 ? q3 : q2;
+  // Yüzde, eşiğe olan uzaklık; q zaten 0..1 olduğu için doğrudan orantılı.
+  const yuzde = Math.max(1, Math.round((esik - q) * 100));
+  return m.yildizaKalan(hedefYildiz, sayi(m, yuzde, 0));
 }
 
 /** Süre: ondalık ayırıcı dile göre değişir (Türkçe "8,0", İngilizce "8.0"). */

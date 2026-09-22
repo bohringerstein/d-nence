@@ -1,7 +1,7 @@
 // İpucu önceliği (şartname 7. bölüm).
 import test from "node:test";
 import assert from "node:assert";
-import { ipucu, ogreticiTablosu, yildizYazisi, sureYazisi, kayipYazisi, payYazisi } from "./hints.ts";
+import { ipucu, ogreticiTablosu, yildizYazisi, sureYazisi, kayipYazisi, kalanYazisi } from "./hints.ts";
 import type { Level, Best } from "../core/index.ts";
 import { TR } from "../dil/tr.ts";
 import { EN } from "../dil/en.ts";
@@ -115,22 +115,34 @@ test("patron bölümü bitirilmişse ipucu yerini rekora bırakır", () => {
   assert.ok(m.includes("en iyin"), m);
 });
 
-// --- Kazanma satırındaki pay -------------------------------------------------
+// --- Kazanma satırındaki "kalan" eki -----------------------------------------
 //
-// Yıldız üç kovadır ve ölçüm şunu gösterdi: sıradan bir oyuncu bölümlerin %68'ini
-// 1 yıldızla bitiriyor, 1000 bölümün 294'ünde 3 yıldız 60 denemede bir kez bile
-// çıkmıyor. Oyuncunun gelişmesi ekranda hiç görünmüyordu. Eşikleri sıkmak bunu
-// çözmez (oyun yalnızca daha cezalı olur); kalan payın SAYISINI göstermek çözer.
-test("pay eki payı okunur bir sayıya çeviriyor", () => {
-  assert.equal(payYazisi(2.43, TR), " · 2,4° pay");
-  assert.equal(payYazisi(2.43, EN), " · 2.4° margin");
-  // 10 derecenin üstünde ondalık bilgi taşımaz, yalnızca satırı uzatır.
-  assert.equal(payYazisi(14.62, TR), " · 15° pay");
+// Ölçüm: sıradan bir oyuncu bölümlerin %68'ini 1 yıldızla bitiriyor ve 1000 bölümün
+// 304'ünde 3 yıldız 60 denemede bir kez bile çıkmıyor — yani gelişme ekranda
+// görünmüyordu. İlk çözüm payı DERECE olarak yazmaktı ve yanlıştı: 3 yıldız eşiğinin
+// derece karşılığı bölümden bölüme 3,32°-44,89° arasında, 13,5 kat. "5,0° pay" 39
+// bölümde 3 yıldız, 797 bölümde 1 yıldız demekti. q ise her bölümde aynı ölçekte.
+test("kalan eki bir ÜST yıldızı ve ona olan mesafeyi söyler", () => {
+  const q3 = 0.67, q2 = 0.42;
+  // 1 yıldız bölgesi: hedef 2 yıldız.
+  assert.equal(kalanYazisi(0.33, q3, q2, TR), " · 2 yıldıza %9 kaldı");
+  assert.equal(kalanYazisi(0.33, q3, q2, EN), " · 9% from 2 stars");
+  // 2 yıldız bölgesi: hedef 3 yıldız.
+  assert.equal(kalanYazisi(0.60, q3, q2, TR), " · 3 yıldıza %7 kaldı");
 });
 
-test("geçersiz pay satırı kirletmez", () => {
-  // Kazanma satırı her hâlükârda okunabilir kalmalı; eksik bir sayı hiç yazılmasın.
-  assert.equal(payYazisi(NaN, TR), "");
-  assert.equal(payYazisi(-0.5, TR), "");
-  assert.equal(payYazisi(0, TR), " · 0,0° pay");
+test("3 yıldızda ek yok", () => {
+  // "Temiz açılış ★★★" zaten üst basamakta olunduğunu söylüyor; ikinci kez söylemek
+  // satırı uzatmaktan başka bir şey yapmaz.
+  assert.equal(kalanYazisi(0.67, 0.67, 0.42, TR), "");
+  assert.equal(kalanYazisi(0.95, 0.67, 0.42, TR), "");
+});
+
+test("kalan eki hiçbir zaman %0 demiyor", () => {
+  // Eşiğin kıl payı altında kalan oyuncuya "%0 kaldı" demek, kazandığını sandırır.
+  assert.equal(kalanYazisi(0.6699, 0.67, 0.42, TR), " · 3 yıldıza %1 kaldı");
+});
+
+test("geçersiz q satırı kirletmez", () => {
+  assert.equal(kalanYazisi(NaN, 0.67, 0.42, TR), "");
 });

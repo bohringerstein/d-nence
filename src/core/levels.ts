@@ -31,6 +31,16 @@ export interface Level {
 }
 
 export interface LevelTable {
+  /**
+   * Tablonun sürüm damgası (bölümlerin ve eşiklerin özeti).
+   *
+   * Kayıt bölümleri NUMARAYLA saklar; tablo yeniden üretildiğinde o numara başka bir
+   * bulmacaya ait olur. Damga, oyunun elindeki kaydın hangi tabloya ait olduğunu
+   * bilmesini sağlar (bkz. game/storage.ts tabloSurumuUygula).
+   *
+   * İsteğe bağlı: damgadan önce üretilmiş bir tabloyla da oyun açılabilmeli.
+   */
+  v?: string;
   /** 3 yıldız eşiği. */
   q3: number;
   /** 2 yıldız eşiği. */
@@ -79,6 +89,7 @@ const nesneMi = (x: unknown): x is Record<string, unknown> =>
 export function validateTable(data: unknown): string[] {
   const err: string[] = [];
   if (!nesneMi(data)) return ["tablo bir JSON nesnesi değil"];
+  if (data.v !== undefined && typeof data.v !== "string") err.push("sürüm damgası dize değil");
   if (!sayiMi(data.q3) || !sayiMi(data.q2)) err.push("q3/q2 sayı değil");
   else if (!(data.q3 > data.q2)) err.push("q3, q2 değerinden büyük olmalı");
   if (!Array.isArray(data.levels) || data.levels.length !== LEVEL_COUNT) {
