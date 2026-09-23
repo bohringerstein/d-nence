@@ -5,6 +5,7 @@
 // CSS'te bir renk değişirse test de onu görür (kopya tutulmaz).
 import test from "node:test";
 import assert from "node:assert";
+import { kuralGovdesi } from "./cssOku.ts";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -12,9 +13,7 @@ const css = fs.readFileSync(path.join(import.meta.dirname, "..", "styles.css"), 
 
 /** styles.css içindeki bir blokta tanımlı --değişkenleri toplar. */
 function blokRenkleri(baslangic: string): Record<string, string> {
-  const i = css.indexOf(baslangic);
-  assert.ok(i >= 0, "CSS bloğu bulunamadı: " + baslangic);
-  const govde = css.slice(i, css.indexOf("}", i));
+  const govde = kuralGovdesi(baslangic.replace(" {", ""));
   const out: Record<string, string> = {};
   // Tire de kabul edilir: --ui-accent gibi çok parçalı adlar atlanmasın.
   for (const m of govde.matchAll(/--([a-z-]+):\s*(#[0-9A-Fa-f]{6})/g)) out[m[1]] = m[2];
@@ -163,10 +162,9 @@ test("duraklatma simgesi arayüz bileşeni eşiğini geçiyor (3:1)", () => {
   // `currentColor` + `opacity:0.5` ile çiziliyordu ve açık temada 2,78:1 ölçülüyordu.
   // Opaklık kanalı bilerek terk edildi: değeri arkasındaki her neyse onunla harmanlanır,
   // yani kararsızdır ve teste bağlanamaz. Token kararlıdır.
-  // Yorumlar elenir: aksi hâlde kuralın NEDEN böyle olduğunu anlatan yorum,
-  // kuralın kendisi sanılır. (Bu testin ilk hâli tam olarak buna takıldı.)
-  const kodu = (blok: string): string => blok.replace(/\/\*[\s\S]*?\*\//g, "");
-  const blok = kodu(css.slice(css.indexOf(".duraklatIm {"), css.indexOf("}", css.indexOf(".duraklatIm {"))));
+  // kuralGovdesi yorumları zaten eliyor: kuralın NEDEN böyle olduğunu anlatan yorum,
+  // kuralın kendisi sanılmasın. (Bu testin ilk hâli tam olarak buna takıldı.)
+  const blok = kuralGovdesi(".duraklatIm");
   assert.ok(!/opacity/.test(blok), "opaklık kanalı kullanılmamalı: değeri kararsız ve ölçülemez");
   assert.ok(/border-left:[^;]*var\(--muted\)/.test(blok), "simge --muted token'ını kullanmalı");
   for (const [ad, t] of temalar) {

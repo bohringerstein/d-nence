@@ -138,11 +138,21 @@ let azalt = hareketAzalt() || ayarlar.hareketAzalt;
  * Buradaki değer geçicidir: `levelYukle` aşağıda arayüzü, kaydı ve sayacı da kurar.
  */
 let durum: LevelState = createLevel(tablo.levels[acilisBolumu(kayit) - 1], 1);
-let bitti = false;
-/** Ayarlar paneli açıkken oyun durur: uyarıyı okumak oyuncunun süresini yakmamalı. */
-let panelAcik = false;
-/** Oyuncunun kendi duraklatması (sayaca dokunarak ya da Esc ile). */
-let duraklatildi = false;
+/**
+ * Ekranın modu. Üç ayrı boole yerine TEK bir değer.
+ *
+ * Eskiden `bitti`, `panelAcik` ve `duraklatildi` bağımsız üç bayraktı; üçü de aynı
+ * soruyu (`oyunDonuk`) besliyordu ama birbirini dışlamıyordu. Sekiz temsil edilebilir
+ * kombinasyon vardı, geçerli olan dördü. Bedeli kodda görünüyordu: tek bir tıklamada
+ * dört örtü ve iki bayrak birden sıfırlanıyordu — "durumu çözemiyorum, hepsini
+ * sıfırlayayım" refleksi. Bu proje doğru deseni zaten biliyor (`TapSonuc`,
+ * `AdimSonuc`, `Sonraki` ayrık birleşimleri); ekran durumu onun dışında kalmıştı.
+ *
+ * `geriSayim` BİLEREK ayrı kaldı: o bir mod değil, bir sayaç — her modda değil,
+ * yalnız "oyun" modunda ilerler ve sıfıra ulaşınca kendiliğinden biter.
+ */
+type Mod = "oyun" | "panel" | "duraklat" | "bitis";
+let mod: Mod = "oyun";
 
 /**
  * Devam ederken çalışan geri sayım (saniye). Sıfırdan büyükken oyun HÂLÂ donuktur.
@@ -158,7 +168,7 @@ const GERI_SAYIM_BEKLEME = 0.6;   // rakam başına saniye
 let sonGeriSayimRakami = -1;
 
 /** Oyun canlı değil: fizik durur, dokunuşlar yok sayılır. */
-const oyunDonuk = (): boolean => bitti || panelAcik || duraklatildi || geriSayim > 0;
+const oyunDonuk = (): boolean => mod !== "oyun" || geriSayim > 0;
 
 const tuval = tuvalKur(ui.canvas, cizVeYaz);
 // Ekranın tamamı dokunma alanı: canvas'a bağlansaydı üst ve alt çubuk ölü bölge olurdu.
@@ -317,7 +327,7 @@ const oyun = dongu({
    */
   cozuldu() { if (!oyunDonuk()) geriSayimBaslat(); },
   cizim(dt) {
-    if (bitti) return;
+    if (mod === "bitis") return;
     geriSayimIlerlet(dt);
     // Kilit yalnızca oyun CANLIYKEN işler: duraklatan oyuncu mesajı okuma süresini yakmasın.
     if (!oyunDonuk()) ipucuKilidiIlerlet(dt);
@@ -357,7 +367,7 @@ function guncellemeyiIste(sonrakiBolum: number): void {
 
 /** Geri sayımı başlatır: oyun donuk kalır, ekranda 3-2-1 görünür. */
 function geriSayimBaslat(): void {
-  if (bitti) return;
+  if (mod === "bitis") return;
   geriSayim = GERI_SAYIM_ADET * GERI_SAYIM_BEKLEME;
   sonGeriSayimRakami = -1;
   girdi.temizle();   // "Devam et"e basarken sızan dokunuş oyuna gitmesin
@@ -386,7 +396,7 @@ function geriSayimIlerlet(dt: number): void {
 
 function duraklatmaAc(): void {
   if (oyunDonuk()) return;
-  duraklatildi = true;
+  mod = "duraklat";
   geriSayimDurdur();
   girdi.temizle();
   ui.duraklatMetin.textContent = M.duraklatAciklama(sureYazisi(kalanSure(durum), M));
@@ -398,17 +408,16 @@ function duraklatmaKapat(): void {
   // yenileme gelmezse örtü açık kalır ve "Devam et" ölürdü.
   guncellemeyiIste(durum.level.n);
   ortuKapat(ui.duraklat, ui.canvas, ui.arka);
-  duraklatildi = false;
+  mod = "oyun";
   geriSayimBaslat();
 }
 
 ui.clock.addEventListener("click", e => { e.stopPropagation(); duraklatmaAc(); });
 ui.devamDugme.addEventListener("click", duraklatmaKapat);
 // Duraklatmadan bölüm seçimine: oyuncu duraklatma örtüsünde kalmaz, seçim örtüsüne
-// geçer. `duraklatildi` sıfırlanır çünkü seçimden çıkış kendi geri sayımını başlatır.
+// geçer; mod "panel" olur çünkü seçimden çıkış kendi geri sayımını başlatır.
 ui.duraklatSecim.addEventListener("click", () => {
   ui.duraklat.hidden = true;   // odak seçim örtüsüne taşınıyor
-  duraklatildi = false;
   secimAc();
 });
 
@@ -431,7 +440,7 @@ window.addEventListener("keydown", e => {
 
 // ---- Bitiş ekranı ----------------------------------------------------------
 function bitisGoster(): void {
-  bitti = true;
+  mod = "bitis";
   const y = toplamYildiz(kayit);
   const b = bitirilenLevel(kayit);
   ui.bitisMetin.textContent = M.bitisMetni(LEVEL_COUNT, b, y, b * 3);
@@ -446,7 +455,7 @@ function bitisGoster(): void {
  */
 function bitisKapat(n: number): void {
   ortuKapat(ui.bitis, ui.canvas, ui.arka);
-  bitti = false;
+  mod = "oyun";
   ipucuKilidiSifirla();
   levelYukle(n);
   geriSayimBaslat();
@@ -457,7 +466,6 @@ ui.bitisDugme.addEventListener("click", () => bitisKapat(bitisCikisi("bastanOyna
 // bitiş ekranı, o düğme ne yaparsa yapsın, oyuncuyu tek bir yola mahkûm ediyordu.
 ui.bitisSecim.addEventListener("click", () => {
   ui.bitis.hidden = true;   // odak zaten seçim örtüsüne taşınıyor
-  bitti = false;
   ipucuKilidiSifirla();
   // Durum HÂLÂ bitmiş 1000. bölümün durumu. Seçimden bölüm seçmeden çıkılırsa oyun
   // o durumla canlanır ve `step()` her adımda yine "bitti" döndürüp bitiş ekranını
@@ -505,8 +513,7 @@ ui.reset.addEventListener("click", () => {
   ui.secim.hidden = true;
   ui.yedek.hidden = true;
   ui.bitis.hidden = true;
-  panelAcik = false;
-  bitti = false;
+  mod = "oyun";
   ipucuKilidiSifirla();
   bastanBasla(kayit);
   levelYukle(1);
@@ -538,7 +545,7 @@ function ilerlemeOzeti(): string {
 
 // ---- Ayarlar paneli --------------------------------------------------------
 function ayarPaneliAc(): void {
-  panelAcik = true;
+  mod = "panel";
   ui.desenKutu.checked = ayarlar.desenYumusat;
   ui.hareketKutu.checked = ayarlar.hareketAzalt;
   ui.titresimKutu.checked = ayarlar.titresim;
@@ -572,7 +579,7 @@ function ayarlariUygula(): void {
   sonFlas = -1;   // flaş katmanı yeni ayara göre tazelensin
 }
 
-ui.ayarAc.addEventListener("click", e => { e.stopPropagation(); if (!bitti) ayarPaneliAc(); });
+ui.ayarAc.addEventListener("click", e => { e.stopPropagation(); if (mod !== "bitis") ayarPaneliAc(); });
 
 // ---- Nasıl oynanır ---------------------------------------------------------
 /**
@@ -581,7 +588,7 @@ ui.ayarAc.addEventListener("click", e => { e.stopPropagation(); if (!bitti) ayar
  *   açılınca görünür. Işığa duyarlılık uyarısı HER İKİ HALDE de kalır.
  */
 function nasilAc(kisa = false): void {
-  panelAcik = true;
+  mod = "panel";
   ui.nasilIcerik.classList.toggle("kisa", kisa);
   ui.ayarPanel.hidden = true;
   // Önce odak (kaydırmadan), sonra başa sar: ters sırada tarayıcı kutuyu aşağı kaydırıyor.
@@ -596,7 +603,7 @@ ui.nasilKapat.addEventListener("click", () => {
   ortuKapat(ui.nasil, ui.canvas, ui.arka);
   ayarlar.uyariGoruldu = true;
   ayarlariYaz(ayarlar);
-  panelAcik = false;
+  mod = "oyun";
   geriSayimBaslat();
 });
 // Zemine dokunmak ayarları kapatır: kısa ekranlarda panelden çıkışın ikinci yolu.
@@ -638,7 +645,7 @@ function secimCiz(): void {
 }
 
 function secimAc(): void {
-  panelAcik = true;
+  mod = "panel";
   ui.ayarPanel.hidden = true;
   // Oyuncunun bulunduğu sayfayla açılır: 412. bölümdeyken 1-100 arasını göstermek,
   // her açılışta dört kez ileri bastırmak demekti.
@@ -654,7 +661,7 @@ function secimAc(): void {
 
 function secimKapat(): void {
   ortuKapat(ui.secim, ui.canvas, ui.arka);
-  panelAcik = false;
+  mod = "oyun";
   geriSayimBaslat();
 }
 
@@ -686,7 +693,6 @@ ui.secimIzgara.addEventListener("click", e => {
   const n = Number(d.dataset.n);
   if (!Number.isInteger(n) || n < 1 || n > LEVEL_COUNT) return;
   secimKapat();
-  bitti = false;
   ui.bitis.hidden = true;
   ipucuKilidiSifirla();
   levelYukle(n);
@@ -708,7 +714,7 @@ function yedekOnayiSifirla(): void {
 }
 
 function yedekAc(): void {
-  panelAcik = true;
+  mod = "panel";
   ui.ayarPanel.hidden = true;
   ui.yedekKod.value = disaAktar(kayit);
   ui.yedekGiris.value = "";
@@ -720,7 +726,7 @@ function yedekAc(): void {
 ui.yedekAc.addEventListener("click", () => { ayarlariUygula(); yedekAc(); });
 ui.yedekKapat.addEventListener("click", () => {
   ortuKapat(ui.yedek, ui.canvas, ui.arka);
-  panelAcik = false;
+  mod = "oyun";
   geriSayimBaslat();
 });
 ui.yedek.addEventListener("click", e => { if (e.target === ui.yedek) ui.yedekKapat.click(); });
@@ -787,7 +793,7 @@ ui.ayarKapat.addEventListener("click", () => {
   ayarlar.uyariGoruldu = true;
   ayarlariYaz(ayarlar);
   ortuKapat(ui.ayarPanel, ui.canvas, ui.arka);
-  panelAcik = false;
+  mod = "oyun";
   // Panelde geçen süre zaten işlemiyordu (oyun donuktu). Eskiden level yine de baştan
   // başlatılıyordu ve ayarları açmanın bedeli ilerlemeydi — oyuncu ara vermek için
   // paneli kullanınca bölümü kaybediyordu. Artık kaldığı karede devam eder.

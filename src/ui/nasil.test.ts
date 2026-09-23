@@ -5,6 +5,7 @@
 // mekaniği yalnızca ilk göründüğü levelde bir kez anlatıyordu.
 import test from "node:test";
 import assert from "node:assert";
+import { kuralGovdesi } from "./cssOku.ts";
 import fs from "node:fs";
 import path from "node:path";
 import { nasilHtml } from "./nasil.ts";
@@ -55,9 +56,7 @@ test("kısa sürümde uyarı gösterge listesinin ÜSTÜNE alınıyor", () => {
     "sıra değiştirmek için kutu esnek sütun olmalı");
   /** Seçicinin kuralındaki order değerini okur (düz metin araması, regex kurmadan). */
   const sira = (secici: string): number => {
-    const i = css.indexOf(secici + " {");
-    assert.ok(i >= 0, "sıra kuralı yok: " + secici);
-    const m = css.slice(i, css.indexOf("}", i)).match(/order:\s*(\d+)/);
+    const m = kuralGovdesi(secici).match(/order:\s*(\d+)/);
     assert.ok(m, "order değeri yok: " + secici);
     return Number(m[1]);
   };

@@ -1,5 +1,5 @@
 // Canvas çizimi (şartname 7. bölüm).
-import { TAU, DEG, canPass, gapCenters, isaretAcisi, layout, wrap } from "../core/index.ts";
+import { TAU, canPass, isaretAcisi, layout, ciziliYaylar } from "../core/index.ts";
 import type { Layout, Ring } from "../core/index.ts";
 import { aciklikBolgeleri, sonrakiHalka, HEPSI } from "./state.ts";
 import type { LevelState } from "./state.ts";
@@ -86,13 +86,10 @@ export function tuvalKur(canvas: HTMLCanvasElement, degisti: () => void): Tuval 
  * Yay her iki uçtan bu kadar kısaltılır, böylece yuvarlak uç tam boşluk sınırında biter.
  */
 function halkaCiz(ctx: CanvasRenderingContext2D, r: Ring, R: number, kalinlik: number): void {
-  const yarim = r.gap * DEG / 2;
-  const ucPayi = (kalinlik / 2) / R;
-  const merkezler = gapCenters(r).map(wrap).sort((a, b) => a - b);
-  for (let i = 0; i < merkezler.length; i++) {
-    const a0 = merkezler[i] + yarim + ucPayi;
-    const a1 = (i + 1 < merkezler.length ? merkezler[i + 1] : merkezler[0] + TAU) - yarim - ucPayi;
-    if (a1 > a0) { ctx.beginPath(); ctx.arc(0, 0, R, a0, a1); ctx.stroke(); }
+  // Yay bölütleme çekirdekte (bkz. core/rings.ts ciziliYaylar): aynı döngü burada bir
+  // kez daha yazılıyordu ve halka geometrisinin ikinci kopyasıydı.
+  for (const [a0, a1] of ciziliYaylar(r, (kalinlik / 2) / R)) {
+    ctx.beginPath(); ctx.arc(0, 0, R, a0, a1); ctx.stroke();
   }
 }
 

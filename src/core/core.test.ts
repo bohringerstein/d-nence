@@ -46,7 +46,7 @@ test("maske uygulama: tek boşluklu halka yalnızca boşluğu açık bırakır",
 
 test("maske uygulama: iki boşluklu halka iki ayrı bölge bırakır", () => {
   const m = C.newMask();
-  C.applyMask(m, live({ gap: 30, gaps: 2, gapOffset: 150, start: 0 }));
+  C.applyMask(m, live({ gap: 30, gaps: 2 as const, gapOffset: 150, start: 0 }));
   assert.equal(C.maskRuns(m).length, 2, "iki ayri acik bolge olmali");
 });
 
@@ -217,4 +217,44 @@ test("işaret boşluk kenarlarından uzak duruyor", () => {
     for (const c of C.gapCenters(r)) enYakin = Math.min(enYakin, Math.abs(C.norm(a - c)) - yarim);
   }
   assert.ok(enYakin > 2 * DEG, `işaret bir boşluk kenarına ${deg(enYakin).toFixed(2)}° kadar yaklaştı`);
+});
+
+// --- Yay bölütleme: tek kopya ------------------------------------------------
+//
+// Aynı döngü hem burada hem `game/render.ts` içinde ayrı ayrı yazılmıştı; yorum bile
+// iki yerin birbirine bağlı olduğunu kabul ediyordu ama ortak fonksiyona çıkarılmamıştı.
+test("çizilen yaylar boşlukların tümleyeni", () => {
+  const r = { speed: 1, gap: 60, gaps: 1 as const, gapOffset: 180, flip: 0, wobble: false,
+    preLocked: false, start: 0, angle: 0 };
+  const y = C.ciziliYaylar(r);
+  assert.equal(y.length, 1, "tek kapılı halkada tek yay");
+  // Yayın uzunluğu tam çember eksi boşluk.
+  assert.ok(Math.abs((y[0][1] - y[0][0]) - (C.TAU - 60 * C.DEG)) < 1e-9);
+});
+
+test("iki kapılı halkada iki yay, toplamı çember eksi iki boşluk", () => {
+  const r = { speed: 1, gap: 40, gaps: 2 as const, gapOffset: 150, flip: 0, wobble: false,
+    preLocked: false, start: 0.7, angle: 0.7 };
+  const y = C.ciziliYaylar(r);
+  assert.equal(y.length, 2);
+  const toplam = y.reduce((s, a) => s + (a[1] - a[0]), 0);
+  assert.ok(Math.abs(toplam - (C.TAU - 2 * 40 * C.DEG)) < 1e-9);
+});
+
+test("uç payı yayı İKİ uçtan da kısaltır", () => {
+  const r = { speed: 1, gap: 60, gaps: 1 as const, gapOffset: 180, flip: 0, wobble: false,
+    preLocked: false, start: 0, angle: 0 };
+  const pay = 0.02;
+  const [a] = C.ciziliYaylar(r);
+  const [b] = C.ciziliYaylar(r, pay);
+  assert.ok(Math.abs((b[0] - a[0]) - pay) < 1e-12, "başlangıç pay kadar ileri");
+  assert.ok(Math.abs((a[1] - b[1]) - pay) < 1e-12, "bitiş pay kadar geri");
+});
+
+test("işaret açısı en geniş yayın ortasında", () => {
+  const r = { speed: 1, gap: 40, gaps: 2 as const, gapOffset: 150, flip: 0, wobble: false,
+    preLocked: false, start: 0.7, angle: 0.7, locked: true, dir: 1 as const, t: 0 };
+  const y = C.ciziliYaylar(r);
+  const enGenis = y.reduce((en, a) => (a[1] - a[0] > en[1] - en[0] ? a : en));
+  assert.ok(Math.abs(C.isaretAcisi(r) - (enGenis[0] + enGenis[1]) / 2) < 1e-12);
 });

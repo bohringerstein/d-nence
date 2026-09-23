@@ -8,6 +8,7 @@
 // yüzden denetim tek örtüye değil SINIFA bakar.
 import test from "node:test";
 import assert from "node:assert";
+import { kuralGovdesi } from "./cssOku.ts";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -19,12 +20,8 @@ import { TR } from "../dil/tr.ts";
 const shell = html(TR);
 const main = fs.readFileSync(path.join(kok, "src", "main.ts"), "utf8");
 
-/** Bir seçicinin gövdesini döndürür (ilk eşleşme). */
-function blok(secici: string): string {
-  const i = css.indexOf(secici + " {");
-  assert.ok(i >= 0, `CSS kuralı yok: ${secici}`);
-  return css.slice(i, css.indexOf("}", i));
-}
+/** CSS kural gövdesi; yuvalanmayı sayar ve yorumları eler (bkz. cssOku.ts). */
+const blok = (secici: string): string => kuralGovdesi(secici);
 
 test("örtü zemini OPAK, tek istisna duraklatma", () => {
   assert.ok(/background:\s*var\(--bg\)\s*;/.test(blok(".ortu")),
@@ -149,4 +146,22 @@ test("örtü kapanırken önce inert açılıyor, sonra odak taşınıyor", () =
   assert.ok(gizle > odak, "gizleme en son olmalı");
   // Sıra bir çağrı sözleşmesi OLAMAZ: main.ts'te elle arkaKilit çağrısı kalmamalı.
   assert.ok(!/^\s*arkaKilit\(/m.test(main), "arkaKilit main.ts'ten elle çağrılmamalı");
+});
+
+test("ekran durumu TEK bir değerde, üç bağımsız bayrakta değil", () => {
+  // Eskiden `bitti`, `panelAcik` ve `duraklatildi` bağımsız üç boole idi: sekiz
+  // temsil edilebilir kombinasyon, dördü geçerli. Bedeli kodda görünüyordu — tek bir
+  // tıklamada dört örtü ve iki bayrak birden sıfırlanıyordu ("durumu çözemiyorum,
+  // hepsini sıfırlayayım"). Bu proje doğru deseni zaten biliyor (TapSonuc, Sonraki);
+  // ekran durumu onun dışında kalmıştı.
+  assert.ok(/type Mod = "oyun" \| "panel" \| "duraklat" \| "bitis";/.test(main),
+    "ekran modu ayrık birleşim olmalı");
+  assert.ok(/const oyunDonuk = \(\): boolean => mod !== "oyun" \|\| geriSayim > 0;/.test(main),
+    "donukluk tek bir karşılaştırmaya inmeli");
+  for (const eski of ["panelAcik", "duraklatildi"]) {
+    assert.ok(!new RegExp("^\\s*(let|const)\\s+" + eski, "m").test(main),
+      `${eski} bayrağı kalmamalı`);
+  }
+  // `bitti` adında bir bayrak da kalmamalı (state.ts'teki "bitti" ADIM SONUCU ayrı şey).
+  assert.ok(!/^\s*let bitti\b/m.test(main), "bitti bayrağı kalmamalı");
 });

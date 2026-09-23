@@ -6,6 +6,7 @@
 // denetler. Davranışın kendisi main.ts'te; burada ölçülen sözleşme.
 import test from "node:test";
 import assert from "node:assert";
+import { kuralGovdesi } from "./cssOku.ts";
 import fs from "node:fs";
 import path from "node:path";
 import { nasilHtml } from "./nasil.ts";
@@ -60,7 +61,7 @@ test("kalan süre düğmenin DIŞINDA ve düğmenin adı sabit", () => {
 });
 
 test("sayaç düğme gibi görünmüyor ama dokunma hedefi 44px", () => {
-  const blok = css.slice(css.indexOf("button.clock {"), css.indexOf("}", css.indexOf("button.clock {")));
+  const blok = kuralGovdesi("button.clock");
   assert.ok(/border:\s*none/.test(blok), "kenarlık alınmalı: sayaç düğmeye benzememeli");
   assert.ok(/min-height:\s*44px/.test(blok), "dokunma hedefi 44px kalmalı");
 });

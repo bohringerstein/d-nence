@@ -85,17 +85,39 @@ export { TAU };
  * `angle + gapOffset`'tedir ve gapOffset 180°'ye yakınsa işaret boşluğun tam ortasına
  * düşüyordu — oyuncu boşlukta havada duran bir nokta görüyordu.
  */
-export function isaretAcisi(r: Ring): number {
-  // Yuvarlak uçlar yayı kısaltır (bkz. game/render.ts halkaCiz); işaret yayın
-  // ORTASINA konduğu için bu kısalma sonucu değiştirmez.
+/**
+ * Halkanın ÇİZİLEN yaylarını verir: boşlukların arasında kalan parçalar.
+ *
+ * Tek kopya. Aynı döngü hem çekirdekte (`isaretAcisi`) hem çizimde (`game/render.ts`
+ * `halkaCiz`) ayrı ayrı yazılmıştı; yorum bile iki yerin birbirine bağlı olduğunu
+ * kabul ediyordu ama ortak fonksiyona çıkarılmamıştı. "Halka geometrisi tek çekirdek
+ * modülde yaşar" kuralının sızıntısıydı.
+ *
+ * @param ucPayi Yuvarlak çizgi uçlarının taşmasını telafi eden pay (radyan). Çizim
+ *   bunu verir; geometri hesapları 0 kullanır, çünkü yay ORTASINA konan bir işaret
+ *   kısalmadan etkilenmez.
+ * @returns `[başlangıç, bitiş]` çiftleri; boşluklar örtüşüyorsa boş yaylar elenir.
+ */
+export function ciziliYaylar(r: RingDef & { angle: number }, ucPayi = 0): Array<[number, number]> {
   const yarim = r.gap * DEG / 2;
   const merkezler = gapCenters(r).map(wrap).sort((a, b) => a - b);
-  let enIyi = merkezler[0] + Math.PI;   // tek kapılı halkada zaten doğru cevap
-  let enGenis = -1;
+  const yaylar: Array<[number, number]> = [];
   for (let i = 0; i < merkezler.length; i++) {
-    const a0 = merkezler[i] + yarim;
-    const a1 = (i + 1 < merkezler.length ? merkezler[i + 1] : merkezler[0] + TAU) - yarim;
-    if (a1 - a0 > enGenis) { enGenis = a1 - a0; enIyi = (a0 + a1) / 2; }
+    const a0 = merkezler[i] + yarim + ucPayi;
+    const a1 = (i + 1 < merkezler.length ? merkezler[i + 1] : merkezler[0] + TAU) - yarim - ucPayi;
+    if (a1 > a0) yaylar.push([a0, a1]);
   }
-  return enIyi;
+  return yaylar;
+}
+
+export function isaretAcisi(r: Ring): number {
+  // Yuvarlak uçlar yayı kısaltır (bkz. ciziliYaylar `ucPayi`); işaret yayın ORTASINA
+  // konduğu için bu kısalma sonucu değiştirmez, o yüzden pay 0.
+  const yaylar = ciziliYaylar(r);
+  if (yaylar.length === 0) return r.angle + Math.PI;   // boşluklar örtüşüyor: güvenli varsayılan
+  let enIyi = yaylar[0], enGenis = -1;
+  for (const y of yaylar) {
+    if (y[1] - y[0] > enGenis) { enGenis = y[1] - y[0]; enIyi = y; }
+  }
+  return (enIyi[0] + enIyi[1]) / 2;
 }

@@ -7,6 +7,7 @@
 // okuma boş dönüyor ve oturum boyunca siyah kalıyordu.
 import test from "node:test";
 import assert from "node:assert";
+import { bildirimler, kuralGovdesi } from "../ui/cssOku.ts";
 
 /** styles.css uygulanmış/uygulanmamış bir belgeyi taklit eder. */
 function sahneKur(degerler: Record<string, string>, tema: string | null = null): void {
@@ -86,13 +87,9 @@ test("transparent geçerli sayılmaz", () => {
   assert.equal(renkleriOku().ball, "#E89B00", "transparent top rengi görünmez yapardı");
 });
 
-test("yedek palet styles.css ile aynı", async () => {
-  const fs = await import("node:fs");
-  const path = await import("node:path");
-  const css = fs.readFileSync(path.join(import.meta.dirname, "..", "styles.css"), "utf8");
+test("yedek palet styles.css ile aynı", () => {
   const blok = (bas: string): Record<string, string> => {
-    const i = css.indexOf(bas);
-    const govde = css.slice(i, css.indexOf("}", i));
+    const govde = kuralGovdesi(bas.replace(" {", ""));
     const o: Record<string, string> = {};
     for (const m of govde.matchAll(/--([a-z]+):\s*(#[0-9A-Fa-f]{6})/g)) o[m[1]] = m[2];
     return o;
@@ -108,5 +105,21 @@ test("yedek palet styles.css ile aynı", async () => {
   for (const k of ANAHTARLAR) {
     assert.equal(acikYedek[k].toUpperCase(), acikCss[k].toUpperCase(), `açık tema --${k} yedeği CSS'ten farklı`);
     assert.equal(koyuYedek[k].toUpperCase(), koyuCss[k].toUpperCase(), `koyu tema --${k} yedeği CSS'ten farklı`);
+  }
+});
+
+// --- Koyu palet iki blokta; ikisi de denetlenmeli -----------------------------
+//
+// Koyu renkler CSS'te İKİ kez yazılı: `@media (prefers-color-scheme: dark)` içinde
+// ve `:root[data-theme="dark"]` altında. Bu test eskiden yalnız ikincisine bakıyordu —
+// oysa cihazlarda fiilen kullanılan kopya BİRİNCİSİ, çünkü `data-theme` özniteliğini
+// hiçbir kod yazmıyor. Yani test, kullanılmayan bloğu koruyup kullanılanı korumuyordu.
+test("koyu paletin iki kopyası birebir aynı", () => {
+  const medya = bildirimler(':root:not([data-theme="light"])');
+  const oznitelik = bildirimler(':root[data-theme="dark"]');
+  assert.deepEqual(Object.keys(medya).sort(), Object.keys(oznitelik).sort(),
+    "iki blokta aynı değişkenler tanımlı olmalı");
+  for (const k of Object.keys(medya)) {
+    assert.equal(medya[k], oznitelik[k], `${k} iki blokta farklı: sapma sessizce kayar`);
   }
 });

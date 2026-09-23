@@ -265,6 +265,19 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
   z-index: 10;
 }
 .ortu[hidden] { display: none; }
+
+/* Örtülerdeki tam genişlik yığın düğmeleri. Aynı üç bildirim beş ayrı seçicide
+   tekrarlanıyordu (.nasilAlt, .kutuAlt, #ayarPanel .kutu > button, .yedekKutu button
+   ve bir kopyası); birinde max-width değişse öbürleri kalırdı. `:where()` özgüllüğü
+   sıfırlar, yani bu kural tek tek kuralların yerini alır ama onları ezmez. */
+:where(.nasilAlt, .kutuAlt) button,
+#ayarPanel .kutu > button,
+.yedekKutu button {
+  display: flex;
+  width: 100%;
+  max-width: 14rem;
+  margin: 0.5rem auto 0;
+}
 /* [hidden] GENEL sıfırlaması. Tarayıcının kendi `[hidden] { display: none }` kuralı
    bir UA kuralıdır; yazar (author) stil sayfasındaki herhangi bir `display` bildirimi
    onu köken sırası gereği — özgüllükten bağımsız olarak — EZER. Bu yüzden `.secenek`
@@ -349,7 +362,6 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
   padding: 0.85rem 0 0.25rem;
   margin-top: 0.5rem;
 }
-.nasilAlt button { display: flex; margin: 0 auto; width: 100%; max-width: 14rem; }
 
 /* Ayarlar panelinin çıkış şeridi; .nasilAlt ile aynı iş, aynı görünüm. */
 .kutuAlt {
@@ -360,7 +372,6 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
   padding: 0.6rem 0 0.15rem;
   margin-top: 0.75rem;
 }
-.kutuAlt button { display: flex; margin: 0 auto; width: 100%; max-width: 14rem; }
 
 .gosterge { list-style: none; margin: 0 0 1rem; padding: 0; }
 .gosterge li {
@@ -520,12 +531,6 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
    Yan yana dizildiklerinde altlarındaki açıklama hangi düğmeye ait olduğunu
    söylemiyordu: "Level 1'e döner ve açtığın bölümler kilitlenir" cümlesi
    "Nasıl oynanır"ın da altında duruyordu. */
-#ayarPanel .kutu > button {
-  display: flex;
-  width: 100%;
-  max-width: 14rem;
-  margin: 0.5rem auto 0;
-}
 
 /* Ayarlardaki gizlilik bağlantısı: sessiz bir metin bağlantısı, düğme değil. Seyrek
    açılır ama her iki mağaza da uygulamanın içinde bulunmasını şart koşuyor. */
@@ -680,4 +685,4 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 }
 .yedekAlan:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 #ayarPanel .kutu > .grupBaslik, #ayarPanel .kutu > .grupCizgi { width: 100%; }
-.yedekKutu button { display: flex; width: 100%; max-width: 14rem; margin: 0.5rem auto 0; }
+
