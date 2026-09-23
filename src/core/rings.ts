@@ -57,7 +57,16 @@ export function stepRings(rs: Ring[], dt: number, lt: number): void {
   for (const r of rs) {
     if (r.locked) continue;
     r.t += dt;
-    if (r.flip && r.t >= r.flip) { r.t = 0; r.dir = r.dir === 1 ? -1 : 1; }
+    if (r.flip) {
+      // İleri: sayaç periyodu geçince yön değişir.
+      if (r.t >= r.flip) { r.t = 0; r.dir = r.dir === 1 ? -1 : 1; }
+      // GERİ: sayaç sıfırın altına düşerse flip GERİ ALINIR. Oyun hiç negatif adım
+      // atmaz, ama level üretici "oyuncu ε saniye ERKEN dokundu" durumunu geri sararak
+      // kuruyor. Geri alma olmadan `r.t` negatife düşüyor ve `dir` flip'lenmiş kalıyordu:
+      // halka, zaman geri akarken flip SONRASI yönde dönmeye devam ediyordu. Ölçülen
+      // hata 32,5° — tipik boşluk payının neredeyse iki katı.
+      else if (r.t < 0) { r.t += r.flip; r.dir = r.dir === 1 ? -1 : 1; }
+    }
     const w = r.wobble ? 1 + 0.7 * Math.sin(lt * 2.3 + r.start) : 1;
     r.angle += r.speed * r.dir * w * dt;
   }

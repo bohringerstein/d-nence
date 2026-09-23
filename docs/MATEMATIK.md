@@ -249,11 +249,15 @@ P_i = max(P_i, 2·flip_i)                 // yön değiştiren halkada
 halkaların ikinci turunu bekleyebilen oyuncu için zamanlama ölçüsü olmaktan çıkar.
 Doğrulama `GAMA_TAVAN + 0,05` toleransıyla denetler; ölçülen en yüksek γ **1,309**.
 
-> **Denetim notu (açık):** `P_i`'nin iki dalı da ölçülerek sorunlu bulundu. Flip'li
-> halkaların %87'sinde `|ω|·flip < 2π/g`, yani halka çemberin tamamını hiç taramıyor
-> ve bazı yönler için fırsat periyodu **sonsuz** olmalı; formül sonlu bir sayı veriyor.
-> İki kapılı halkalarda `gapOffset` medyanı 157° olduğu için ortalama periyot, en uzun
-> beklemeyi %13-28 eksik sayıyor. Düzeltilmedi; bkz. aksiyon listesi.
+`P_i` (fırsat periyodu) iki yerde yanlıştı, ikisi de düzeltildi:
+
+- **İki kapılı halka.** Periyot ortalama yaydan hesaplanıyordu; oysa oyuncunun
+  beklediği şey EN UZUN yaydır. `gapOffset` medyanı 157° olduğu için ortalama, en uzun
+  beklemeyi %13-28 eksik sayıyordu. Artık `P = max(gapOffset, 2π − gapOffset) / |ω|`.
+- **Yön değiştiren halka.** Flip'li halkaların %87'sinde `|ω|·flip < 2π/g`, yani halka
+  bir turda çemberin tamamını taramıyor: bazı açılar hiç gelmiyor ve fırsat periyodu
+  **sonsuz** olmalıyken formül sonlu bir sayı veriyordu. Artık bir kapsama denetimi var
+  — `(|ω|·flip + boşluk) / (2π/g) < 1` ise periyot sonsuzdur ve aday elenir.
 
 **EN_AZ_PAY — baştan kilitli halkalardan sonra kalan taban pay.**
 
@@ -267,16 +271,20 @@ halkalarda bekleyebilir, bekleyemediği tek kilit ilkidir. 396 bölümde baştan
 halka var ve kısıt sıkı bağlıyor: ölçülen en küçük pay fazlası **0,033°**.
 
 **RHYTHM — halka sayısı ritmi.** Formül 17. bölümde 6'ya ulaşıp orada kalıyordu.
-6'ya ulaşıldıktan sonra halka sayısı `[6, 6, 5, 6, 4, 6, 5, 6]` dizisinden
-`(n−1) mod 8` ile seçilir. Daha az halkalı bölümler zorluğu kaybetmez: ayarlayıcı
-boşluğu daraltarak aynı kazanma oranını tutturur, yani o bölümler dayanıklılık yerine
-hassasiyet ister.
+6'ya ulaşıldıktan sonra halka sayısı `[6, 6, 5, 6, 4, 6, 5, 6]` kümesinden seçilir.
+Daha az halkalı bölümler zorluğu kaybetmez: ayarlayıcı boşluğu daraltarak aynı kazanma
+oranını tutturur, yani o bölümler dayanıklılık yerine hassasiyet ister.
 
-> **Denetim notu (açık):** `RHYTHM` (periyot 8) ile arketip rotasyonu (periyot 8,
-> indeks `(n−60) mod 8`) sabit farkla **faz kilitli** (`59 mod 8 = 3`). Sonuç: n ≥ 60
-> için sekiz artık sınıfının dördünde halka sayısı tek değerli. Halka sayısı serisinin
-> özilintisi lag 8'de **0,781**. Ritim denetimi bunu göremiyor çünkü kazanma oranı
-> serisine bakıyor ve o seri hedefe oturtulmuş durumda.
+Küme başta **dizi** olarak uygulanıyordu (`RHYTHM[(n−1) mod 8]`) ve bu, arketip
+rotasyonuyla (periyot 8, indeks `(n−60) mod 8`) sabit farkla **faz kilidi** üretiyordu
+(`59 mod 8 = 3`): n ≥ 60 için sekiz artık sınıfının dördünde halka sayısı tek değerliydi
+ve halka sayısı serisinin özilintisi lag 8'de **0,781** çıkıyordu.
+
+Düzeltme nefesteki ile aynı: **küme korunur, sıra karıştırılır.** Her 8'lik blok kendi
+karmasıyla (`karistir(blok ⊕ 0x5bf03635)` tohumlu Fisher-Yates) yeniden sıralanır.
+Dağılım blok blok birebir aynı kalır — "her 8 bölümde bir 4 halkalı" garantisi durur —
+ama yeri öngörülemez ve arketip döngüsüyle faz kilidi kırılır. Uzun seri riski de yok:
+karıştırma blok İÇİNDE olduğu için aynı değer en fazla blok sınırında komşulaşabilir.
 
 **SURE_TAVANI ve süre kaybı.** Süre sınırı üretimde iki yönden sıkıştırılır: alt
 sınır çözücünün süresi (`best·1,5 + 1,5`), üst sınır γ tavanı. Ayrıca doğrulama iki
@@ -311,15 +319,166 @@ yıldız alması. Ölçülen dağılım: **%25 / %35 / %40**.
 
 ## 8. Doğrulamanın istatistiği
 
-Kazanma oranı bölüm başına 50 denemeyle ölçülür. `p ≈ 0,4` civarında bir oranın
-standart hatası:
+### 8.1 Üç ayrı tohum
+
+Üretim rastgeleliğe dayanır (oyuncu hatası simüle edilir), dolayısıyla her kazanma
+oranı bir **ölçümdür**, gerçeğin kendisi değil. Tek tohum kullanmak, sınavı cevap
+anahtarıyla okumaktır. Bu yüzden üç ayrı çekiliş var ve hiçbiri diğerinin yerine
+geçemez:
+
+| Tohum | Nerede | Deneme | İşi |
+|---|---|---|---|
+| `URETIM_TOHUMU` = 777 | `tune` taraması | 50 | ucuz eleme: hangi tolerans hedefe yakın |
+| `SECIM_TOHUMU` = 424242 | finalist ölçümü | 200 | **karar**: hangi aday tabloya girer |
+| `DENETIM_TOHUMU` = 20260923 | `npm run verify` | 200 | **sınav**: tablo hedefi tutturmuş mu |
+
+Bu ayrım eklenmeden önce `verify`, ayarlayıcının optimize ettiği aynı 50 çekilişi
+tekrar oynatıyordu; ölçülen sapma gerçeğin yaklaşık **1/28'i** kadar çıkıyordu.
+
+### 8.2 Kazananın laneti
+
+Ayrı tohum eklenince ortaya çıkan ilk bulgu şuydu: 12 bölüm hedefinin **20-30 puan
+üstünde**, ve sapmaların hepsi **aynı yönde** — yani gürültü değil yanlılık.
+
+Sebep seçim kuralının kendisiydi. Tarama, bölüm başına 36 adayı 8 tolerans adımıyla
+deniyor ve hedefe en yakın **ölçümü** seçiyor. 50 denemede standart sapma ~7 puan
+olduğu için, 288 gürültülü ölçümün en iyisini seçmek klasik **kazananın laneti**ni
+üretir: hedefin altında ölçülen aday seçilme şansı yüksek olduğundan, seçilenin
+gerçek kazanma oranı sistematik olarak hedefin üstüne çıkar. Beklenen yanlılık
+yaklaşık `2σ ≈ 14 puan`; ölçülen 15-22 puandı.
+
+Çare standarttır — seçimi ikiye bölmek:
+
+1. **Tarama** ucuz ve gürültülü kalır (36 aday × 50 deneme, tohum 777).
+2. **Finalistler** (hedefe en yakın 4 aday) bağımsız bir tohumla ve 200 denemeyle
+   yeniden ölçülür; karar o ölçüme göre verilir.
+
+Yeniden ölçüm seçimden bağımsız olduğu için lanet 4 finaliste ve 200 denemeye iner
+(`≈ 1,2 × 3,2 ≈ 4 puan`). Ek maliyet taramanın yanında yaklaşık %5.
+
+### 8.3 Bant ve nokta tahmini sorunu
+
+Karar ölçümü 200 denemedir; `p ≈ 0,4` civarında standart hata:
 
 ```
-SE = √(p(1−p)/50) = 0,069  →  6,9 puan
+SE = √(p(1−p)/200) = 0,035  →  3,5 puan
 ```
 
-Bu yüzden hedef eğriden izin verilen sapma **±20 puan** (≈3σ), patronlarda ±25'tir.
-Daha dar bir bant ölçüm gürültüsünü hata sanardı.
+Hedef eğriden izin verilen sapma **±20 puan**, patronlarda ±25. Bant, ölçüm hatasının
+değil **tasarım toleransının** ölçüsüdür: bir bölümün hedefinden 20 puan sapması
+oyuncunun hissedeceği ama eğriyi bozmayacak bir farktır.
+
+Ama bant, bölümün **gerçek** kazanma oranı hakkındadır; elimizdeki ise 3,5 puan
+hatalı bir tahmin. Nokta tahminini sert bir eşikle karşılaştırmak, gerçek sapması 17
+puan olan bir bölümün koşuların yaklaşık beşte birinde "ihlal" görünmesi demektir. Ve
+`verify` yayın kapısı olduğu için bu, tablonun değil ölçümün gürültüsüyle kırmızıya
+dönen bir kapı olurdu. Ölçtüm: art arda koşularda bantta kalamayan bölüm kümesi her
+seferinde değişiyordu (192/233/380/428/828/860/928 → 623/663 → 428), hiçbiri sabit
+değildi; sayıları da 1 ile 3 arasında gidip geliyordu.
+
+Bu yüzden karar iki ayrı ölçüyle verilir ve ikisi farklı şeyi yakalar:
+
+| Ölçü | Eşik | Neyi yakalar |
+|---|---|---|
+| Tek bölüm | `\|sapma\| > bant + 2·SE` (±27, patron ±32) | gerçekten eğri dışına düşmüş bölüm |
+| Toplam | bandı aşan bölüm sayısı > **10** (%1) | tek tek marjinal olsalar bile eğrinin kayması |
+
+Gevşeyen yalnızca "bir bölüm sınıra değdi" durumudur. Sistematik bir bozulma — ki
+denetimin asıl işi odur — eskisinden daha kesin yakalanır, çünkü eskiden sayı hiç
+ölçülmüyordu. Aynı mantık süre şiddeti kuralına da uygulandı: o kuralın işi **bozuk
+bir arketipi** yakalamaktı ve öyle bir arketip onlarca bölüm üretir (ölçülen 22); tek
+şanssız bir bölüm onunla aynı kovaya konmamalı. Ölçü artık sayı tavanı (3) artı tek
+bölüm için mutlak tavan (%55).
+
+### 8.4 Ritim: tavanı elle koymamak
+
+Ritim denetimi "oyun kendini tekrar ediyor mu" sorusunu sorar. İki kere yeniden
+yazıldı, çünkü ilk iki hâli yanlış şeyi ölçüyordu:
+
+- İlk hâli **tek bir gecikmeye** (120) bakıyordu ve düzeltme tepeyi 70'e taşıyınca
+  kör kaldı.
+- İkinci hâli bütün gecikmeleri tarıyordu ama **kazanma oranı serisine** bakıyordu —
+  oysa o seri zaten hedefe oturtulmuş durumda, yani yapıdaki tekrarı gizliyor. Üstelik
+  tavanı (0,60) elle konmuştu; ölçüm aştığında tavanı yükseltmek cazip hale geliyordu,
+  ki bu sınavı cevaba uydurmaktır.
+
+Şimdiki hâli üç seriyi birden ölçer ve **her birinin tavanını kendi boş hipotezinden
+türetir**:
+
+| Seri | Ne ölçer | İstatistik |
+|---|---|---|
+| Halka sayısı (patronsuz) | oyuncunun doğrudan gördüğü yapı | `s[i] = s[i+ℓ]` eşleşme oranı |
+| Arketip (patronsuz) | hangi mekanikler var | eşleşme oranı |
+| Hedeften sapma | tasarımın tutturulamadığı yer | tarafsız özilinti |
+
+**Neden patronsuz.** Altı patron tasarımı 10 bölümde bir dönüyor, yani aynısı 60
+bölümde bir geliyor. Bu kasıtlı ve oyuncuya görünür bir dönüm noktası; şartnamede
+yazılı, `levels.test.ts` ayrıca garanti ediyor. Seriye katıldığında 60'ın katı olan
+gecikmelere sabit bir eşleşme sinyali ekliyor (ölçtüm: lag 240'ta 74 patron çiftinin
+73'ü eşleşiyor) ve denetimin ASIL aradığı şeyi — sıradan bölümlerde istemeden oluşan
+tekrarı — bastırıyor.
+
+**Neden "hedeften sapma", "eğilimden arındırılmış oran" değil.** Zorluk serisinin
+kalıntısı önce 25 pencereli hareketli ortalamayla çıkarılıyordu. Ölçtüm: o kalıntının
+en güçlü gecikmeleri 120, 50, 190, 310, 240, 290, 70 — **hepsi 10'un katı**, yani
+patron temposu. Patronlar çıkarılınca tepe düşüyor ama geniş bir yükselme kalıyordu;
+sebebi zorluk eğrisinin kendi dalgası: `DALGA_PERIYOT = 24` ve 25'lik bir hareketli
+ortalama 24 periyotlu bir sinüsü izleyemez, dolayısıyla kalıntıda dalganın tamamı
+duruyordu. Yani denetim, tasarımın KASITLI ritmini kusur sayıyordu.
+
+Doğru kalıntı hedeften sapmadır: hedef eğrisi dalgayı, nefesi ve patron çukurunu
+zaten içerir. Geriye kalan "tasarımdan sapma"dır, beyaz gürültü olmalıdır, ve orada
+bulunan her periyot istemsizdir. Permütasyon boş hipotezi de ancak bu seri için
+geçerlidir — süzgeçten geçmiş bir seri sıra değişimine duyarsız değildir.
+
+Tavan şu soruyla bulunur: *"aynı seri rastgele sıralansaydı bu istatistik en fazla ne
+kadar yükselirdi?"* Seri 200 kez karıştırılır, her karıştırmada istatistiğin
+gecikmeler üstündeki **maksimumu** alınır, tavan bu dağılımın %99'luk dilimidir.
+İstatistik zaten bir maksimum olduğu için çoklu karşılaştırma düzeltmesi de bedava
+gelir: boş hipotez de aynı maksimumu alıyor.
+
+**Bu denetim işe yaradı.** İlk çalıştırmada halka sayısı serisinde lag 240'ta %53,2
+eşleşme buldu (tavan %37,0) ve teşhis `RHYTHM`'i değil **arketip rotasyonunu**
+gösterdi: `hassasiyet` 3-4, `dayaniklilik` 5-6 halka zorunlu kıldığı ve arketip
+`(n−60) mod 8` ile seçildiği için halka sayısı da 8 periyotluydu — 8'in katı olan her
+gecikmede eşleşme %48, katı olmayanda %28. Patronlar seriden çıkarılınca tepe %30'a
+düşüyordu, yani kalan imzayı arketip basıyordu. İkisi de blok karıştırmasıyla
+düzeltildi (küme korunur, sıra karıştırılır).
+
+### 8.5 Ritim denetiminin bulduğu ikinci şey: kilitli zorluk kolu
+
+Kalıntı hedeften sapma olarak yeniden tanımlandıktan sonra denetim bir periyot daha
+gösterdi: en güçlü iki gecikme **120 ve 240** (0,24 ve 0,16), yani gerçek bir periyot
+ve katı. 120 = EKOK(dalga 24, patron 10).
+
+Teşhis: sapmayı üreten bölümler `merkez` patronunun dalga çukuruna denk gelen
+örnekleriydi — hedef %22, ulaşılan %49. Sebep tasarımın içindeydi. `merkez`'in baştan
+kilitli bir halkası var, dolayısıyla `gerekenPay(4) = 15°` kuralı başlangıç
+açıklığına taban koyuyor ve boşluk `NEED_PASS + 15° = 33°`in altına inemiyor. Tabloda
+ölçülen boşluk tam **33,0°**: kısıt birebir bağlıyordu. Yani ayarlayıcının zorluk kolu
+kilitliydi; hedef ne derse desin o bölüm daha zor olamıyordu.
+
+Çözüm hedefi indirmek değil, çalışan kolu kullanmak: `τ = (boşluk − NEED_PASS) / Σ'|ω|`
+olduğu için hızları 1,5 katına çıkarmak aynı boşlukta τ'yu **48,5 ms'den 32,3 ms'ye**
+indirir — insan sınırının (25 ms) hâlâ üstünde. `buyukKasa`da yapılan düzeltmenin
+aynısı.
+
+> Bu, ritim denetiminin neden zorluk serisini de ölçmesi gerektiğinin örneğidir:
+> yapı serileri temizdi, bant ihlali yalnızca iki bölümdü, ama periyot analizin
+> gösterdiği şey iki bölüm değil **bir tasarım kusuruydu** ve her 120 bölümde
+> tekrar ediyordu.
+
+### 8.6 Zor seri
+
+Ritmin bedeli ayrıca denetlenir: periyodikliği kırmanın kolay yolu zor bölümleri arka
+arkaya dizmektir. Bu ölçü de iki kere düzeltildi. Eskiden **mutlak** eşiklerle
+çalışıyordu (%35/%40/%45 altı); ama hedef eğrisi 200. bölümde zaten %35'e indiği için
+sonraki 800 bölümün neredeyse tamamı "%45 altı" sayılıyordu — denetim ritmi değil
+eğrinin kendisini ölçüyordu.
+
+Şimdi ölçü **yerel hedefe** göre: bir bölüm ancak kendi hedefinin 7 puan (≈2 SE)
+altındaysa "olması gerekenden zor" sayılır. Tavan yine boş hipotezden gelir — aynı
+oranda ama bağımsız dağılmış zor bölümlerle en uzun kesintisiz serinin %99'luk dilimi.
 
 ---
 
@@ -327,15 +486,23 @@ Daha dar bir bant ölçüm gürültüsünü hata sanardı.
 
 | | |
 |---|---|
-| Hassasiyet τ | en düşük **25,0 ms**, medyan 34 ms, en yüksek 278 ms |
+| Hassasiyet τ | en düşük **25,0 ms**, medyan 31 ms, en yüksek 326 ms |
 | 25 ms altında bölüm | **0** |
-| Halka dağılımı | 2:4, 3:116, 4:148, 5:259, 6:473 |
-| Patron | 100 (altı tasarım dönüşümlü) |
-| Farklı yapı | 267 |
-| Yıldız eşikleri | q3 = 0,67, q2 = 0,42 |
-| Yıldız dağılımı (usta) | %25 / %35 / %40 |
-| Süre sınırı | 6,2–29,8 sn, ortalama 11,55 sn |
-| Doğrulama | **0 sorun** |
+| Halka dağılımı | 2:4, 3:173, 4:138, 5:250, 6:435 |
+| Mekanik | iki kapılı 516, flip 482, hızlanan 550, baştan kilitli 371 bölüm |
+| Patron | 100 (altı tasarım dönüşümlü + kapanış) |
+| Yıldız eşikleri | q3 = 0,67, q2 = 0,41 |
+| Yıldız dağılımı (usta) | %25 / %35 / %41 |
+| Süre sınırı | 5,3–33,6 sn, ortalama 11,9 sn |
+| γ | ortalama 0,58, en yüksek 1,31 (tavan 1,3) |
+| Bant dışı bölüm | **1** / 1000 (tavan 10); en büyük sapma +20 puan (tavan ±27) |
+| Saate yenilme | baskın olduğu bölüm 1/1000; %30 üstü 1 bölüm (tavan 3) |
+| Ritim | halka 0,359 / 0,375 — arketip 0,234 / 0,254 — zorluk 0,139 / 0,156 (hepsi tavan altı) |
+| Zor seri | en uzun 2 (tavan 2) |
+
+Bu sayıların hepsi **üretimden bağımsız bir tohumla** ölçülmüştür (bkz. §8.1).
+Önceki sürümde aynı satır "doğrulama: 0 sorun" diyordu ve bu doğru değildi —
+ayarlayıcının optimize ettiği çekilişi tekrar oynatıyordu.
 
 ---
 
