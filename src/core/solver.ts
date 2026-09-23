@@ -5,13 +5,10 @@
 // Tek kopya: level üretici de, testler de bunu kullanır. Üretici bir leveli bu çözücüyle
 // doğruladığında, oyunun kendi döngüsünü aynı kilit anlarıyla sürmek anlamlı bir sınama olur.
 import { NEED_PASS, SOLVER_MARGIN, REACT } from "./geometry.ts";
-import { liveRings, stepRings } from "./rings.ts";
+import { liveRings, stepRings, ADIM } from "./rings.ts";
 import { OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen } from "./opening.ts";
 import type { Open } from "./opening.ts";
 import type { RingDef } from "./rings.ts";
-
-/** Fizik adımı. Oyunun döngüsüyle aynı olmak zorunda. */
-export const SOLVER_ADIM = 1 / 120;
 
 /** Çözücünün hedeflediği genişlik: geçiş eşiğinin biraz üstü, insan oyuncuya yer kalsın diye. */
 export const SOLVER_HEDEF = NEED_PASS + SOLVER_MARGIN;
@@ -30,7 +27,7 @@ export interface Cozum {
 /** Çözülemezse null. Bir halka 30 saniye içinde vurulamıyorsa aday elenir. */
 export function solve(def: readonly RingDef[]): Cozum | null {
   const rs = liveRings(def);
-  const dt = SOLVER_ADIM;
+  const dt = ADIM;
   let open: Open = initialOpen(rs);
   let t = 0, last = 0;
   const kilitler: Kilit[] = [];

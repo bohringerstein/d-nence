@@ -13,14 +13,18 @@ import type { DilKodu } from "../dil/index.ts";
 
 const kok = path.join(import.meta.dirname, "..", "..");
 const sayfa = fs.readFileSync(path.join(kok, "public", "gizlilik.html"), "utf8");
-const shellHam = fs.readFileSync(path.join(kok, "src", "ui", "shell.ts"), "utf8");
-/** Yorumlar elenir: bir kuralın NEDEN böyle olduğunu anlatan yorum, kuralın
-    kendisi sanılmasın. (Bu dosyadaki testlerden biri tam olarak buna takıldı.) */
-const shell = shellHam.replace(/<!--[\s\S]*?-->/g, "");
+import { html } from "./shell.ts";
+import { TR } from "../dil/tr.ts";
+/** Gerçek üretilmiş markup: yorum ayıklamaya gerek yok. */
+const shell = html(TR);
 
 test("sayfa uygulamayla birlikte yayınlanıyor ve ayarlardan açılıyor", () => {
   assert.ok(shell.includes('href="./gizlilik.html"'), "ayarlarda bağlantı olmalı");
-  assert.ok(!shell.includes('target="_blank"'),
+  // Bağlantının KENDİSİNE bak, belgenin tamamına değil: HTML yorumları da üretilen
+  // markup'ın parçası ve bir yorumda "target=_blank" sözü geçebiliyor.
+  const bag = shell.match(/<a href="\.\/gizlilik\.html"[^>]*>/);
+  assert.ok(bag, "gizlilik bağlantısı bulunamadı");
+  assert.ok(!bag[0].includes("target="),
     "gizlilik bağlantısı yeni sekmede açılmamalı: PWA'da uygulamadan çıkarıyor");
   for (const k of Object.keys(DILLER) as DilKodu[]) {
     assert.ok(DILLER[k].gizlilik.trim().length > 0, `${k}: bağlantı metni eksik`);

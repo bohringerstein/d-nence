@@ -25,7 +25,12 @@ const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel
   await import("./storage.ts");
 const { LEVEL_COUNT } = await import("../core/index.ts");
 
-const KEY = "kasa:v1";
+/**
+ * Birincil kayıt anahtarı. Eskiden burada "kasa:v1" yazıyordu — yani 10'dan fazla
+ * doğrulama testi aslında GÖÇ yolunu sınıyor, birincil yolu hiç sınamıyordu. Eski
+ * anahtar desteği bir gün kaldırılsa bu testler yanlış sebepten düşerdi.
+ */
+const KEY = "donence:v1";
 const yaz = (v: unknown): void => { depo.temizle(); depo.setItem(KEY, JSON.stringify(v)); };
 
 test("kayıt yokken Level 1'den başlar", () => {
@@ -283,10 +288,14 @@ test("yedek gidip geri geliyor", () => {
 test("bozuk yedek reddedilir, kısmen yüklenmez", () => {
   // Elle yapıştırılan bir metin güvenilmeyen girdidir ve ayıklama `oku()` ile AYNI
   // yoldan geçer. Kısmi bir kayıt yüklemektense hiç yüklememek iyidir.
-  for (const bozuk of ["", "{}", "merhaba", '{"level":5}', '{"dnc":99,"enUzak":5}',
-                       '{"dnc":1,"enUzak":1,"bests":{}}']) {
+  for (const bozuk of ["", "{}", "merhaba", '{"level":5}', '{"dnc":99,"enUzak":5}']) {
     assert.equal(iceAktar(bozuk), null, `reddedilmeliydi: ${bozuk}`);
   }
+  // BOŞ ama geçerli bir yedek artık burada reddedilmiyor: o karar mevcut kayda
+  // bakmalı ve çağrı yerinde veriliyor (bkz. main.ts). Denetim burada olduğu sürece
+  // 1. bölümdeki oyuncunun kendi yedeği "Kod okunamadı" diyordu.
+  assert.ok(iceAktar('{"dnc":1,"level":1,"enUzak":1,"bests":{}}'),
+    "boş ama geçerli yedek okunabilmeli");
 });
 
 test("yedekteki bozuk rekorlar ayıklanıyor", () => {
@@ -297,5 +306,10 @@ test("yedekteki bozuk rekorlar ayıklanıyor", () => {
   const k = iceAktar(metin);
   assert.ok(k);
   assert.deepEqual(Object.keys(k.bests), ["5"], "yalnız geçerli rekor kalmalı");
-  assert.equal(({} as Record<string, unknown>).s, undefined, "prototip kirlenmemeli");
+  // Bu iddia YANLIŞ NESNEYE bakıyordu ve başarısız OLAMAZDI: yük `bests["__proto__"]`,
+  // yani koruma kaldırılsaydı kirlenecek olan Object.prototype değil `k.bests`'in
+  // prototipiydi.
+  assert.equal((k.bests as Record<string, unknown>).s, undefined, "bests prototipi kirlenmemeli");
+  assert.equal(Object.getPrototypeOf(k.bests), Object.prototype, "bests prototipi değişmemeli");
+  assert.equal(({} as Record<string, unknown>).s, undefined, "Object.prototype kirlenmemeli");
 });

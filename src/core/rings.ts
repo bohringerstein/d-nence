@@ -1,5 +1,5 @@
 // Halka modeli ve hareketi.
-import { TAU, DEG } from "./geometry.ts";
+import { TAU, DEG, wrap } from "./geometry.ts";
 
 /** Level tablosundaki halka tanımı (data/levels.json biçimi). */
 export interface RingDef {
@@ -31,6 +31,22 @@ export interface Ring extends RingDef {
 }
 
 /**
+ * Fizik adımı. Sabit 1/120 saniye.
+ *
+ * TEK KAYNAK. Beş ayrı yerde tanımlıydı (`solver.ts`, `game/loop.ts`, `tools/gen.ts`
+ * iki kez, `tools/play.ts`) ve `solver.ts`'in yorumu "oyunun döngüsüyle aynı olmak
+ * zorunda" diyordu — yani bir yorum, ortak bir sabitin işini yapmaya çalışıyordu.
+ * Eşitliği sınayan bir test de yoktu.
+ *
+ * Neden önemli: level tablosu bu adımla üretildi ve yön değiştiren halkalar adım
+ * büyüklüğüne DUYARLI. Etkin flip periyodu `⌈flip·120⌉/120`'dir ve hata birikir;
+ * ölçüldü: bir bölüm boyunca en kötü birikimli açı hatası 13,1° — medyan boşluk
+ * payının dörtte üçü. Beş kopyadan biri kaysaydı üretici "çözülebilir" dediği bir
+ * bölümü oyunun kaybettiği bir bölüme çevirirdi ve hiçbir test bunu göstermezdi.
+ */
+export const ADIM = 1 / 120;
+
+/**
  * Halkaları bir adım ilerletir. `lt` levelin başından beri geçen süredir.
  *
  * `dt` negatif olabilir (simülasyonda erken dokunuşu geri sarmak için). Geri sarma ancak
@@ -48,7 +64,7 @@ export function stepRings(rs: Ring[], dt: number, lt: number): void {
 }
 
 /** Halkanın boşluk merkezleri (bir ya da iki tane). */
-export function gapCenters(r: Ring | RingDef & { angle: number }): number[] {
+export function gapCenters(r: RingDef & { angle: number }): number[] {
   const c = [r.angle];
   if (r.gaps === 2) c.push(r.angle + r.gapOffset * DEG);
   return c;
@@ -73,7 +89,7 @@ export function isaretAcisi(r: Ring): number {
   // Yuvarlak uçlar yayı kısaltır (bkz. game/render.ts halkaCiz); işaret yayın
   // ORTASINA konduğu için bu kısalma sonucu değiştirmez.
   const yarim = r.gap * DEG / 2;
-  const merkezler = gapCenters(r).map(c => ((c % TAU) + TAU) % TAU).sort((a, b) => a - b);
+  const merkezler = gapCenters(r).map(wrap).sort((a, b) => a - b);
   let enIyi = merkezler[0] + Math.PI;   // tek kapılı halkada zaten doğru cevap
   let enGenis = -1;
   for (let i = 0; i < merkezler.length; i++) {

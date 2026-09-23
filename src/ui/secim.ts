@@ -11,6 +11,7 @@
 import type { Metinler } from "../dil/index.ts";
 import type { Best } from "../core/index.ts";
 import { bossMu } from "../core/index.ts";
+import { yildizYazisi } from "../game/hints.ts";
 
 export const SAYFA_BOYU = 100;
 
@@ -37,9 +38,8 @@ export function aralik(sayfa: number, toplam: number): [number, number] {
   return [bas, Math.min(toplam, bas + SAYFA_BOYU - 1)];
 }
 
-/** Yıldızları düğmenin içinde gösterilecek biçimde: "★★☆", hiç oynanmadıysa boş. */
-const yildizlar = (b: Best | undefined): string =>
-  b ? "★".repeat(b.s) + "☆".repeat(3 - b.s) : "";
+/** Yıldız glifi TEK kopya: gösterim kuralı oyunun para birimine ait, iki modülde olamaz. */
+const yildizlar = (b: Best | undefined): string => (b ? yildizYazisi(b.s) : "");
 
 /**
  * Sayfanın düğmeleri.

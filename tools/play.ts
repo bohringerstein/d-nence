@@ -13,12 +13,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  canPass, largestOpen, peekOpen, lockOpen, initialOpen, OPEN_ALL, liveRings, stepRings, DEG
+  canPass, largestOpen, peekOpen, lockOpen, initialOpen, OPEN_ALL, liveRings, stepRings, NEED_PASS, ADIM
 } from "../src/core/index.ts";
 import type { LevelTable, Level, Open } from "../src/core/index.ts";
 import { createLevel, tap, step } from "../src/game/state.ts";
 
-const ADIM = 1 / 120;
+
 const tablo: LevelTable = JSON.parse(
   fs.readFileSync(path.join(import.meta.dirname, "..", "data", "levels.json"), "utf8"));
 
@@ -133,7 +133,7 @@ function birDeneme(level: Level, p: Profil, sapma: number, R: () => number): Den
         basmakIstiyor = t >= p.tepki + (1 - p.acgozluluk) * 0.8;
       } else if (simdiki !== null && canPass(sonuc.w) && tepeyiGecti) {
         const kayip = simdiki - sonuc.w;
-        const pay = simdiki - 18 * DEG;          // geçiş eşiğine kalan pay
+        const pay = simdiki - NEED_PASS;          // geçiş eşiğine kalan pay
         // Sabır bittiyse ya da süre eriyorsa tepe noktasında eline geleni alır.
         basmakIstiyor = kayip <= pay * p.acgozluluk || sabirBitti || sureBitiyor;
       }

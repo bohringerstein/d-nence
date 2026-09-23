@@ -1,6 +1,6 @@
 // Level tablosunun biçimi ve şema doğrulaması.
 // Oynanabilirlik denetimi ayrıdır: tools/gen.ts --verify.
-import { TAU, NEED, DEG } from "./geometry.ts";
+import { TAU, NEED_PASS, DEG } from "./geometry.ts";
 import type { RingDef } from "./rings.ts";
 
 /**
@@ -126,7 +126,10 @@ export function validateTable(data: unknown): string[] {
       }
       if (!tipTamam) return;
       if (r.gaps !== 1 && r.gaps !== 2) err.push(nerede + "gaps 1 veya 2 olmalı");
-      if (r.gap < NEED / DEG || r.gap > GAP_MAX_DEG) err.push(nerede + "gap " + r.gap.toFixed(1) + " derece, sınırların dışında");
+      // Alt sınır NEED değil NEED_PASS: tek başına geçilebilirlik sınırı dilime
+      // yuvarlanmış olandır. Aradaki 0,129°'lik bant şemadan geçip ASLA açılamayan
+      // bir bölüm üretebilirdi (bugün tabloda böyle halka yok; uyuyan hata).
+      if (r.gap < NEED_PASS / DEG || r.gap > GAP_MAX_DEG) err.push(nerede + "gap " + r.gap.toFixed(1) + " derece, sınırların dışında");
       if (r.start < 0 || r.start >= TAU) err.push(nerede + "start 0..2pi dışında");
       if (r.flip < 0) err.push(nerede + "flip negatif");
       // Birebir aynı iki halka ikinci kilidi bedava yapar (10. patronda böyle bir hata vardı).

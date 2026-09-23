@@ -12,7 +12,12 @@ export type Stars = 1 | 2 | 3;
  * kullanılıyordu ve q, kaybedilen bir genişlikte bile küçük pozitif çıkabiliyordu.
  */
 export const starRatio = (widthRad: number, minGapRad: number): number =>
-  (widthRad - NEED_PASS) / (minGapRad - NEED_PASS);
+  // Math.min ŞART: analitik modelde `w ≤ minGap` garantili ama OYUN dilim sayar ve
+  // bir dilime (0,5°) kadar fazla ölçebilir. Tablodaki en küçük payda 3,729° olduğu
+  // için q teorik olarak 1,13'e çıkabilir. 592 gerçek oyunda gözlenmedi (en büyük
+  // 0,960) ama yapısal olarak engellenmemişti — ve aynı oranın ses perdesi için
+  // kullanılan ikizi (game/state.ts aciklikOrani) zaten sıkıştırıyordu.
+  Math.min(1, (widthRad - NEED_PASS) / (minGapRad - NEED_PASS));
 
 export const starCount = (q: number, q3: number, q2: number): Stars =>
   q >= q3 ? 3 : q >= q2 ? 2 : 1;

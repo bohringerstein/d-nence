@@ -88,7 +88,7 @@ Halka yalnızca oyun "bekleme" (idle) durumundayken hareket eder. Kilitlendikten
 - **Kayıp koşulu:** kilitten sonra en büyük açıklık `ceil(NEED / 0,5°)` dilimden kısaysa oyuncu kaybeder. Bu eşik `src/core/geometry.ts` içinde tek bir yerde, `NEED_PASS = ceil(NEED / 0,5°) × 0,5°` (= 18,0°) olarak tanımlıdır ve oyun da level üretici de onu kullanır. Eskiden üç ayrı yerde üç farklı değer vardı (17,871° / 18,0° / 18,871°).
 - **Kazanma:** son hareketli halka geçerli şekilde kilitlenince top, en büyük açıklığın ortasındaki açı boyunca fırlatılır.
 
-Level üretici, hız gerektirdiği için dilim yerine **analitik aralık kesişimi** kullanır: açık bölge `{merkez, genişlik}` aralıklarının listesidir ve her kilit bu listeyi kesiştirir. İki yöntemin en fazla 1 dilim farklı olması zorunludur; `src/core/core.test.ts` bunu rastgele senaryolarda, `src/core/levels.test.ts` ise 60 levelin tamamında referans çözücünün yolunu oyunun maske modelinden geçirerek sınar.
+Level üretici, hız gerektirdiği için dilim yerine **analitik aralık kesişimi** kullanır: açık bölge `{merkez, genişlik}` aralıklarının listesidir ve her kilit bu listeyi kesiştirir. İki yöntemin en fazla 1 dilim farklı olması zorunludur; `src/core/core.test.ts` bunu rastgele senaryolarda, `src/core/levels.test.ts` ise 1000 bölümün tamamında referans çözücünün yolunu oyunun maske modelinden geçirerek sınar.
 
 ## 5. Süre ve yıldızlar
 
@@ -98,13 +98,13 @@ Level üretici, hız gerektirdiği için dilim yerine **analitik aralık kesişi
 
 ```
 minGap = leveldeki en küçük gap (radyan)
-q = (en büyük açıklık − NEED) / (minGap − NEED)
+q = (en büyük açıklık − NEED_PASS) / (minGap − NEED_PASS)
 3 yıldız: q >= q3   "Temiz açılış"
 2 yıldız: q >= q2   "İyi açılış"
 1 yıldız: aksi      "Kıl payı"
 ```
 
-`q3` ve `q2` level tablosunun en üstünde gelir. **Bu belgeye sayı yazılmaz**: değerler tablo her üretildiğinde yeniden hesaplanır (bu yazının yazıldığı sırada 0,88 ve 0,68). Oyun bunları `levels.json`'dan okur, koda gömmez.
+`q3` ve `q2` level tablosunun en üstünde gelir. **Bu belgeye sayı yazılmaz**: değerler tablo her üretildiğinde yeniden hesaplanır (bu yazının yazıldığı sırada 0,67 ve 0,42). Oyun bunları `levels.json`'dan okur, koda gömmez.
 
 **Eşikler ustalık referansından hesaplanır.** Yıldız "iyi oynamanın" karşılığıdır, ortalama oyuncunun değil. Bu yüzden eşikler, açıklığın en geniş anını bekleyip vuran ve zamanlaması 35 ms sapan bir oyuncunun (`playUsta`, `tools/gen.ts`) her levelde 25 kez oynadığı sonuçların %75'lik ve %40'lık dilimlerinden alınır. Hedef: bu oyuncu levellerin yaklaşık %25'inde 3 yıldız, %60'ında en az 2 yıldız alsın.
 

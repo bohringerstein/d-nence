@@ -20,7 +20,11 @@ const sahteEleman = {
 };
 Object.defineProperty(globalThis, "window", { value: sahteEleman, configurable: true });
 Object.defineProperty(globalThis, "Element", { value: class {}, configurable: true });
-Object.defineProperty(globalThis, "performance", { value: { now: () => 0 }, configurable: true });
+// `damga()` artık gelecek zamanlı bir timeStamp'i reddediyor (epoch tabanlı damga
+// veren bir tarayıcıda kuyruk sonsuza kadar büyür ve hiçbir dokunuş işlenmez).
+// Testlerdeki damgalar bu yüzden "şimdi"nin GERİSİNDE olmalı.
+let simdi = 1e9;
+Object.defineProperty(globalThis, "performance", { value: { now: () => simdi }, configurable: true });
 
 const { girdiBagla } = await import("./input.ts");
 const girdi = girdiBagla(sahteEleman as unknown as HTMLCanvasElement);
@@ -130,7 +134,18 @@ test("temizle bekleyenleri atar", () => {
 test("damgası olmayan olay şimdiki zamana düşer", () => {
   girdi.temizle();
   for (const f of dinleyiciler.get("pointerdown") ?? []) f({ isPrimary: true, button: 0, timeStamp: 0, target: null, preventDefault: () => {} });
-  assert.equal(girdi.al(0), 1, "damga yoksa dokunuş kaybolmamalı");
+  assert.equal(girdi.al(simdi), 1, "damga yoksa dokunuş kaybolmamalı");
+});
+
+test("GELECEK zamanlı damga şimdiki zamana düşer", () => {
+  // Bir tarayıcı `timeStamp`'i epoch tabanlı verirse (eski WebKit davranışı) damga
+  // her zaman fizik saatinin ilerisinde kalır, kuyruk sonsuza kadar büyür ve HİÇBİR
+  // dokunuş işlenmez: oyun sessizce oynanamaz hâle gelir, hata mesajı da olmaz.
+  girdi.temizle();
+  for (const f of dinleyiciler.get("pointerdown") ?? []) {
+    f({ isPrimary: true, button: 0, timeStamp: simdi + 1e12, target: null, preventDefault: () => {} });
+  }
+  assert.equal(girdi.al(simdi), 1, "gelecek zamanlı damga kuyruğu kilitlememeli");
 });
 
 // --- Dokunma alanı: ekranın tamamı, düğmeler ve örtüler hariç -----------------

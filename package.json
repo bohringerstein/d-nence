@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "sync": "node tools/sync-prototype.ts",
     "check": "npm run typecheck && npm test && npm run verify && node tools/sync-prototype.ts --check",
-    "icons": "node tools/make-icons.ts"
+    "icons": "node tools/make-icons.ts",
+    "play": "node tools/play.ts"
   },
   "engines": {
     "node": ">=22.6"

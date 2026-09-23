@@ -232,6 +232,62 @@ sıçramalar oluyor ve ekrandaki en büyük sayı zorluk hakkında ters sinyal v
 
 ---
 
+## 6b. Üretimin sert eleme ölçütleri
+
+Zorluk eğrisi bir *hedef*tir; aşağıdaki dört kural ise **aday eleyicidir** — sağlamayan
+yapı tabloya hiç girmez. Hiçbiri belgeye yazılmamıştı, yalnız kod yorumlarında yaşıyordu.
+
+**γ — bekleme bütçesi.** "Oyuncu halka başına kaç tur izleyebilir?"
+
+```
+P_i = 2π / (g_i · |ω_i|)                 // bir halkanın fırsat periyodu
+P_i = max(P_i, 2·flip_i)                 // yön değiştiren halkada
+γ   = (limit − m·REACT) / Σ P_i          // m = hareketli halka sayısı
+```
+
+`GAMA_TAVAN = 1,3`: γ bunun üstündeyse aday elenir. Sebep, süre sınırının öteki ucu —
+halkaların ikinci turunu bekleyebilen oyuncu için zamanlama ölçüsü olmaktan çıkar.
+Doğrulama `GAMA_TAVAN + 0,05` toleransıyla denetler; ölçülen en yüksek γ **1,309**.
+
+> **Denetim notu (açık):** `P_i`'nin iki dalı da ölçülerek sorunlu bulundu. Flip'li
+> halkaların %87'sinde `|ω|·flip < 2π/g`, yani halka çemberin tamamını hiç taramıyor
+> ve bazı yönler için fırsat periyodu **sonsuz** olmalı; formül sonlu bir sayı veriyor.
+> İki kapılı halkalarda `gapOffset` medyanı 157° olduğu için ortalama periyot, en uzun
+> beklemeyi %13-28 eksik sayıyor. Düzeltilmedi; bkz. aksiyon listesi.
+
+**EN_AZ_PAY — baştan kilitli halkalardan sonra kalan taban pay.**
+
+```
+gerekenPay(kalan) = 6° × (1 + (kalan−1)/2) = 3°·kalan + 3°
+```
+
+Afin bir kural; eğimi halka başına 6° değil **3°**. Gerekçe: "hiç tepki veremeden
+ölmek" yalnız BİRİNCİ dokunuşta olur — dar bir kanalı fark eden oyuncu sonraki
+halkalarda bekleyebilir, bekleyemediği tek kilit ilkidir. 396 bölümde baştan kilitli
+halka var ve kısıt sıkı bağlıyor: ölçülen en küçük pay fazlası **0,033°**.
+
+**RHYTHM — halka sayısı ritmi.** Formül 17. bölümde 6'ya ulaşıp orada kalıyordu.
+6'ya ulaşıldıktan sonra halka sayısı `[6, 6, 5, 6, 4, 6, 5, 6]` dizisinden
+`(n−1) mod 8` ile seçilir. Daha az halkalı bölümler zorluğu kaybetmez: ayarlayıcı
+boşluğu daraltarak aynı kazanma oranını tutturur, yani o bölümler dayanıklılık yerine
+hassasiyet ister.
+
+> **Denetim notu (açık):** `RHYTHM` (periyot 8) ile arketip rotasyonu (periyot 8,
+> indeks `(n−60) mod 8`) sabit farkla **faz kilitli** (`59 mod 8 = 3`). Sonuç: n ≥ 60
+> için sekiz artık sınıfının dördünde halka sayısı tek değerli. Halka sayısı serisinin
+> özilintisi lag 8'de **0,781**. Ritim denetimi bunu göremiyor çünkü kazanma oranı
+> serisine bakıyor ve o seri hedefe oturtulmuş durumda.
+
+**SURE_TAVANI ve süre kaybı.** Süre sınırı üretimde iki yönden sıkıştırılır: alt
+sınır çözücünün süresi (`best·1,5 + 1,5`), üst sınır γ tavanı. Ayrıca doğrulama iki
+ayrı ölçü tutar — `sureKaybi` (tüm denemeler içinde saate yenilenlerin payı, KARAR
+ölçüsü) ve `sureOrani` (yalnız kayıplar içindeki pay, teşhis). Hiçbir bölümde
+`sureKaybi > 0,30` olamaz; ölçülen ihlal **0**.
+
+**SOLVER_MARGIN.** Referans çözücü geçiş eşiğini değil, onun biraz üstünü hedefler
+(`SOLVER_HEDEF = NEED_PASS + SOLVER_MARGIN`): kusursuz bir çözücünün kıl payı geçtiği
+bir bölüm, insan oyuncu için çözülemez demektir.
+
 ## 7. Yıldız
 
 ```
@@ -271,14 +327,14 @@ Daha dar bir bant ölçüm gürültüsünü hata sanardı.
 
 | | |
 |---|---|
-| Hassasiyet τ | en düşük **25,0 ms**, medyan 36 ms, en yüksek 260 ms |
+| Hassasiyet τ | en düşük **25,0 ms**, medyan 34 ms, en yüksek 278 ms |
 | 25 ms altında bölüm | **0** |
-| Halka dağılımı | 2:4, 3:125, 4:139, 5:254, 6:478 |
+| Halka dağılımı | 2:4, 3:116, 4:148, 5:259, 6:473 |
 | Patron | 100 (altı tasarım dönüşümlü) |
 | Farklı yapı | 267 |
-| Yıldız eşikleri | q3 = 0,68, q2 = 0,42 |
+| Yıldız eşikleri | q3 = 0,67, q2 = 0,42 |
 | Yıldız dağılımı (usta) | %25 / %35 / %40 |
-| Süre sınırı | 6,2–25,1 sn, ortalama 11,4 sn |
+| Süre sınırı | 6,2–29,8 sn, ortalama 11,55 sn |
 | Doğrulama | **0 sorun** |
 
 ---

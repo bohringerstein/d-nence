@@ -13,7 +13,10 @@ import path from "node:path";
 
 const kok = path.join(import.meta.dirname, "..", "..");
 const css = fs.readFileSync(path.join(kok, "src", "styles.css"), "utf8");
-const shell = fs.readFileSync(path.join(kok, "src", "ui", "shell.ts"), "utf8");
+import { html } from "./shell.ts";
+import { TR } from "../dil/tr.ts";
+/** Gerçek üretilmiş markup (bkz. shell.ts html). */
+const shell = html(TR);
 const main = fs.readFileSync(path.join(kok, "src", "main.ts"), "utf8");
 
 /** Bir seçicinin gövdesini döndürür (ilk eşleşme). */
@@ -74,10 +77,10 @@ test("kapanışta odak OYUN ALANINA döner, düğmeye değil", () => {
   // Bu oyunun tek kontrolü boşluk/Enter. Odağı açan düğmeye geri vermek, oyuncunun
   // bir sonraki boşluk tuşunun o düğmeyi çalıştırması demek olurdu — ayarları
   // kapatıp boşluğa basan oyuncu ayarları yeniden açardı.
-  const kapatmalar = main.match(/ortuKapat\(ui\.\w+, [^)]+\)/g) ?? [];
+  const kapatmalar = main.match(/ortuKapat\(ui\.\w+, ui\.\w+, [^)]+\)/g) ?? [];
   assert.ok(kapatmalar.length >= 6, "altı örtünün de kapanışı olmalı");
   for (const k of kapatmalar) {
-    assert.ok(k.endsWith("ui.canvas)"), "odak oyun alanına dönmeli: " + k);
+    assert.ok(/ortuKapat\(ui\.\w+, ui\.canvas,/.test(k), "odak oyun alanına dönmeli: " + k);
   }
   assert.ok(/<canvas id="c" tabindex="0"/.test(shell), "oyun alanı odaklanabilir olmalı");
 });
@@ -88,10 +91,10 @@ test("panel açılınca odak BAŞLIĞA gider, en alttaki düğmeye değil", () =
   // "Nasıl oynanır"ı gösteriyordu. Başlık odakta olunca ekran okuyucu panelin adını
   // okur ve gezinme baştan başlar.
   assert.ok(/id="ayarBaslik" tabindex="-1"/.test(shell), "ayarlar başlığı odaklanabilir olmalı");
-  assert.ok(/ortuAc\(ui\.ayarPanel, ui\.ayarBaslik\)/.test(main), "ayarlar açılınca odak başlığa gitmeli");
-  assert.ok(!/ortuAc\(ui\.ayarPanel, ui\.ayarKapat\)/.test(main), "odak kapatma düğmesine verilmemeli");
-  assert.ok(/ortuAc\(ui\.nasil, ui\.nasilBaslik\)/.test(main), "nasıl oynanır açılınca odak başlığa gitmeli");
-  assert.ok(!/ortuAc\(ui\.nasil, ui\.nasilKapat\)/.test(main), "odak kapatma düğmesine verilmemeli");
+  assert.ok(/ortuAc\(ui\.ayarPanel, ui\.ayarBaslik,/.test(main), "ayarlar açılınca odak başlığa gitmeli");
+  assert.ok(!/ortuAc\(ui\.ayarPanel, ui\.ayarKapat,/.test(main), "odak kapatma düğmesine verilmemeli");
+  assert.ok(/ortuAc\(ui\.nasil, ui\.nasilBaslik,/.test(main), "nasıl oynanır açılınca odak başlığa gitmeli");
+  assert.ok(!/ortuAc\(ui\.nasil, ui\.nasilKapat,/.test(main), "odak kapatma düğmesine verilmemeli");
 });
 
 test("bölüm seçimi örtüsü tam takım: Escape, çıkış şeridi, sayfalama", () => {
@@ -129,4 +132,21 @@ test("bölüm seçimi doğru YERDE açılıyor ve sayfa değişiminde başa sar�
     "sayfa değişiminde kutu başa sarmalı");
   // Kaydıran öğe .secimIzgara DEĞİL; ona yazmak ölü satırdı.
   assert.ok(!/secimIzgara\.scrollTop/.test(main), "secimIzgara kaydırıcı değil");
+});
+
+test("örtü kapanırken önce inert açılıyor, sonra odak taşınıyor", () => {
+  // İkinci sıra hatası: odak doğru zamanda dışarı taşınıyordu ama HEDEF odak
+  // alamıyordu — oyun alanının atası hâlâ `inert` taşıyordu, çünkü `arkaKilit(false)`
+  // `ortuKapat`'tan SONRA çağrılıyordu. `inert` ağacındaki öğe odaklanamaz; `focus()`
+  // sessizce hiçbir şey yapmıyordu. Altı çağrı yerinde birden.
+  const ortu = fs.readFileSync(path.join(kok, "src", "ui", "ortu.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const govde = ortu.slice(ortu.indexOf("export function ortuKapat"));
+  const kilit = govde.indexOf("arkaKilit(arka, false)");
+  const odak = govde.indexOf("geriOdak.focus");
+  const gizle = govde.indexOf("ortu.hidden = true");
+  assert.ok(kilit >= 0 && odak > kilit, "önce arkanın kilidi açılmalı, sonra odak taşınmalı");
+  assert.ok(gizle > odak, "gizleme en son olmalı");
+  // Sıra bir çağrı sözleşmesi OLAMAZ: main.ts'te elle arkaKilit çağrısı kalmamalı.
+  assert.ok(!/^\s*arkaKilit\(/m.test(main), "arkaKilit main.ts'ten elle çağrılmamalı");
 });

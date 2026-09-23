@@ -9,13 +9,16 @@ import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
 import { nasilHtml } from "./nasil.ts";
+import { html } from "./shell.ts";
 import { TR } from "../dil/tr.ts";
 
 /** Testler Türkçe metinle çalışır; İngilizce eksiksizliği dil.test.ts sınar. */
 const NASIL_HTML = nasilHtml(TR);
 
 const kok = path.join(import.meta.dirname, "..", "..");
-const shell = fs.readFileSync(path.join(kok, "src", "ui", "shell.ts"), "utf8");
+/** Gerçek üretilmiş markup. Dosyayı metin olarak okuyup yorum ayıklamaktan
+ *  kurtarır — o yol iki kez yanlış sonuç verdi. */
+const shell = html(TR);
 const css = fs.readFileSync(path.join(kok, "src", "styles.css"), "utf8");
 const main = fs.readFileSync(path.join(kok, "src", "main.ts"), "utf8");
 
@@ -27,7 +30,7 @@ test("sayaç bir düğme ve duraklatma etiketi taşıyor", () => {
   // Erişilebilir ad aria-label DEĞİL, görsel olarak gizli bir metin olmalı:
   // aria-label görünen metni ezer ve WCAG 2.5.3 (Label in Name) ihlali doğurur.
   assert.ok(!/aria-label/.test(m[0]), "sayaçta aria-label olmamalı");
-  assert.ok(/<span class="gizli">\$\{m\.duraklatDugmesi\}<\/span>/.test(m[0]),
+  assert.ok(/<span class="gizli">Duraklat<\/span>/.test(m[0]),
     "düğmenin erişilebilir adı yalnızca duraklatma olmalı");
   assert.ok(/\.gizli\s*\{/.test(css), "görsel gizleme sınıfı tanımlı olmalı");
   assert.equal(TR.duraklatDugmesi, "Duraklat");
@@ -87,10 +90,19 @@ test("ara vermek ilerlemeyi geri almıyor", () => {
   assert.ok(!govde.includes("levelYukle("), "ayarları kapatmak leveli baştan başlatmamalı");
 });
 
-test("arkaplandan dönüşte de geri sayım var", () => {
-  const blok = main.slice(main.indexOf('"visibilitychange"'));
-  assert.ok(blok.slice(0, 600).includes("geriSayimBaslat()"),
-    "uygulamadan çıkıp dönen oyuncu halkaları bir anda hareket hâlinde bulmamalı");
+test("donukluktan dönen HER yol geri sayımdan geçiyor", () => {
+  // Haber artık DÖNGÜDEN geliyor. Sebep: donukluğu çözen olay `focus` olmak zorunda
+  // değil — eşleşmeyen bir `blur` sonrası tek çıkış yolu DOKUNUŞ ve o dokunuş
+  // `focus` dinleyicisini tetiklemiyordu; oyun geri sayım olmadan canlanıyor ve aynı
+  // dokunuş bedava bir kilit oluyordu (çoğu durumda anında kayıp).
+  assert.ok(/cozuldu\(\) \{ if \(!oyunDonuk\(\)\) geriSayimBaslat\(\); \}/.test(main),
+    "döngü donukluğu çözdüğünü haber vermeli ve geri sayım başlamalı");
+  const loop = fs.readFileSync(path.join(kok, "src", "game", "loop.ts"), "utf8");
+  assert.ok(/if \(oncekiGizli\) cozuldu\?\.\(\)/.test(loop),
+    "döngü yalnızca donukluktan ÇIKARKEN haber vermeli");
+  // Eski, eksik yol kalmamalı: focus dinleyicisi tek başına yetmiyordu.
+  assert.ok(!/window\.addEventListener\("focus"/.test(main),
+    "geri sayım tek bir yerden başlamalı");
 });
 
 test("nasıl oynanır duraklatmayı anlatıyor", () => {
@@ -157,8 +169,7 @@ test("odak kaybı da oyunu durduruyor", () => {
     "görünürlük her çağrıldığında odak yeniden ölçülmeli");
   assert.ok(/addEventListener\("pointerdown", dokunusla/.test(loop),
     "dokunuş da donmayı çözmeli: oyuncu ekrana bastıysa oyun donuk kalmamalı");
-  assert.ok(/window\.addEventListener\("focus"/.test(main),
-    "odak geri gelince geri sayım başlamalı");
+  assert.ok(/cozuldu\(\)/.test(main), "donukluk çözülünce geri sayım başlamalı");
 });
 
 // --- Güncellemenin uygulandığı an --------------------------------------------
@@ -168,15 +179,18 @@ test("odak kaybı da oyunu durduruyor", () => {
 // ürettiği registerSW.js YALNIZCA kaydediyordu; yeni servis çalışanı devralıyor ama
 // çizilmiş sayfa eski varlıkları tutmaya devam ediyordu.
 test("yeni sürüm yalnızca GÜVENLİ anlarda uygulanıyor", () => {
-  assert.ok(/function guncellemeyiDene/.test(main), "güvenli an denetimi olmalı");
+  assert.ok(/function guncellemeyiIste/.test(main), "güvenli an denetimi olmalı");
   // Bölüm kazanıldıktan sonra: yenileme oyuncudan hiçbir şey götürmüyor.
   const kazanma = main.slice(main.indexOf('if (sonraki.tip === "bitis")'));
-  assert.ok(kazanma.slice(0, 260).includes("guncellemeyiDene(sonraki.n)"),
-    "bölüm sınırında güncelleme denenmeli");
+  assert.ok(kazanma.slice(0, 700).includes("guncellemeyiIste(sonraki.n)"),
+    "bölüm sınırında güncelleme istenmeli");
   // Duraklatmadan dönerken: oyuncu zaten durmuş.
   const devam = main.slice(main.indexOf("function duraklatmaKapat("));
-  assert.ok(devam.slice(0, 300).includes("guncellemeyiDene("),
-    "duraklatmadan dönerken güncelleme denenmeli");
+  assert.ok(devam.slice(0, 400).includes("guncellemeyiIste("),
+    "duraklatmadan dönerken güncelleme istenmeli");
+  // Sonuca BAKILMAMALI: yenileme gelmezse oyun takılıp kalırdı.
+  assert.ok(!/if \(guncellemeyiIste\(/.test(main),
+    "güncelleme isteğinin sonucuna göre dallanılmamalı");
   // Oyun ORTASINDA uygulanmamalı: yenileme oyuncunun turunu keser.
   const adim = main.slice(main.indexOf("function dokunusIsle("), main.indexOf("// ---- Döngü"));
   assert.ok(!adim.includes("guncelleme"), "dokunuş işlenirken güncelleme uygulanmamalı");
@@ -184,9 +198,15 @@ test("yeni sürüm yalnızca GÜVENLİ anlarda uygulanıyor", () => {
 
 test("güncelleme uygulanmadan önce ilerleme yazılıyor", () => {
   // Yenileme sayfayı baştan yükler; kayıt yazılmazsa oyuncu bir bölüm geriden başlar.
-  const g = main.slice(main.indexOf("function guncellemeyiDene"), main.indexOf("// ---- Duraklatma"));
+  const g = main.slice(main.indexOf("function guncellemeyiIste"), main.indexOf("// ---- Duraklatma"));
+  const isaret = g.indexOf("devamNoktasiYaz(");
   const kayitSira = g.indexOf("levelKaydet(");
   const uygulaSira = g.indexOf("guncellemeyiUygula()");
-  assert.ok(kayitSira >= 0 && uygulaSira > kayitSira,
-    "önce ilerleme yazılmalı, sonra sayfa yenilenmeli");
+  assert.ok(isaret >= 0 && kayitSira > isaret && uygulaSira > kayitSira,
+    "önce devam noktası, sonra ilerleme, en son yenileme");
+  // Devam noktası OTURUM depolamasında: kalıcı `enUzak` bölüm seçiminden geriye
+  // dönmüş oyuncuyu yanlış yere atardı.
+  const storage = fs.readFileSync(path.join(kok, "src", "game", "storage.ts"), "utf8");
+  assert.ok(/sessionStorage\.setItem\(DEVAM_KEY/.test(storage),
+    "devam noktası oturum depolamasında olmalı");
 });

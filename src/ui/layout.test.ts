@@ -1,13 +1,15 @@
 // Düzen (şartname 10. bölüm: "360×640 ve 1440×900 ekranlarda halkalar ekrana sığıyor").
 // Geometrinin matematiksel tarafı; üst/alt çubuğun taşmadığı tarayıcıda doğrulanır.
 import test from "node:test";
+import { KAMA_TASMA } from "../game/render.ts";
 import assert from "node:assert";
 import { layout, RATIO, LINE_WIDTH_MIN, LINE_WIDTH_MAX } from "../core/index.ts";
 
 /** Üst çubuk + süre çubuğu + alt çubuğun oyun alanından aldığı yaklaşık yükseklik. */
 const KROM = 110;
 /** Kamalar halkaların dışına S × 0,05 kadar taşar (render.ts). */
-const KAMA_TASMA = 0.05;
+// render.ts bu değeri zaten export ediyor; kopyalamak, oradaki değer değişince
+// testin eski değerle "sığıyor" demeye devam etmesi demekti.
 
 const ekranlar: Array<[string, number, number]> = [
   ["telefon dikey (şartname)", 360, 640],

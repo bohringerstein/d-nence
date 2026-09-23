@@ -20,7 +20,9 @@ const depo = new SahteDepo();
 Object.defineProperty(globalThis, "localStorage", { value: depo, configurable: true });
 
 const { ayarlariOku, ayarlariYaz, halkaOpakligi } = await import("./ayarlar.ts");
-const KEY = "kasa:ayarlar:v1";
+/** Birincil anahtar. Eskiden eski ("kasa:") anahtar yazıyordu; testler göç
+ * yolunu sınayıp birincil yolu hiç sınamıyordu. */
+const KEY = "donence:ayarlar:v1";
 
 test("kayıt yokken her şey kapalı ve uyarı henüz görülmemiş", () => {
   depo.temizle();

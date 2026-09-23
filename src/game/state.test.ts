@@ -209,7 +209,7 @@ test("decay görsel değerleri söndürür ve topu uçurur", () => {
   assert.equal(s.shake, 0, "sarsıntı sıfıra inmeli");
 });
 
-test("tablo 60 level ve tüm patronlar yerinde", () => {
+test("tablo LEVEL_COUNT kadar bölüm içeriyor", () => {
   assert.equal(tablo.levels.length, LEVEL_COUNT);
 });
 

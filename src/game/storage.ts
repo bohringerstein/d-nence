@@ -8,10 +8,8 @@ import type { Best, Stars } from "../core/index.ts";
 const KEY = "donence:v1";
 /** Oyunun eski adıyla yazılmış kayıt. Bulunursa okunur ve yeni anahtara taşınır. */
 const ESKI_KEY = "kasa:v1";
-const SURUM = 1;
 
 export interface Kayit {
-  surum: number;
   /** Son oynanan level. Bölüm seçiminden geriye dönünce bu küçülür. */
   level: number;
   /**
@@ -37,7 +35,7 @@ export interface Kayit {
   bests: Record<number, Best>;
 }
 
-const bos = (): Kayit => ({ surum: SURUM, level: 1, enUzak: 1, bests: {} });
+const bos = (): Kayit => ({ level: 1, enUzak: 1, bests: {} });
 
 const gecerliYildiz = (s: unknown): s is Stars => s === 1 || s === 2 || s === 3;
 
@@ -106,6 +104,33 @@ export function levelKaydet(k: Kayit, level: number): void {
 }
 
 /**
+ * Yenilemeden sonra dönülecek bölüm. OTURUM depolamasında, kalıcı kayıtta değil.
+ *
+ * Neden ayrı: kalıcı kayıttaki `enUzak` "ulaşılan en uzak bölüm"dür ve soğuk açılışın
+ * çıpasıdır. Ama uygulama kendi kararıyla sayfayı yenilediğinde (yeni sürüm hazır,
+ * bkz. game/guncelleme.ts) oyuncu tam bıraktığı yere dönmeli — bölüm seçiminden 5.
+ * bölüme dönmüş 412'lik bir oyuncuyu 412'ye fırlatmak, uygulamanın oyuncuya YAPTIĞI
+ * bir kayıp olurdu.
+ *
+ * `sessionStorage` tam doğru ömre sahip: yenilemeyi aşar, sekmenin kapanmasını aşmaz.
+ */
+const DEVAM_KEY = "donence:devam";
+
+export function devamNoktasiYaz(n: number): void {
+  try { sessionStorage.setItem(DEVAM_KEY, String(n)); } catch { /* işaret olmadan da çalışır */ }
+}
+
+/** İşareti okur ve SİLER: yalnızca bir kez geçerlidir. */
+export function devamNoktasiOku(): number | null {
+  try {
+    const ham = sessionStorage.getItem(DEVAM_KEY);
+    sessionStorage.removeItem(DEVAM_KEY);
+    const n = Number(ham);
+    return Number.isInteger(n) && n >= 1 && n <= LEVEL_COUNT ? n : null;
+  } catch { return null; }
+}
+
+/**
  * Yedekleme biçiminin sürümü. Biçim değişirse bu artar ve eski yedekler reddedilir
  * (sessizce yanlış okumaktansa açıkça reddetmek iyidir).
  */
@@ -139,13 +164,27 @@ export function iceAktar(metin: string): Kayit | null {
   if (typeof ham !== "object" || ham === null) return null;
   if ((ham as Record<string, unknown>).dnc !== YEDEK_SURUM) return null;
   const k = ayikla(ham);
-  // Boş bir yedek, var olan ilerlemenin üstüne yazılmamalı.
-  if (k.enUzak <= 1 && Object.keys(k.bests).length === 0) return null;
+  // Damga alanı yedekte YOKSA açıkça silinir. Aksi hâlde çağıran taraf `Object.assign`
+  // ile yazarken eksik alan "eski değeri koru" anlamına gelir ve yedek, MEVCUT tablonun
+  // damgasını miras alır; `tabloSurumuUygula` "eşleşiyor" deyip hiçbir şey temizlemez.
+  // Sonuç: başka bir tablonun rekorları sessizce benimsenir — kuralın var olma sebebi
+  // olan durumda kural çalışmaz.
+  if (typeof (ham as Record<string, unknown>).tabloSurum !== "string") delete k.tabloSurum;
   return k;
 }
 
-/** Yedekten gelen kaydı diske yazar. */
-export function yedegiYukle(k: Kayit): void { yaz(k); }
+/**
+ * Yedekten gelen kaydı yürürlükteki kaydın ÜSTÜNE yazar — alan alan, `Object.assign`
+ * ile değil. Fark önemli: `Object.assign` eksik alanı atlar, yani "yedekte yok" ile
+ * "yedekte boş" aynı sonucu verir.
+ */
+export function kaydiDegistir(k: Kayit, yeni: Kayit): void {
+  k.level = yeni.level;
+  k.enUzak = yeni.enUzak;
+  k.bests = yeni.bests;
+  k.tabloSurum = yeni.tabloSurum;
+  yaz(k);
+}
 
 /**
  * Kaydı, yüklenen tablonun sürümüyle hizalar. Kaç rekorun silindiğini döner.

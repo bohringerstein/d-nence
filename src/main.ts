@@ -15,9 +15,10 @@ import { girdiBagla } from "./game/input.ts";
 import { tuvalKur, ciz } from "./game/render.ts";
 import { renkleriOku, renklerHazir, hareketAzalt, tercihleriIzle } from "./game/theme.ts";
 import { ogreticiTablosu, ipucu, yildizYazisi, sureYazisi, kayipYazisi, kalanYazisi } from "./game/hints.ts";
-import { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, tabloSurumuUygula, disaAktar, iceAktar, yedegiYukle } from "./game/storage.ts";
+import { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, tabloSurumuUygula, disaAktar, iceAktar, kaydiDegistir,
+  devamNoktasiYaz, devamNoktasiOku } from "./game/storage.ts";
 import { izgaraHtml, sayfaSayisi, sayfasi, aralik } from "./ui/secim.ts";
-import { acilisBolumu, resetOnayHedefi, kazanincaSonraki } from "./game/akis.ts";
+import { acilisBolumu, resetOnayHedefi, kazanincaSonraki, bitisCikisi } from "./game/akis.ts";
 import { ayarlariOku, ayarlariYaz, halkaOpakligi, titret, titresimVarMi } from "./game/ayarlar.ts";
 import { cal, sesiAc, sesiDuraklat, sesVarMi } from "./game/ses.ts";
 import { kabukKur } from "./ui/shell.ts";
@@ -124,7 +125,19 @@ const ogretici = ogreticiTablosu(tablo.levels, M);
 let renk = renkleriOku();
 // Sistem tercihi VEYA oyuncunun kendi seçimi; ikisinden biri yeterli.
 let azalt = hareketAzalt() || ayarlar.hareketAzalt;
-let durum: LevelState = null as unknown as LevelState;
+/**
+ * Yürürlükteki bölümün durumu. GERÇEKTEN kurulu başlar — `null as unknown as
+ * LevelState` değil.
+ *
+ * Eski hâlde tip yalan söylüyordu: `durum` asla null olamaz diyordu ama açılışın
+ * sonuna kadar null'du ve dört satır aşağıdaki `if (durum)` koruması derleyici
+ * gözünde ölü koddu. Bir sonraki geliştirici ya korumayı "gereksiz" diye silerdi ya
+ * da erken erişip `undefined` okuma hatası alırdı — üstelik `cizim()` zaten korumasız
+ * `durum.rings.length` okuyor. Tip, sözleşmeyi kovalamalı; derleyiciyi susturmamalı.
+ *
+ * Buradaki değer geçicidir: `levelYukle` aşağıda arayüzü, kaydı ve sayacı da kurar.
+ */
+let durum: LevelState = createLevel(tablo.levels[acilisBolumu(kayit) - 1], 1);
 let bitti = false;
 /** Ayarlar paneli açıkken oyun durur: uyarıyı okumak oyuncunun süresini yakmamalı. */
 let panelAcik = false;
@@ -147,7 +160,7 @@ let sonGeriSayimRakami = -1;
 /** Oyun canlı değil: fizik durur, dokunuşlar yok sayılır. */
 const oyunDonuk = (): boolean => bitti || panelAcik || duraklatildi || geriSayim > 0;
 
-const tuval = tuvalKur(ui.canvas, () => { if (durum) cizVeYaz(); });
+const tuval = tuvalKur(ui.canvas, cizVeYaz);
 // Ekranın tamamı dokunma alanı: canvas'a bağlansaydı üst ve alt çubuk ölü bölge olurdu.
 const girdi = girdiBagla(ui.kok);
 
@@ -157,16 +170,10 @@ const girdi = girdiBagla(ui.kok);
 ui.kok.addEventListener("pointerdown", () => { if (ayarlar.ses) sesiAc(); });
 // Sekme arkaplana alınınca oyun zaten duruyor (game/loop.ts); ses bağlamı da askıya
 // alınır, sonraki dokunuşta kendiliğinden uyanır.
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) { sesiDuraklat(); return; }
-  // Arkaplandan dönüşte oyun doğrudan canlıya dönüyordu: uygulamayı değiştirip geri
-  // gelen oyuncu halkaları bir anda hareket hâlinde buluyordu. Duraklatmayla aynı
-  // muamele: önce geri sayım.
-  if (!oyunDonuk()) geriSayimBaslat();
-});
-// Pencere odağı da aynı muamele: oyun odak kaybında duruyor (bkz. game/loop.ts),
-// odak geri geldiğinde halkalar bir anda hareket hâlinde bulunmamalı.
-window.addEventListener("focus", () => { if (!oyunDonuk()) geriSayimBaslat(); });
+// Sekme gizlenince ses bağlamı askıya alınır. Geri sayımı BURADAN başlatmıyoruz:
+// donukluğun çözülmesi `focus` ya da `visibilitychange` olmak zorunda değil — dokunuş
+// da çözüyor — o yüzden haber döngüden geliyor (bkz. dongu `cozuldu`).
+document.addEventListener("visibilitychange", () => { if (document.hidden) sesiDuraklat(); });
 
 // ---- Level yükleme: tek nesne toptan değişir, alan alan sıfırlama yok -------
 function levelYukle(n: number, denemeyiKoru = false): void {
@@ -293,13 +300,22 @@ const oyun = dongu({
         const sonraki = kazanincaSonraki(durum.level.n);
         if (sonraki.tip === "bitis") { bitisGoster(); return false; }
         // Bölüm sınırı, yenilemenin oyuncudan hiçbir şey götürmediği tek an.
-        if (guncellemeyiDene(sonraki.n)) return false;
+        // Sonuca BAKMIYORUZ ve oyunu normal akışına bırakıyoruz: yenileme gerçekten
+        // olursa aşağıdaki iş boşa gider, OLMAZSA (bekleyen işçi başka bir sekmede
+        // çoktan uygulanmışsa `messageSkipWaiting` sessizce hiçbir şey yapar) oyun
+        // takılıp kalmaz. Erken çıkış, yenilemenin kesin olduğunu varsayıyordu.
+        guncellemeyiIste(sonraki.n);
         levelYukle(sonraki.n);
       }
       return false;   // level değişti: bu karede daha fazla adım atma
     }
     return true;
   },
+  /**
+   * Donukluk çözüldü: oyuna dönen her yol geri sayımdan geçer. `geriSayimBaslat`
+   * girdi kuyruğunu da temizler, yani çözen dokunuş kilit olmaz.
+   */
+  cozuldu() { if (!oyunDonuk()) geriSayimBaslat(); },
   cizim(dt) {
     if (bitti) return;
     geriSayimIlerlet(dt);
@@ -321,11 +337,16 @@ const oyun = dongu({
  * Yalnızca güvenli anlardan çağrılır: bölüm kazanıldıktan sonra ve duraklatmadan
  * dönerken. Oyun ortasında yenilemek oyuncunun turunu keserdi.
  */
-function guncellemeyiDene(sonrakiBolum: number): boolean {
-  if (!guncellemeHazir()) return false;
+function guncellemeyiIste(sonrakiBolum: number): void {
+  if (!guncellemeHazir()) return;
+  // Yenilemeden sonra oyuncu TAM OLARAK buraya dönmeli. `acilisBolumu` kayıttaki
+  // `enUzak`'ı kullanıyor; bölüm seçiminden 5. bölüme dönmüş 412'lik bir oyuncu
+  // yenilemeden sonra 5'e değil 412'ye düşerdi — uygulamanın kendi başlattığı bir
+  // eylem, oyuncunun bulunduğu yeri kaybettirirdi. Oturum çapındaki bu işaret tam
+  // olarak doğru ömre sahip: yenilemeyi aşar, uygulamanın kapanmasını aşmaz.
+  devamNoktasiYaz(sonrakiBolum);
   levelKaydet(kayit, sonrakiBolum);
   guncellemeyiUygula();
-  return true;
 }
 
 // ---- Duraklatma ------------------------------------------------------------
@@ -369,15 +390,14 @@ function duraklatmaAc(): void {
   geriSayimDurdur();
   girdi.temizle();
   ui.duraklatMetin.textContent = M.duraklatAciklama(sureYazisi(kalanSure(durum), M));
-  arkaKilit(true);
-  ortuAc(ui.duraklat, ui.devamDugme);
+  ortuAc(ui.duraklat, ui.devamDugme, ui.arka);
 }
 
 function duraklatmaKapat(): void {
-  // İkinci güvenli an: oyuncu zaten durmuş, bölüm baştan başlayacak.
-  if (guncellemeyiDene(durum.level.n)) return;
-  ortuKapat(ui.duraklat, ui.canvas);
-  arkaKilit(false);
+  // İkinci güvenli an: oyuncu zaten durmuş. Sonuca bakmadan devam ediyoruz —
+  // yenileme gelmezse örtü açık kalır ve "Devam et" ölürdü.
+  guncellemeyiIste(durum.level.n);
+  ortuKapat(ui.duraklat, ui.canvas, ui.arka);
   duraklatildi = false;
   geriSayimBaslat();
 }
@@ -405,7 +425,7 @@ window.addEventListener("keydown", e => {
   if (!ui.ayarPanel.hidden) { ui.ayarKapat.click(); return; }
   // Bitiş ekranında Escape "Baştan oyna"yı TETİKLEMEZ: o düğme oyunu 1. bölüme alır,
   // Escape ise iptal demektir. Kapanış bölümüne dönülür, hiçbir durum değişmez.
-  if (!ui.bitis.hidden) { bitisKapat(LEVEL_COUNT); return; }
+  if (!ui.bitis.hidden) { bitisKapat(bitisCikisi("iptal")); return; }
   if (!oyunDonuk()) duraklatmaAc();
 });
 
@@ -415,8 +435,7 @@ function bitisGoster(): void {
   const y = toplamYildiz(kayit);
   const b = bitirilenLevel(kayit);
   ui.bitisMetin.textContent = M.bitisMetni(LEVEL_COUNT, b, y, b * 3);
-  arkaKilit(true);
-  ortuAc(ui.bitis, ui.bitisDugme);
+  ortuAc(ui.bitis, ui.bitisDugme, ui.arka);
 }
 
 /**
@@ -426,21 +445,24 @@ function bitisGoster(): void {
  *   Escape'in evrensel anlamı "iptal"dir, durum değiştirmemeli.
  */
 function bitisKapat(n: number): void {
-  ortuKapat(ui.bitis, ui.canvas);
-  arkaKilit(false);
+  ortuKapat(ui.bitis, ui.canvas, ui.arka);
   bitti = false;
   ipucuKilidiSifirla();
   levelYukle(n);
   geriSayimBaslat();
 }
 
-ui.bitisDugme.addEventListener("click", () => bitisKapat(1));
+ui.bitisDugme.addEventListener("click", () => bitisKapat(bitisCikisi("bastanOyna")));
 // İkinci çıkış: oyuncu eksik yıldızlarını toplamak isteyebilir. Tek düğmeli bir
 // bitiş ekranı, o düğme ne yaparsa yapsın, oyuncuyu tek bir yola mahkûm ediyordu.
 ui.bitisSecim.addEventListener("click", () => {
   ui.bitis.hidden = true;   // odak zaten seçim örtüsüne taşınıyor
   bitti = false;
   ipucuKilidiSifirla();
+  // Durum HÂLÂ bitmiş 1000. bölümün durumu. Seçimden bölüm seçmeden çıkılırsa oyun
+  // o durumla canlanır ve `step()` her adımda yine "bitti" döndürüp bitiş ekranını
+  // geri açar — Escape "iptal" demek, ama iptal etmiyordu.
+  levelYukle(LEVEL_COUNT);
   secimAc();
 });
 
@@ -477,18 +499,18 @@ ui.reset.addEventListener("click", () => {
   ayarlariUygula();
   ayarlar.uyariGoruldu = true;
   ayarlariYaz(ayarlar);
-  ui.ayarPanel.hidden = true;
+  // ortuKapat: arkanın kilidini açar, odağı oyun alanına taşır, sonra gizler.
+  // Doğrudan `hidden = true` yazmak `inert`'i açık bırakırdı.
+  ortuKapat(ui.ayarPanel, ui.canvas, ui.arka);
   ui.secim.hidden = true;
   ui.yedek.hidden = true;
-  arkaKilit(false);
+  ui.bitis.hidden = true;
   panelAcik = false;
   bitti = false;
-  ui.bitis.hidden = true;
   ipucuKilidiSifirla();
   bastanBasla(kayit);
   levelYukle(1);
   geriSayimBaslat();
-  ui.canvas.focus({ preventScroll: true });   // sonraki boşluk oyuna gitsin, düğmeye değil
 });
 
 tercihleriIzle(() => { renk = renkleriOku(); azalt = hareketAzalt() || ayarlar.hareketAzalt; });
@@ -506,15 +528,6 @@ if (!renklerHazir()) {
   window.addEventListener("load", () => { if (renklerHazir()) renk = renkleriOku(); }, { once: true });
 }
 
-/**
- * Örtü açıkken arka planı Tab ile gezilemez yapar.
- *
- * `aria-modal="true"` yalnızca ekran okuyucuya bilgi verir; klavye odağını tutmaz.
- * Bu olmadan Tab örtüden çıkıp arkadaki düğmelere gidiyordu.
- */
-function arkaKilit(kapali: boolean): void {
-  for (const el of ui.arka) el.toggleAttribute("inert", kapali);
-}
 
 /** "312 bölüm açıldı · 714 / 936 yıldız" — birikimi görünür kılar. */
 function ilerlemeOzeti(): string {
@@ -526,7 +539,6 @@ function ilerlemeOzeti(): string {
 // ---- Ayarlar paneli --------------------------------------------------------
 function ayarPaneliAc(): void {
   panelAcik = true;
-  arkaKilit(true);
   ui.desenKutu.checked = ayarlar.desenYumusat;
   ui.hareketKutu.checked = ayarlar.hareketAzalt;
   ui.titresimKutu.checked = ayarlar.titresim;
@@ -546,7 +558,7 @@ function ayarPaneliAc(): void {
   // olunca ekran okuyucu panelin adını okur ve Tab baştan başlar.
   // preventScroll + scrollTop: tarayıcı odaklanan öğeyi görünür kılmak için kutuyu
   // kaydırıyordu; panel her zaman baştan açılmalı.
-  ortuAc(ui.ayarPanel, ui.ayarBaslik);
+  ortuAc(ui.ayarPanel, ui.ayarBaslik, ui.arka);
   ui.ayarPanel.querySelector(".kutu")?.scrollTo({ top: 0 });
 }
 
@@ -570,20 +582,18 @@ ui.ayarAc.addEventListener("click", e => { e.stopPropagation(); if (!bitti) ayar
  */
 function nasilAc(kisa = false): void {
   panelAcik = true;
-  arkaKilit(true);
   ui.nasilIcerik.classList.toggle("kisa", kisa);
   ui.ayarPanel.hidden = true;
   // Önce odak (kaydırmadan), sonra başa sar: ters sırada tarayıcı kutuyu aşağı kaydırıyor.
   // Odak başlıkta, kapatma düğmesinde değil: düğme en altta ve oradan Tab, metnin
   // tamamını atlıyordu (bkz. ayarPaneliAc).
-  ortuAc(ui.nasil, ui.nasilBaslik);
+  ortuAc(ui.nasil, ui.nasilBaslik, ui.arka);
   ui.nasilIcerik.scrollTop = 0;
 }
 
 ui.nasilAc.addEventListener("click", () => { ayarlariUygula(); nasilAc(); });
 ui.nasilKapat.addEventListener("click", () => {
-  ortuKapat(ui.nasil, ui.canvas);
-  arkaKilit(false);
+  ortuKapat(ui.nasil, ui.canvas, ui.arka);
   ayarlar.uyariGoruldu = true;
   ayarlariYaz(ayarlar);
   panelAcik = false;
@@ -629,13 +639,12 @@ function secimCiz(): void {
 
 function secimAc(): void {
   panelAcik = true;
-  arkaKilit(true);
   ui.ayarPanel.hidden = true;
   // Oyuncunun bulunduğu sayfayla açılır: 412. bölümdeyken 1-100 arasını göstermek,
   // her açılışta dört kez ileri bastırmak demekti.
   secimSayfa = sayfasi(durum.level.n);
   secimCiz();
-  ortuAc(ui.secim, ui.secimBaslik);
+  ortuAc(ui.secim, ui.secimBaslik, ui.arka);
   // Panel doğru SAYFAYLA açılıyordu ama doğru YERDE değil: 900. bölümdeki oyuncunun
   // kendi düğmesi kutunun 972 pikselinde, görünen alan 682 piksel — yani oyuncu
   // paneli açıp "neredeyim?" sorusunun cevabını göremiyordu. Kendi bölümü her zaman
@@ -644,8 +653,7 @@ function secimAc(): void {
 }
 
 function secimKapat(): void {
-  ortuKapat(ui.secim, ui.canvas);
-  arkaKilit(false);
+  ortuKapat(ui.secim, ui.canvas, ui.arka);
   panelAcik = false;
   geriSayimBaslat();
 }
@@ -701,19 +709,17 @@ function yedekOnayiSifirla(): void {
 
 function yedekAc(): void {
   panelAcik = true;
-  arkaKilit(true);
   ui.ayarPanel.hidden = true;
   ui.yedekKod.value = disaAktar(kayit);
   ui.yedekGiris.value = "";
   ui.yedekNot.textContent = "";
   yedekOnayiSifirla();
-  ortuAc(ui.yedek, ui.yedekBaslik);
+  ortuAc(ui.yedek, ui.yedekBaslik, ui.arka);
 }
 
 ui.yedekAc.addEventListener("click", () => { ayarlariUygula(); yedekAc(); });
 ui.yedekKapat.addEventListener("click", () => {
-  ortuKapat(ui.yedek, ui.canvas);
-  arkaKilit(false);
+  ortuKapat(ui.yedek, ui.canvas, ui.arka);
   panelAcik = false;
   geriSayimBaslat();
 });
@@ -734,7 +740,13 @@ ui.yedekKopyala.addEventListener("click", () => {
  */
 ui.yedekYukle.addEventListener("click", () => {
   const yeni = iceAktar(ui.yedekGiris.value);
-  if (!yeni) {
+  // Boş bir yedeğin DOLU bir ilerlemenin üstüne yazmasını engelle. Denetim `iceAktar`
+  // içindeyken 1. bölümdeki oyuncunun kendi yedeği reddediliyor ve ekranda "Kod
+  // okunamadı" yazıyordu — oyuncu özelliğin bozuk olduğu sonucuna varıyordu. Karar
+  // yedeğin kendisine değil MEVCUT kayda bakmalı.
+  const bosYedek = yeni !== null && yeni.enUzak <= 1 && Object.keys(yeni.bests).length === 0;
+  const doluKayit = kayit.enUzak > 1 || Object.keys(kayit.bests).length > 0;
+  if (!yeni || (bosYedek && doluKayit)) {
     yedekOnayiSifirla();
     ui.yedekNot.textContent = M.yedekGecersiz;
     return;
@@ -746,8 +758,7 @@ ui.yedekYukle.addEventListener("click", () => {
     return;
   }
   yedekOnayiSifirla();
-  Object.assign(kayit, yeni);
-  yedegiYukle(kayit);
+  kaydiDegistir(kayit, yeni);
   // Yedek başka bir tablodan gelmiş olabilir; aynı kural işler.
   tabloSurumuUygula(kayit, tablo.v);
   ui.yedekNot.textContent = M.yedekYuklendi(bitirilenLevel(kayit));
@@ -775,8 +786,7 @@ ui.ayarKapat.addEventListener("click", () => {
   ayarlariUygula();
   ayarlar.uyariGoruldu = true;
   ayarlariYaz(ayarlar);
-  ortuKapat(ui.ayarPanel, ui.canvas);
-  arkaKilit(false);
+  ortuKapat(ui.ayarPanel, ui.canvas, ui.arka);
   panelAcik = false;
   // Panelde geçen süre zaten işlemiyordu (oyun donuktu). Eskiden level yine de baştan
   // başlatılıyordu ve ayarları açmanın bedeli ilerlemeydi — oyuncu ara vermek için
@@ -784,12 +794,16 @@ ui.ayarKapat.addEventListener("click", () => {
   geriSayimBaslat();
 });
 
-levelYukle(acilisBolumu(kayit));
+// Güncelleme yenilemesinden dönülüyorsa oyuncu tam bıraktığı bölüme döner
+// (bkz. guncellemeyiIste); değilse ulaşılan en uzak bölümden başlar.
+// Rekorlar silindiyse oyuncu bunu sessizce öğrenmemeli. levelYukle'den ÖNCE:
+// sonradan yazılırsa `yazKoru` bekleyen ipucunu da siler ve oyuncu o bölümün
+// öğretici ipucunu hiç görmez.
+if (silinenRekor > 0) yazKoru(M.rekorlarYenilendi);
+levelYukle(devamNoktasiOku() ?? acilisBolumu(kayit));
 tuval.boyutla();
 oyun.basla();
 
-// Rekorlar silindiyse oyuncu bunu sessizce öğrenmemeli.
-if (silinenRekor > 0) yazKoru(M.rekorlarYenilendi);
 
 // İlk açılışta kuralları ve ışığa duyarlılık notunu bir kez göster (bkz. ui/nasil.ts).
 // Göstermiyorsak oyun yine de GERİ SAYIMLA başlar: sayfanın açıldığı an — ve dil

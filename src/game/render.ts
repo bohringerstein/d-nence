@@ -16,7 +16,6 @@ export interface Tuval {
   /** Kare başına bir kez hesaplanan yerleşim; prototipte kare başına üç kez üretiliyordu. */
   yerlesim: (halkaSayisi: number) => Layout;
   boyutla: () => void;
-  birak: () => void;
   /**
    * Bir önceki karede temizlenen kutunun yarı genişliği. Temizleme alanı daralırsa
    * (top merkeze dönünce, level değişince) önceki karenin izi kalırdı; bu yüzden
@@ -72,12 +71,7 @@ export function tuvalKur(canvas: HTMLCanvasElement, degisti: () => void): Tuval 
       }
       return onbellek;
     },
-    boyutla,
-    birak() {
-      gozlemci.disconnect();
-      window.removeEventListener("resize", boyutla);
-      document.removeEventListener("visibilitychange", gorunurlukte);
-    }
+    boyutla
   };
   return kendi;
 }

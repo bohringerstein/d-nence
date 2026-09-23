@@ -82,6 +82,7 @@ var DonenceCore = (() => {
   // src/core/index.ts
   var index_exports = {};
   __export(index_exports, {
+    ADIM: () => ADIM,
     BIN: () => BIN,
     BINS: () => BINS,
     BOSS_ARALIGI: () => BOSS_ARALIGI,
@@ -98,7 +99,6 @@ var DonenceCore = (() => {
     PATRON_ANAHTARLARI: () => PATRON_ANAHTARLARI,
     RATIO: () => RATIO,
     REACT: () => REACT,
-    SOLVER_ADIM: () => SOLVER_ADIM,
     SOLVER_HEDEF: () => SOLVER_HEDEF,
     SOLVER_MARGIN: () => SOLVER_MARGIN,
     TAU: () => TAU,
@@ -172,6 +172,7 @@ var DonenceCore = (() => {
   }
 
   // src/core/rings.ts
+  var ADIM = 1 / 120;
   function stepRings(rs, dt, lt) {
     for (const r of rs) {
       if (r.locked) continue;
@@ -192,7 +193,7 @@ var DonenceCore = (() => {
   var liveRings = (def) => def.map((r) => ({ ...r, angle: r.start, dir: 1, t: 0, locked: !!r.preLocked }));
   function isaretAcisi(r) {
     const yarim = r.gap * DEG / 2;
-    const merkezler = gapCenters(r).map((c) => (c % TAU + TAU) % TAU).sort((a, b) => a - b);
+    const merkezler = gapCenters(r).map(wrap).sort((a, b) => a - b);
     let enIyi = merkezler[0] + Math.PI;
     let enGenis = -1;
     for (let i = 0; i < merkezler.length; i++) {
@@ -279,7 +280,14 @@ var DonenceCore = (() => {
   }
 
   // src/core/stars.ts
-  var starRatio = (widthRad, minGapRad) => (widthRad - NEED_PASS) / (minGapRad - NEED_PASS);
+  var starRatio = (widthRad, minGapRad) => (
+    // Math.min ŞART: analitik modelde `w ≤ minGap` garantili ama OYUN dilim sayar ve
+    // bir dilime (0,5°) kadar fazla ölçebilir. Tablodaki en küçük payda 3,729° olduğu
+    // için q teorik olarak 1,13'e çıkabilir. 592 gerçek oyunda gözlenmedi (en büyük
+    // 0,960) ama yapısal olarak engellenmemişti — ve aynı oranın ses perdesi için
+    // kullanılan ikizi (game/state.ts aciklikOrani) zaten sıkıştırıyordu.
+    Math.min(1, (widthRad - NEED_PASS) / (minGapRad - NEED_PASS))
+  );
   var starCount = (q, q3, q2) => q >= q3 ? 3 : q >= q2 ? 2 : 1;
   var isBetter = (yeni, eski) => !eski || yeni.s > eski.s || yeni.s === eski.s && yeni.t < eski.t;
 
@@ -350,7 +358,7 @@ var DonenceCore = (() => {
         }
         if (!tipTamam) return;
         if (r.gaps !== 1 && r.gaps !== 2) err.push(nerede + "gaps 1 veya 2 olmalı");
-        if (r.gap < NEED / DEG || r.gap > GAP_MAX_DEG) err.push(nerede + "gap " + r.gap.toFixed(1) + " derece, sınırların dışında");
+        if (r.gap < NEED_PASS / DEG || r.gap > GAP_MAX_DEG) err.push(nerede + "gap " + r.gap.toFixed(1) + " derece, sınırların dışında");
         if (r.start < 0 || r.start >= TAU) err.push(nerede + "start 0..2pi dışında");
         if (r.flip < 0) err.push(nerede + "flip negatif");
         const anahtar = JSON.stringify(r);
@@ -376,11 +384,10 @@ var DonenceCore = (() => {
   }
 
   // src/core/solver.ts
-  var SOLVER_ADIM = 1 / 120;
   var SOLVER_HEDEF = NEED_PASS + SOLVER_MARGIN;
   function solve(def) {
     const rs = liveRings(def);
-    const dt = SOLVER_ADIM;
+    const dt = ADIM;
     let open = initialOpen(rs);
     let t = 0, last = 0;
     const kilitler = [];
@@ -416,7 +423,7 @@ var DonenceCore = (() => {
   }
   return __toCommonJS(index_exports);
 })();
-const { BIN, BINS, BOSS_ARALIGI, BOSS_LEVELS, DEG, GAP_MAX_DEG, LEVEL_COUNT, LINE_WIDTH_MAX, LINE_WIDTH_MIN, NEED, NEED_BINS, NEED_PASS, OPEN_ALL, PATRON_ANAHTARLARI, RATIO, REACT, SOLVER_ADIM, SOLVER_HEDEF, SOLVER_MARGIN, TAU, applyMask, bossMu, canPass, firstSeen, gapCenters, initialOpen, isBetter, isaretAcisi, largestOpen, layout, liveRings, lockOpen, maskLargest, maskRuns, newMask, norm, peekOpen, solve, starCount, starRatio, stepRings, validateTable, wrap } = DonenceCore;
+const { ADIM, BIN, BINS, BOSS_ARALIGI, BOSS_LEVELS, DEG, GAP_MAX_DEG, LEVEL_COUNT, LINE_WIDTH_MAX, LINE_WIDTH_MIN, NEED, NEED_BINS, NEED_PASS, OPEN_ALL, PATRON_ANAHTARLARI, RATIO, REACT, SOLVER_HEDEF, SOLVER_MARGIN, TAU, applyMask, bossMu, canPass, firstSeen, gapCenters, initialOpen, isBetter, isaretAcisi, largestOpen, layout, liveRings, lockOpen, maskLargest, maskRuns, newMask, norm, peekOpen, solve, starCount, starRatio, stepRings, validateTable, wrap } = DonenceCore;
 // <<< core.js
 </script>
 <script>

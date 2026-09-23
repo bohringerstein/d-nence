@@ -1,5 +1,5 @@
 // Tablo testi: her levelin, OYUNUN kullandığı maske modeliyle de bitirilebildiğini gösterir.
-// Üretici analitik aralık modeliyle çalışır; bu test ikisinin 60 levelin hiçbirinde ayrışmadığını
+// Üretici analitik aralık modeliyle çalışır; bu test ikisinin 1000 bölümün hiçbirinde ayrışmadığını
 // kanıtlar. Ayrışırsa, üreticinin "çözülebilir" dediği bir level oyunda kaybedilir.
 import test from "node:test";
 import assert from "node:assert";

@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import {
   TAU, DEG, NEED_PASS, SOLVER_MARGIN, REACT, GAP_MAX_DEG, LEVEL_COUNT, BOSS_ARALIGI, bossMu,
-  canPass, stepRings, liveRings, validateTable, solve,
+  canPass, stepRings, liveRings, validateTable, solve, ADIM, wrap,
   OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio
 } from "../src/core/index.ts";
 import type { RingDef, LevelTable, Open, PatronAnahtari } from "../src/core/index.ts";
@@ -17,9 +17,17 @@ interface RawRing extends RingDef { gapScale?: number }
 
 /** Kayıp sebebi: "sure" = zaman doldu, "kanal" = açıklık geçilemeyecek kadar daraldı. */
 type Sebep = "sure" | "kanal";
-interface PlayResult { win: boolean; t: number; q?: number; sebep?: Sebep }
+/**
+ * Bir oynanış denemesinin sonucu. AYRIK BİRLEŞİM: `q` yalnız kazanılan denemede,
+ * `sebep` yalnız kaybedilende vardır. Tek bir arayüzle yazıldığında üç yerde
+ * `r.q` gerekiyordu ve "kaybedilen bir denemenin q'sunu okuma" hatası
+ * derleyicide değil çalışma zamanında ortaya çıkardı.
+ */
+type PlayResult =
+  | { win: true; t: number; q: number }
+  | { win: false; t: number; sebep: Sebep };
 interface Finalized { def: RingDef[]; best: number; limit: number; want: number; roomy: boolean }
-interface Evaluated { win: number; qs: number[]; sureOrani: number; sureKaybi: number }
+interface Evaluated { win: number; qs: number[]; sureKaybi: number }
 type Candidate = Finalized & Evaluated & { tol: number; boss?: PatronAnahtari };
 /**
  * Patron tasarımı. Görünen ad ve ipucu BURADA DEĞİL, src/dil/ altında: tabloya yalnızca
@@ -38,7 +46,7 @@ const needS = NEED_PASS + SOLVER_MARGIN;
 
 // İnsan benzeri oyuncu: dokunuşu ±sigma sn sapar
 function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): PlayResult {
-  const rs = liveRings(def), dt = 1 / 120; let open = initialOpen(rs), t = 0, last = 0;
+  const rs = liveRings(def), dt = ADIM; let open = initialOpen(rs), t = 0, last = 0;
   for (let i = 0; i < rs.length; i++) { const r = rs[i]; if (r.locked) continue;
     const rem = rs.filter((x, k) => k > i && !x.locked).length; let done = false;
     while (t < limit) {
@@ -94,13 +102,12 @@ function sizeGaps(rings: RawRing[], tolSec: number): void {
   const vsum = hizlar.slice(1).reduce((s, v) => s + v, 0);
   const base = NEED_PASS / DEG + tolSec * vsum / DEG;
   for (const r of rings) {
-    const gap = Math.min(base * (r.gapScale || 1), GAP_MAX);
+    const gap = Math.min(base * (r.gapScale || 1), GAP_MAX_DEG);
     r.gap = gap;
     if (r.gaps === 2 && (gap > 80 || r.gapOffset < gap + 30 || 360 - r.gapOffset < gap + 30)) r.gaps = 1;
   }
 }
 
-const GAP_MAX = GAP_MAX_DEG;
 
 /**
  * Bir bölümü geçmek için gereken zamanlama hassasiyeti (saniye):
@@ -129,11 +136,20 @@ function tauHesapla(def: RingDef[]): number {
  * bunun altında ilk dokunuş kaçınılmaz ölüme dönüşür. Test oyuncuları tam bundan
  * şikâyet etti: eski tabloda halka başına 3,7-4,4° kalan bölümler vardı.
  *
- * Pay halka başına DOĞRUSAL değildir. İlk halkaya tam pay, sonrakilere yarısı düşer:
- * korunmak istenen şey "hiç tepki veremeden ölmek"tir ve bu birinci dokunuşta olur.
- * Doğrusal kural (kalan × 6°) 5 halkalı bir bölümde 30° pay şart koşuyordu ve boşluğu
+ * Kural AFİNDİR: `6° × (1 + (kalan−1)/2)` = `3°·kalan + 3°`. Eğimi halka başına 6°
+ * değil 3°; yani "ilk halkaya tam pay, sonrakilere yarısı". (Eski yorum bunu
+ * "doğrusal değildir" diye niteliyordu — yanlış: değişen şey doğrusallık değil eğim.)
+ *
+ * Neden sonrakilere yarısı: korunmak istenen şey "hiç tepki veremeden ölmek"tir ve bu
+ * yalnız BİRİNCİ dokunuşta olur. Dar bir kanalı fark eden oyuncu sonraki halkalarda
+ * bekleyebilir; bekleyemediği tek kilit ilkidir.
+ *
+ * Eski kural (kalan × 6°) 5 halkalı bir bölümde 30° pay şart koşuyordu ve boşluğu
  * zorunlu olarak geniş bırakıyordu; baştan kilitli halkası olan patronlar bu yüzden
  * hedeflerinin 30-44 puan üstünde, yani kolay kalıyordu.
+ *
+ * Etki alanı geniş: 396 bölümde baştan kilitli halka var ve kısıt SIKI bağlıyor
+ * (ölçülen en küçük pay fazlası 0,033°).
  */
 const EN_AZ_PAY = 6 * DEG;
 const gerekenPay = (kalan: number): number => EN_AZ_PAY * (1 + (kalan - 1) * 0.5);
@@ -314,7 +330,7 @@ const BOSSES: Record<number, Boss | undefined> = {
 };
 
 function finalize(rings: RawRing[], n: number): Finalized | null {
-  const def = rings.map(r => ({ speed: rnd4(r.speed), gap: rnd4(r.gap), gaps: r.gaps, gapOffset: rnd4(r.gapOffset), flip: rnd4(r.flip), wobble: r.wobble, preLocked: r.preLocked, start: rnd4(((r.start % TAU) + TAU) % TAU) }));
+  const def = rings.map(r => ({ speed: rnd4(r.speed), gap: rnd4(r.gap), gaps: r.gaps, gapOffset: rnd4(r.gapOffset), flip: rnd4(r.flip), wobble: r.wobble, preLocked: r.preLocked, start: rnd4(wrap(r.start)) }));
   // Baştan kilitli halkalar kanalı fazla daralttıysa aday elenir (bkz. EN_AZ_PAY).
   const canli = liveRings(def);
   const baslangic = initialOpen(canli);
@@ -350,7 +366,7 @@ function finalize(rings: RawRing[], n: number): Finalized | null {
 const USTA_SAPMA = 0.035;   // keskin ama insan: ~35 ms zamanlama sapmasi
 
 function playUsta(def: RingDef[], limit: number): PlayResult {
-  const rs = liveRings(def), dt = 1 / 120;
+  const rs = liveRings(def), dt = ADIM;
   let open: Open = initialOpen(rs), t = 0, last = 0;
   for (let i = 0; i < rs.length; i++) {
     const r = rs[i]; if (r.locked) continue;
@@ -370,12 +386,12 @@ function playUsta(def: RingDef[], limit: number): PlayResult {
         const sdt = e >= 0 ? dt : -dt;
         for (let k = Math.abs(e); k > 0; k -= dt) { const lt = sdt > 0 ? t + sdt : t; stepRings(rs, sdt, lt); t += sdt; }
         open = lockOpen(open, r);
-        if (!canPass(largestOpen(open).w)) return { win: false, t };
+        if (!canPass(largestOpen(open).w)) return { win: false, t, sebep: "kanal" };
         r.locked = true; last = t; done = true; break;
       }
       t += dt; stepRings(rs, dt, t);
     }
-    if (!done) return { win: false, t };
+    if (!done) return { win: false, t, sebep: "sure" };
   }
   const minGap = Math.min(...def.map(r => r.gap)) * DEG;
   return { win: true, t, q: starRatio(largestOpen(open).w, minGap) };
@@ -385,26 +401,24 @@ function evaluate(L: { def: RingDef[]; limit: number }, trials = 50): Evaluated 
   es = 777; let w = 0, sure = 0; const qs: number[] = [];
   for (let k = 0; k < trials; k++) {
     const r = play(L.def, L.limit);
-    if (r.win) { w++; qs.push(r.q as number); } else if (r.sebep === "sure") sure++;
+    if (r.win) { w++; qs.push(r.q); } else if (r.sebep === "sure") sure++;
   }
-  const kayip = trials - w;
-  // İki ölçü: sureOrani kayıpların içindeki pay (teşhis için), sureKaybi ise TÜM
-  // denemelerin içindeki pay (karar için). İkincisi doğru ölçüttür: %92 kazanılan bir
-  // bölümde kayıpların %75'i süre dolması olsa bile oyuncunun yalnızca %6'sı saate
-  // yenilir, bu bir sorun değildir.
-  return { win: w / trials, qs, sureOrani: kayip ? sure / kayip : 0, sureKaybi: sure / trials };
+  // Ölçü TÜM denemelerin içindeki paydır, kayıpların içindeki değil. Doğru olan
+  // budur: %92 kazanılan bir bölümde kayıpların %75'i süre dolması olsa bile
+  // oyuncunun yalnızca %6'sı saate yenilir, bu bir sorun değildir.
+  return { win: w / trials, qs, sureKaybi: sure / trials };
 }
 
 /**
  * Zorluk eğrisi. Üç parça:
  *
- *   taban  — %94'ten %25'e iner ve 150. bölümde tabana oturur. Üs 0,45 olduğu için
+ *   taban  — %94'ten %35'e iner ve 200. bölümde tabana oturur. Üs 0,45 olduğu için
  *            iniş BAŞTA diktir: oyuncu 11. bölümde %80'in, 39'da %60'ın altına düşer.
  *            Eski 60 bölümlük eğri %80'e ancak 21. bölümde iniyordu ve "zorluk çok
  *            yavaş artıyor" şikâyetinin sebebi buydu.
- *   dalga  — ±9 puanlık, 24 bölümlük salınım. 150'den sonra eğri düz kalsaydı geri
- *            kalan 350 bölüm tek bir duvar olurdu; dalga oraya ritim veriyor.
- *   nefes  — her 4. bölüm +12 puan (bkz. nefesMi).
+ *   dalga  — ±8 puanlık, 24 bölümlük salınım. 200'den sonra eğri düz kalsaydı geri
+ *            kalan 800 bölüm tek bir duvar olurdu; dalga oraya ritim veriyor.
+ *   nefes  — hash'le seçilen {3,4} aralıklarıyla +12 puan, dalgayı ezerek (bkz. nefesMi).
  */
 const TABAN_BOLUM = 200;
 const DALGA_GENLIK = 0.08;
@@ -801,7 +815,7 @@ function verify(): number {
   const pay = [tumQ.filter(q => q >= data.q3).length, tumQ.filter(q => q < data.q3 && q >= data.q2).length, tumQ.filter(q => q < data.q2).length].map(v => v / tumQ.length);
   if (pay[0] < 0.15 || pay[0] > 0.35) sorunlar.push(`ustanın 3 yıldız oranı %${Math.round(pay[0] * 100)} — %15-35 dışında`);
 
-  // Süre dolması baskın kayıp sebebi olan bölümler (bkz. SURE_ORANI_ESIGI). Tek tük
+  // Süre dolması baskın kayıp sebebi olan bölümler (bkz. SURE_KAYBI_VERIFY). Tek tük
   // olması normal; yaygınlaşması zorluğun daralmadan değil saatten geldiği anlamına gelir.
   const SURELI_TAVAN = Math.round(LEVEL_COUNT * 0.02);
   if (sureliler.length > SURELI_TAVAN) {
@@ -913,7 +927,8 @@ function verify(): number {
   }
 
   if (sorunlar.length) { console.error("\n" + sorunlar.length + " sorun:"); sorunlar.forEach(s => console.error("  - " + s)); return 1; }
-  console.log("Tüm leveller çözülebilir, zorluk eğrisi hedefin ±15 puanı içinde");
+  console.log(`Tüm leveller çözülebilir, zorluk eğrisi hedefin ±${Math.round(BAND * 100)} puanı içinde ` +
+    `(patronlarda ±${Math.round(BAND_BOSS * 100)})`);
   return 0;
 }
 

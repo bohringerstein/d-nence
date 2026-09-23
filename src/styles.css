@@ -265,6 +265,14 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
   z-index: 10;
 }
 .ortu[hidden] { display: none; }
+/* [hidden] GENEL sıfırlaması. Tarayıcının kendi `[hidden] { display: none }` kuralı
+   bir UA kuralıdır; yazar (author) stil sayfasındaki herhangi bir `display` bildirimi
+   onu köken sırası gereği — özgüllükten bağımsız olarak — EZER. Bu yüzden `.secenek`
+   ve `.secimIzgara > li` gibi display taşıyan sınıflarda `hidden` sessizce ölüyordu:
+   iOS'ta titreşim desteklenmediği için gizlenmeye çalışılan "Titreşim" satırı ekranda
+   kalıyor, oyuncu işaretliyor ve hiçbir şey olmuyordu. Tuzak `.ortu` için tek tek
+   kapatılmıştı; burada tabana alındı. */
+[hidden] { display: none !important; }
 
 /* Kutu KAYABİLİR olmalı.
 
@@ -642,23 +650,6 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
   border-bottom: 0;
   border-radius: 3px 3px 0 0;
 }
-
-/* Ayarlar panelindeki eylem düğmeleri alt alta ve tam genişlikte.
-   Yan yana dizildiklerinde altlarındaki açıklama hangi düğmeye ait olduğunu
-   söylemiyordu: "Level 1'e döner ve açtığın bölümler kilitlenir" cümlesi
-   "Nasıl oynanır"ın da altında duruyordu. */
-#ayarPanel .kutu > button {
-  display: flex;
-  width: 100%;
-  max-width: 14rem;
-  margin: 0.5rem auto 0;
-}
-
-/* Ayarlardaki gizlilik bağlantısı: sessiz bir metin bağlantısı, düğme değil. Seyrek
-   açılır ama her iki mağaza da uygulamanın içinde bulunmasını şart koşuyor. */
-.gizlilikSatir { margin: 1rem 0 0; font-size: 0.85rem; }
-.gizlilikSatir a { color: var(--muted); }
-.gizlilikSatir a:hover, .gizlilikSatir a:focus-visible { color: var(--ink); }
 
 /* Ayarlar panelindeki grup başlıkları. Panel düz bir listeyken 320 pikselde
    "Nasıl oynanır", "Baştan başla" ve gizlilik fold altında kalıyordu. */

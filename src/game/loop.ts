@@ -4,8 +4,10 @@
 // Level süreleri bu adımla hesaplanmıştır ve yön değiştiren halkalar adım
 // büyüklüğüne duyarlıdır, bu yüzden değişken dt kabul edilmez.
 
-/** Fizik adımı. Level tablosu bu değerle üretildi; değiştirilirse tablo yeniden üretilmelidir. */
-export const ADIM = 1 / 120;
+// Fizik adımı tek kaynaktan gelir (src/core/rings.ts): tablo bu değerle üretildi
+// ve yön değiştiren halkalar adım büyüklüğüne duyarlı.
+export { ADIM } from "../core/index.ts";
+import { ADIM } from "../core/index.ts";
 
 /**
  * Biriktiricinin üst sınırı. Sekme arkaplana alınıp geri gelince ya da cihaz uyandığında
@@ -25,17 +27,24 @@ export interface DonguGeriCagirmalari {
   adim: (dt: number, gercekZaman: number) => boolean;
   /** Görsel sönümleme ve çizim; gerçek geçen süreyi alır. */
   cizim: (dt: number) => void;
+  /**
+   * Donukluk çözüldüğünde çağrılır (sekmeye dönüş, odak, ya da ekrana dokunuş).
+   *
+   * Neden haberin DÖNGÜDEN gelmesi gerekiyor: donukluğu çözen olay `focus` olmak
+   * zorunda değil. Eşleşmeyen bir `blur` sonrası tek çıkış yolu DOKUNUŞTUR ve o
+   * dokunuş `main.ts`'in `focus` dinleyicisini tetiklemez — yani oyun geri sayım
+   * olmadan canlanır ve aynı dokunuş bedava bir kilit olur, çoğu durumda anında
+   * kayıp. Kod tabanındaki bütün öbür devam yolları geri sayımdan geçiyordu; tek
+   * istisna buydu.
+   */
+  cozuldu?: () => void;
 }
 
 export interface Dongu {
   basla: () => void;
-  dur: () => void;
-  /** Duraklatılmış mı (sekme arkaplanda). */
-  duraklatildi: () => boolean;
 }
 
-export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
-  let raf = 0;
+export function dongu({ adim, cizim, cozuldu }: DonguGeriCagirmalari): Dongu {
   let son = 0;
   let birikim = 0;
   let calisiyor = false;
@@ -52,7 +61,7 @@ export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
   let pencereDisinda = false;
 
   const kare = (now: number): void => {
-    raf = requestAnimationFrame(kare);
+    requestAnimationFrame(kare);
     const gercek = Math.min((now - son) / 1000, EN_COK_BIRIKME);
     son = now;
     if (gizli) return;
@@ -76,10 +85,15 @@ export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
     // olayıydı — tıklamak bile temizlemiyordu. Tarayıcıda görüldü: oyun sessizce
     // donuyor, ekranda hiç saymayan bir geri sayım rakamı kalıyor ve donmuş oyun ile
     // başlamak üzere olan oyun ayırt edilemiyordu.
+    const oncekiGizli = gizli;
     pencereDisinda = odaksizMi();
     gizli = document.hidden || pencereDisinda;
     // Geri dönüşte biriken süre atılır: oyuncu yokken geçen zaman levele yazılmaz.
-    if (!gizli) { son = performance.now(); birikim = 0; }
+    if (!gizli) {
+      son = performance.now();
+      birikim = 0;
+      if (oncekiGizli) cozuldu?.();
+    }
   };
 
   /** Başlangıç durumu; hasFocus her ortamda tanımlı değil. */
@@ -103,17 +117,7 @@ export function dongu({ adim, cizim }: DonguGeriCagirmalari): Dongu {
       window.addEventListener("blur", odakGitti);
       window.addEventListener("focus", odakGeldi);
       window.addEventListener("pointerdown", dokunusla, true);
-      raf = requestAnimationFrame(kare);
-    },
-    dur() {
-      if (!calisiyor) return;
-      calisiyor = false;
-      cancelAnimationFrame(raf);
-      document.removeEventListener("visibilitychange", gorunurluk);
-      window.removeEventListener("blur", odakGitti);
-      window.removeEventListener("focus", odakGeldi);
-      window.removeEventListener("pointerdown", dokunusla, true);
-    },
-    duraklatildi: () => gizli
+      requestAnimationFrame(kare);
+    }
   };
 }

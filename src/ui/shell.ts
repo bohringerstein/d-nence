@@ -78,7 +78,15 @@ export interface Kabuk {
   arka: HTMLElement[];
 }
 
-const html = (m: Metinler): string => `
+/**
+ * Ekran iskeletinin markup'ı. DIŞA AKTARILIYOR çünkü testlerin buna ihtiyacı var.
+ *
+ * Testler bu dosyayı METİN olarak okuyup HTML yorumlarını ve `${…}` yer tutucularını
+ * regex'le ayıklıyordu. Kırılgandı ve iki kez yanlış sonuç verdi: bir kuralın NEDEN
+ * böyle olduğunu anlatan yorum, kuralın kendisi sanıldı. `html(TR)` çağırmak gerçek
+ * üretilmiş markup'ı verir — ayıklama yok, kırılganlık yok.
+ */
+export const html = (m: Metinler): string => `
 <div class="app">
   <header>
     <h1>Dönence</h1>
@@ -196,7 +204,9 @@ const html = (m: Metinler): string => `
       <label class="gizli" for="yedekGiris">${m.yedekYapistir}</label>
       <textarea id="yedekGiris" class="yedekAlan" rows="4" placeholder="${m.yedekYapistir}"></textarea>
       <button id="yedekYukle" type="button">${m.yedekYukle}</button>
-      <p class="uyari" id="yedekNot"></p>
+      <!-- role="status": yedek ekranının tek geri bildirim kanalı bu. Yıkıcı bir
+           üzerine yazmanın onayı dahil hiçbir mesaj ekran okuyucuya ulaşmıyordu. -->
+      <p class="uyari" id="yedekNot" role="status"></p>
       <div class="kutuAlt"><button id="yedekKapat" type="button">${m.tamam}</button></div>
     </div>
   </div>

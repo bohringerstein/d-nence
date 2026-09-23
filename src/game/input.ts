@@ -16,7 +16,6 @@ export interface Girdi {
   al: (gercekZaman: number) => number;
   /** Bekleyenleri atar (level değişiminde: eski levele basılan tuş yenisine geçmesin). */
   temizle: () => void;
-  birak: () => void;
 }
 
 /** Odaktaki öğe düğme/bağlantı/form ise Enter, boşluk ve dokunuş oraya aittir, oyuna değil. */
@@ -35,8 +34,15 @@ function ortudeMi(hedef: EventTarget | null): boolean {
  * Olayın zaman damgası. Modern tarayıcılarda `performance.now()` ile aynı ölçektedir;
  * olmadığı ya da sıfır geldiği durumda şimdiki zamana düşeriz.
  */
-const damga = (e: Event): number =>
-  typeof e.timeStamp === "number" && e.timeStamp > 0 ? e.timeStamp : performance.now();
+const damga = (e: Event): number => {
+  const t = e.timeStamp;
+  const simdi = performance.now();
+  // Üst sınır ŞART: bir tarayıcı `timeStamp`'i epoch tabanlı verirse (eski WebKit
+  // davranışı) damga her zaman fizik saatinin ilerisinde kalır, kuyruk sonsuza kadar
+  // büyür ve HİÇBİR dokunuş işlenmez — oyun sessizce oynanamaz hâle gelir, hata
+  // mesajı da olmaz. 50 ms pay, olayın işlenmesiyle bu satır arasındaki gecikme için.
+  return typeof t === "number" && t > 0 && t <= simdi + 50 ? t : simdi;
+};
 
 /**
  * Dokunuş dinleyicisi `kok` üzerine kurulur — canvas'a DEĞİL.
@@ -94,12 +100,6 @@ export function girdiBagla(kok: HTMLElement): Girdi {
       while (kuyruk.length && kuyruk[0] <= gercekZaman) { kuyruk.shift(); n++; }
       return n;
     },
-    temizle() { kuyruk = []; },
-    birak() {
-      kok.removeEventListener("pointerdown", dokun);
-      window.removeEventListener("keydown", tus);
-      kok.removeEventListener("gesturestart", jest);
-      kok.removeEventListener("dblclick", jest);
-    }
+    temizle() { kuyruk = []; }
   };
 }

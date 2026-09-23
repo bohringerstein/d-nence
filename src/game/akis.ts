@@ -42,8 +42,11 @@ export type Sonraki = { tip: "level"; n: number } | { tip: "bitis" };
 export const kazanincaSonraki = (n: number, toplam = LEVEL_COUNT): Sonraki =>
   n >= toplam ? { tip: "bitis" } : { tip: "level", n: n + 1 };
 
+/** Bitiş ekranından çıkış yolları. */
+export type BitisSecimi = "bastanOyna" | "iptal";
+
 /**
- * Bitiş ekranındaki "Baştan oyna" ilerlemeyi SİLMEZ.
+ * Bitiş ekranından çıkınca hangi bölüm yüklenir? İlerleme HİÇBİR HÂLDE silinmez.
  *
  * Silen sürüm kısa bir süre yayındaydı ve oyundaki en kötü hataydı: "Baştan başla"nın
  * açılan bölümleri kilitlemesi (bilinçli bir karar) bitiş ekranına da sızmıştı, üstelik
@@ -51,6 +54,8 @@ export const kazanincaSonraki = (n: number, toplam = LEVEL_COUNT): Sonraki =>
  * bitiren oyuncunun ekrandan tek çıkışı, açtığı her şeyi kilitleyen düğmeydi; sayfayı
  * yenilemek de kurtarmıyordu çünkü `level` 1000'de kalıp aynı ekrana geri çarpıyordu.
  *
+ * Escape "iptal" demektir ve durum değiştirmemeli: kapanış bölümüne döner.
  * Kilitlemeyi isteyen oyuncu ayarlardaki onaylı düğmeyi kullanır.
  */
-export const BITIS_ILERLEMEYI_SILER = false;
+export const bitisCikisi = (secim: BitisSecimi, toplam = LEVEL_COUNT): number =>
+  secim === "bastanOyna" ? 1 : toplam;
