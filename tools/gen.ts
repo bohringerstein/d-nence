@@ -35,8 +35,11 @@ type Candidate = Finalized & Evaluated & { tol: number; boss?: PatronAnahtari;
  * Patron tasarımı. Görünen ad ve ipucu BURADA DEĞİL, src/dil/ altında: tabloya yalnızca
  * anahtar yazılır. Eskiden Türkçe metin 1000 satırın içine gömülüydü ve çevrilemezdi.
  */
-interface Boss { anahtar: PatronAnahtari; tol: number; rings: () => RawRing[] }
+interface Boss { anahtar: PatronAnahtari; rings: () => RawRing[] }
 type Log = (...args: unknown[]) => void;
+
+import * as IST from "./gen/istatistik.ts";
+import type { Tepe } from "./gen/istatistik.ts";
 
 const OUT = path.join(import.meta.dirname, "..", "data", "levels.json");
 let seed = 12345; const R = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
@@ -98,11 +101,7 @@ function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): 
  * Halkalar bu ortak genişliği kendi gapScale çarpanıyla ölçekler.
  */
 function sizeGaps(rings: RawRing[], tolSec: number): void {
-  const hareketli = rings.filter(r => !r.preLocked);
-  const hizlar = hareketli.map(r => Math.abs(r.speed) * (r.wobble ? 1.7 : 1)).sort((a, b) => a - b);
-  // En yavaş halka "ilk kilit" sayılır: oyuncu kanalı ondan kurarsa en az şey kaybeder.
-  const vsum = hizlar.slice(1).reduce((s, v) => s + v, 0);
-  const base = NEED_PASS / DEG + tolSec * vsum / DEG;
+  const base = NEED_PASS / DEG + tolSec * daraltanHizToplami(rings) / DEG;
   for (const r of rings) {
     const gap = Math.min(base * (r.gapScale || 1), GAP_MAX_DEG);
     r.gap = gap;
@@ -114,7 +113,7 @@ function sizeGaps(rings: RawRing[], tolSec: number): void {
 /**
  * Bir bölümü geçmek için gereken zamanlama hassasiyeti (saniye):
  *
- *     tau = (en dar boşluk − NEED_PASS) / (daraltan kilit sayısı × ortalama hız)
+ *     tau = (en dar boşluk − NEED_PASS) / (kanalı daraltan kilitlerin hız toplamı)
  *
  * Zorluğun TEK gerçek ekseni budur ve aşağıdan insan refleksiyle sınırlıdır. İnsanın
  * dokunuş zamanlaması ~60 ms standart sapmayla dağılır; tau 60 ms iken oyuncu kilit
@@ -124,24 +123,45 @@ function sizeGaps(rings: RawRing[], tolSec: number): void {
  */
 const TAU_TABAN = 0.025;
 
-function tauHesapla(def: RingDef[]): number {
-  // Payda `sizeGaps` ile BİREBİR aynı olmalı, çünkü τ o formülün tersidir:
-  //   gap = NEED_PASS + tol · Σ'|ω|   ⇒   τ = (minGap − NEED_PASS) / Σ'|ω|
-  // Eskiden `(k−1) · (Σ|ω|/k)` kullanılıyordu ve `min ≤ ortalama` olduğu için bu
-  // her zaman Σ'den KÜÇÜKTÜ, yani τ'yu şişiriyordu: ölçülen oran medyan 1,070,
-  // en çok 1,420. Sonuç: 25 ms tabanı ortalama %7, en kötü %42 gevşek çalışıyordu
-  // ve "hiçbir bölüm 25 ms altında değil" iddiası tutarlı tanımla 141 bölümde
-  // yanlıştı (en düşüğü 22,5 ms).
+/**
+ * Kanalı daraltan kilitlerin hız toplamı — `sizeGaps` ve `tauHesapla` AYNI değeri
+ * kullanmak zorunda, çünkü τ o formülün tersidir:
+ *   gap = NEED_PASS + tol · Σ'|ω|   ⇒   τ = (minGap − NEED_PASS) / Σ'|ω|
+ *
+ * En yavaş halka toplamdan DÜŞÜLÜR, çünkü oyuncunun ilk kilidi kanalı KURAR,
+ * daraltmaz; kanalı en yavaş halkadan kurmak en az şey kaybettirir.
+ *
+ * AMA bu yalnız baştan kilitli halka YOKKEN doğrudur. Baştan kilitli halka varsa
+ * kanalı onlar tanımlar; oyuncunun ilk kilidi de kanalı daraltır ve düşülecek bir
+ * "bedava kilit" kalmaz. Ölçtüm: 384 bölümde bu varsayım geçersizdi ve tutarlı
+ * tanımla τ medyanı 35,2 → 28,6 ms'ye iniyor, **92 bölüm 25 ms insan sınırının
+ * altına düşüyordu** (en düşüğü 17,7 ms). Yani düzeltilmiş sayılan hatanın (τ'nun
+ * şişmesi) bir kalıntısı tam olarak orada duruyordu.
+ */
+function daraltanHizToplami(def: readonly { speed: number; wobble: boolean; preLocked: boolean }[]): number {
   const hareketli = def.filter(r => !r.preLocked);
   const hizlar = hareketli
     .map(r => Math.abs(r.speed) * (r.wobble ? 1.7 : 1))
     .sort((a, b) => a - b);
-  // İlk kilit toplama girmez (bkz. sizeGaps): o kilit kanalı kurar, daraltmaz.
-  const vsum = hizlar.slice(1).reduce((t, v) => t + v, 0);
+  const bedavaKilit = !def.some(r => r.preLocked);
+  return (bedavaKilit ? hizlar.slice(1) : hizlar).reduce((t, v) => t + v, 0);
+}
+
+/**
+ * τ: oyuncunun zamanlama payı (saniye). Tanım ve türetme için bkz. MATEMATIK §3.
+ * Payda `daraltanHizToplami` — `sizeGaps` ile birebir aynı olmak zorunda.
+ *
+ * Eskiden `(k−1) · (Σ|ω|/k)` kullanılıyordu ve `min ≤ ortalama` olduğu için bu her
+ * zaman Σ'den KÜÇÜKTÜ, yani τ'yu şişiriyordu: ölçülen oran medyan 1,070. Sonuç:
+ * 25 ms tabanı ortalama %7 gevşek çalışıyordu.
+ */
+function tauHesapla(def: RingDef[]): number {
+  const vsum = daraltanHizToplami(def);
   const B = Math.min(...def.map(r => r.gap)) * DEG - NEED_PASS;
-  // Tek hareketli halka: daraltan kilit YOK, yani zamanlama payı sınırsız.
+  // Daraltan kilit yoksa zamanlama payı sınırsızdır.
   return vsum > 0 ? B / vsum : Infinity;
 }
+
 /**
  * Baştan kilitli halkalardan sonra kalması gereken en az hata payı.
  *
@@ -198,7 +218,11 @@ const RHYTHM = [6, 6, 5, 6, 4, 6, 5, 6];
  */
 const blokOnbellek = new Map<string, unknown[]>();
 function blokSirasi<T>(kume: readonly T[], blok: number, tuz: number): T[] {
-  const anahtar = tuz + ":" + blok;
+  // Anahtar kümenin KİMLİĞİNİ de taşımak zorunda. Taşımadığında iki farklı küme aynı
+  // tuzla çağrılırsa ikincisi birincinin karıştırılmış dizisini alır ve `as T[]`
+  // dönüşümü yüzünden derleyici de yakalamaz. Bugün iki çağrı yeri farklı tuz
+  // kullandığı için zararsız, ama bu yazılı olmayan bir sözleşmeydi.
+  const anahtar = tuz + ":" + blok + ":" + kume.length + ":" + kume.join(",");
   const hazir = blokOnbellek.get(anahtar);
   if (hazir) return hazir as T[];
   const a = [...kume];
@@ -215,10 +239,14 @@ function blokSirasi<T>(kume: readonly T[], blok: number, tuz: number): T[] {
 const blokSec = <T,>(kume: readonly T[], i: number, tuz: number): T =>
   blokSirasi(kume, Math.floor(i / kume.length), tuz)[i % kume.length];
 
+/** Blok karıştırma tuzları. Değerleri keyfidir; tek şart birbirinden FARKLI olmaları. */
+const TUZ_RITIM = 0x5bf03635;
+const TUZ_ARKETIP = 0x7f4a7c15;
+
 const ringCount = (n: number): number => {
   const grow = Math.min(2 + Math.floor((n - 1) / 4), 6);
   if (grow < 6) return grow;
-  return blokSec(RHYTHM, n - 1, 0x5bf03635);
+  return blokSec(RHYTHM, n - 1, TUZ_RITIM);
 };
 // Süre limiti artık tasarım girdisi: hareketli halka sayısından gelir ve geç levellerde kademeli sıkılaşır.
 // Çözücü süresi limiti belirlemez, yalnızca "bu limit yeterli mi" diye denetlenir.
@@ -301,7 +329,7 @@ const ARKETIP_BASLANGIC = 60;
  * Çözüm aynı: küme korunur (her 8 bölümde aynı arketip dağılımı), sıra karıştırılır.
  */
 const arketip = (n: number): Arketip =>
-  n < ARKETIP_BASLANGIC ? "karma" : blokSec(ARKETIP_SIRASI, n - ARKETIP_BASLANGIC, 0x7f4a7c15);
+  n < ARKETIP_BASLANGIC ? "karma" : blokSec(ARKETIP_SIRASI, n - ARKETIP_BASLANGIC, TUZ_ARKETIP);
 
 interface ArketipAyari {
   halka?: [number, number];  // halka sayısı aralığı (kapsayıcı)
@@ -336,13 +364,22 @@ const ARKETIP_AYARI: Record<Arketip, ArketipAyari> = {
  * olamaz. Ölçtüm: 623. bölümde 2 baştan kilitli halka var, hedef %33, ulaşılan %55;
  * `merkez` patronunda aynı kısıt hedefi %22 iken %49'da bırakıyordu.
  *
- * Kanal tabanlandığında τ = (kanal − NEED_PASS) / Σ'|ω| olur ve tek kol hızdır. Bu
- * yüzden arama, bant dışında kaldığı GEÇ turlarda hızı kademeli artırır. Bant içinde
- * kalan bölümler ilk turda çıktığı için bu kol normal bölümlere hiç dokunmaz.
+ * Kanal tabanlandığında τ = (kanal − NEED_PASS) / Σ'|ω| olur ve o zaman hız bir kol
+ * haline gelir. Bu yüzden arama, bant dışında kaldığı GEÇ turlarda hızı kademeli artırır.
+ *
+ * `ekHalka` ise ÜÇÜNCÜ kol ve en son çaredir. Tolerans kolu `TAU_TABAN`'a (25 ms insan
+ * sınırı) dayandığında bölüm daha zor OLAMAZ; kalan tek yol daraltan kilit sayısını
+ * artırmaktır. Ölçtüm: 332. bölümde 4 halka, τ = 25,5 ms — taban birebir bağlıyordu ve
+ * hedef %28 iken ulaşılan %50'de kalıyordu. Beşinci halka o kilidi açar.
+ *
+ * İkisi de yalnız KOLAY yönde ve yalnız tur sonunda çıkış olmadığında devreye girer;
+ * bant içinde ve temiz bölümler ilk turda çıktığı için bu kollar onlara hiç dokunmaz.
  */
-function candidate(n: number, hizCarpani = 1): RawRing[] {
+function candidate(n: number, hizCarpani = 1, ekHalka = 0): RawRing[] {
   const a = ARKETIP_AYARI[arketip(n)];
-  const count = a.halka ? a.halka[0] + Math.floor(R() * (a.halka[1] - a.halka[0] + 1)) : ringCount(n);
+  const temel = a.halka ? a.halka[0] + Math.floor(R() * (a.halka[1] - a.halka[0] + 1)) : ringCount(n);
+  // `ekHalka`: zorluğun ÜÇÜNCÜ kolu, yalnız ilk ikisi tükendiğinde. Bkz. aday döngüsü.
+  const count = Math.min(6, temel + ekHalka);
   const base = Math.min(0.8 + n * 0.03, 2.2) * hizCarpani;
   const rings: RawRing[] = [];
   for (let i = 0; i < count; i++) {
@@ -391,10 +428,29 @@ const bossTasarimi = (n: number): Boss | undefined => {
 };
 
 const BOSSES: Record<number, Boss | undefined> = {
-  10: { anahtar: 'ayna', tol: 0.2,
-    // Hizlar birbirinden farkli olmali: esit hiz + esit start = birebir ayni halka, o kilit acikligi hic daraltmaz.
-    // start = A - s * 2.5 oldugu icin hepsi yine t = 2,5 sn'de A acisinda hizalanir.
-    rings: () => [1.3, -1.3, 1.9, -1.9].map(s => mk({ speed: s, start: A - s * 2.5 })) },
+  /**
+   * Hizalanma KADEMELİ hale getirildi (eskiden `start = A − s·2,5`, yani dördü de
+   * t = 2,5 sn'de aynı anda A açısında buluşuyordu).
+   *
+   * Ölçüm: bu tasarımın 17 örneğinin HEPSİ hedefin üstünde, ortalama +6,5 puan,
+   * en büyüğü +11,6. Örnek başına standart hata ~1,1 puan olduğu için bu gürültü
+   * değil sistematik.
+   *
+   * Sebep model uyuşmazlığı: dört halka aynı anda hizalanınca oyuncu dört ayrı an
+   * değil TEK bir an yakalıyor — dört dokunuşu birkaç kare içine sığdırabiliyor.
+   * Oysa τ bunu dört bağımsız daraltan kilit sayıyor, yani ayarlayıcı sandığından
+   * kolay bir bölüm üretiyor. Tolerans kolunu kısmak da yetmiyor: zorluk boşluk
+   * genişliğinden değil, o tek anın varlığından geliyor.
+   *
+   * Kademe 0,6 sn: ölçülen kilit temposundan (1,27 sn) kasıtlı olarak farklı, yani
+   * hizalanmalar oyuncunun doğal dokunuş ritmine de denk gelmiyor. Aynalı hız
+   * çiftleri — tasarımın kimliği — olduğu gibi duruyor.
+   *
+   * Hızlar birbirinden farklı olmalı: eşit hız + eşit start = birebir aynı halka,
+   * o kilit açıklığı hiç daraltmaz.
+   */
+  10: { anahtar: 'ayna',
+    rings: () => [1.3, -1.3, 1.9, -1.9].map((s, i) => mk({ speed: s, start: A - s * (2.5 + i * 0.6) })) },
   /**
    * Hızlar 1,5 KATINA çıkarıldı (eski küme: 2,0 / -1,4 / 1,4 / -2,0).
    *
@@ -412,14 +468,31 @@ const BOSSES: Record<number, Boss | undefined> = {
    * Bu, `buyukKasa`da yapılan düzeltmenin aynısı: süre ya da boşluk kolu ölünce
    * hedefi indirmek değil, çalışan kolu kullanmak.
    */
-  20: { anahtar: 'merkez', tol: 0.15,
+  20: { anahtar: 'merkez',
     rings: () => [3.0, -2.1, 0, 2.1, -3.0].map((s, i) => mk(i === 2 ? { speed: 1, preLocked: true, start: A } : { speed: s, start: R() * TAU })) },
-  30: { anahtar: 'metronom', tol: 0.13,
+  30: { anahtar: 'metronom',
     rings: () => [1.5, -1.6, 1.4, -1.5, 1.6].map(s => mk({ speed: s, flip: 1.2, start: A - s * 0.6 + (R() - 0.5) * 0.4 })) },
-  40: { anahtar: 'catal', tol: 0.12,
+  40: { anahtar: 'catal',
     rings: () => [1.2, -1.5, 1.3, -1.1, 1.6].map(s => mk({ speed: s, gaps: 2, gapOffset: 150 + R() * 30, start: R() * TAU })) },
-  50: { anahtar: 'tavsanKaplumbaga', tol: 0.11,
-    rings: () => [0.5, -2.4, 0.6, -2.5, 0.5, -2.3].map(s => mk({ speed: s, start: R() * TAU })) },
+  /**
+   * Bütün hızlar 1,7 KATINA çıkarıldı (eski küme: 0,5 / -2,4 / 0,6 / -2,5 / 0,5 / -2,3).
+   * Oran korundu, yani "tavşan ve kaplumbağa" karşıtlığı — tasarımın kimliği — aynı.
+   *
+   * Sebep ölçüldü: bu tasarım 16 örneğinin ortalamasında hedeften **+8 puan** sapıyordu
+   * (470. ve 710. bölümde +37 ve +43). Sınırlayan şey tolerans DEĞİLDİ — o bölümlerde
+   * boşluk 50,0°, yani tolerans 67 ms ve insan sınırının (25 ms) çok üstünde; ayarlayıcı
+   * daraltabilirdi ama daraltamıyordu.
+   *
+   * Bağlayan kısıt ÇÖZÜCÜNÜN 16 SANİYE SINIRIYDI. 0,5 rad/sn'lik bir halkanın fırsat
+   * periyodu 12,6 sn; üç tanesi birden varken dar boşlukta çözücü 16 sn'yi aşıyor ve
+   * aday eleniyordu. Hızı 1,7 katına çıkarmak periyotları 7,4 sn'ye indirir, çözücü
+   * rahatlar ve ayarlayıcı boşluğu gerçekten daraltabilir.
+   *
+   * Bu, `merkez` ve `ayna`da olduğu gibi üçüncü bir "kilitli zorluk kolu" vakası —
+   * ve bu kez onu bulan şey tahmin değil, yeni eklenen tasarım başına sapma denetimi.
+   */
+  50: { anahtar: 'tavsanKaplumbaga',
+    rings: () => [0.85, -4.08, 1.02, -4.25, 0.85, -3.91].map(s => mk({ speed: s, start: R() * TAU })) },
   /**
    * Hızlar 1,6 KATINA çıkarıldı (eski küme: 1 / -1,9 / 1,6 / -1,4 / 2,1 / -1,7).
    *
@@ -439,7 +512,7 @@ const BOSSES: Record<number, Boss | undefined> = {
    * ayarlayıcı boşluğu daraltarak geri alır — o zaman zorluk hassasiyetten gelir,
    * saatten değil. 240 (%56→%4) ve 420 (%64→%0) için de aynı.
    */
-  60: { anahtar: 'buyukKasa', tol: 0.11,
+  60: { anahtar: 'buyukKasa',
     rings: () => [mk({ speed: 1.6, preLocked: true, start: A }), mk({ speed: -3.04, flip: 2.1, start: R() * TAU }), mk({ speed: 2.56, gaps: 2, gapOffset: 165, start: R() * TAU }),
       mk({ speed: -2.24, wobble: true, start: R() * TAU }), mk({ speed: 3.36, flip: 1.7, start: R() * TAU }), mk({ speed: -2.72, start: R() * TAU })] }
 };
@@ -548,21 +621,79 @@ const URETIM_TOHUMU = 777;
  * Bu tohum, üretimin hiçbir yerinde kullanılmayan bağımsız bir çekiliş üretir.
  */
 const DENETIM_TOHUMU = 20260923;
-/** Denetimde deneme sayısı: 200. Standart hata ~3,5 puan, bant ±20 puan. */
-const DENETIM_DENEME = 200;
+/**
+ * Denetimde deneme sayısı.
+ *
+ * 200 denemede standart hata `√(0,4·0,6/200) = 3,5 puan`. Nokta tahminini ±20 puanlık
+ * bandın sert eşiğiyle karşılaştırmak, gerçek sapması 17 puan olan bir bölümün
+ * koşuların beşte birinde "ihlal" görünmesi demekti — ve `verify` yayın kapısı olduğu
+ * için kapı, tablonun değil ölçümün gürültüsüyle kırmızıya dönüyordu.
+ *
+ * Bir ara bunu kabul bölgesini genişleterek çözmüştüm (bandı 2·SE kadar gevşetmek).
+ * Yanlış çözümdü: gürültünün çaresi eşiği gevşetmek değil GÜRÜLTÜYÜ KÜÇÜLTMEKTİR.
+ * 1000 denemede standart hata **1,55 puana** iner, 3σ = 4,6 puan olur ve ±20 bandı
+ * tasarlandığı sertlikte, hiç gevşetilmeden uygulanabilir. Bedeli birkaç dakika.
+ */
+const DENETIM_DENEME = 1000;
+
+/**
+ * Ustalık referansının tohumları. Yıldız eşikleri (q3/q2) ÜRETİMDE bu örneklemin
+ * yüzdeliklerinden hesaplanır; denetim "ustanın 3 yıldız oranı %15-35 arasında mı"
+ * diye sorar. İki taraf aynı tohumu kullanırsa denetim kendi cevap anahtarını okur:
+ * cevap inşa gereği ~%25 çıkar ve kapı pratikte hiç ateşlenmez. Bu yüzden denetim
+ * BAŞKA bir tohum kullanır — eşiklerin bağımsız bir örneklemde de bandı tutup
+ * tutmadığı gerçekten sınansın.
+ */
+const USTA_TOHUMU = 4242;
+const USTA_DENETIM_TOHUMU = 909090;
 
 /**
  * Finalist ölçümünün tohumu. Hem üretimden hem denetimden FARKLI olmak zorunda.
  * (Üretim: tarama. Bu: karar. Denetim: sınav. Üçü de ayrı çekiliş.)
  */
 const SECIM_TOHUMU = 424242;
-/** Kaç aday bağımsız tohumla yeniden ölçülüp karara sokulur (bkz. kazananın laneti). */
+/**
+ * Kaç aday bağımsız tohumla yeniden ölçülüp karara sokulur.
+ *
+ * Dört, çünkü kazananın laneti finalist sayısının maksimumundan doğar: 4 adayda
+ * beklenen yanlılık `≈ 1,2 · SE`, 200 denemede `1,2 · 3,5 ≈ 4 puan` (bkz. MATEMATIK
+ * §8.2). Daha fazla finalist yanlılığı büyütür, daha azı iyi adayı kaçırır.
+ */
 const FINALIST = 4;
-/** Finalist ölçümünde deneme sayısı; taramanın dört katı. */
-const FINALIST_DENEME = 200;
+/**
+ * Finalist ölçümünde deneme sayısı — denetimle AYNI, bilerek.
+ *
+ * Karar ölçümü ile denetim ölçümü farklı tohumlardan gelir; aralarındaki fark
+ * `√2·SE` kadar dalgalanır. Karar 200 denemeyle (SE 3,5 puan) verilirken denetim
+ * 1000 denemeyle (SE 1,5) yapılınca bu fark 3,8 puana çıkıyordu ve bant sınırına
+ * yapışık çıkan bölümler denetimde dışarı düşüyordu. Ölçtüm: 332. bölüm kararda
+ * %45 (hedef %28, 17 puan — erken çıkış payının içinde), denetimde %50 (+22 puan).
+ */
+const FINALIST_DENEME = 1000;
+/** Karar ölçümünün standart hatası; erken çıkış payı bundan türetilir. */
+const SECIM_SE = Math.sqrt(0.24 / FINALIST_DENEME);
 
-function evaluate(L: { def: RingDef[]; limit: number }, trials = 50, tohum = URETIM_TOHUMU): Evaluated {
-  es = tohum; let w = 0, sure = 0; const qs: number[] = [];
+/**
+ * Bölüm başına ayrı bir rastgele akış tohumu.
+ *
+ * Eskiden `evaluate` her bölümde `es = tohum` diyordu, yani **1000 bölümün hepsi aynı
+ * 200 hata dizisiyle** oynanıyordu. Tek bir bölümün tahminini yanlı yapmaz ama 1000
+ * bölümü birbirine BAĞLAR: bir koşunun ortalaması, bağımsızlığın öngördüğü 0,11 puan
+ * yerine 1,89 puan standart sapmayla dalgalanıyordu (≈17 kat). Sonuç: bütün toplam
+ * istatistikler tohuma esirdi — "hedefin 7 puan altındaki bölüm oranı" 12 koşuda
+ * %1,4 ile %22,7 arasında zıplıyor, bağımsız akışla ise %8,6–%10,3 arasında kararlı
+ * duruyordu. Yani belgedeki "zor bölüm %1" satırı tablonun değil tohumun eseriydi.
+ *
+ * Daha kötüsü üretim tarafındaydı: bütün tablo TEK bir gürültü gerçeklemesine göre
+ * ayarlanıyordu. Bu sefer zararsız çıktı, ama o akışın ilk 200 dizisi biraz "sert"
+ * olsaydı 1000 bölümün tamamı aynı yönde kayardı ve hiçbir denetim bunu ayırt edemezdi.
+ */
+const bolumTohumu = (tohum: number, bolum: number): number =>
+  1 + ((karistir(bolum) ^ karistir(tohum)) >>> 0) % 2147483646;
+
+function evaluate(L: { def: RingDef[]; limit: number }, bolum: number,
+                  trials = 50, tohum = URETIM_TOHUMU): Evaluated {
+  es = bolumTohumu(tohum, bolum); let w = 0, sure = 0; const qs: number[] = [];
   for (let k = 0; k < trials; k++) {
     const r = play(L.def, L.limit);
     if (r.win) { w++; qs.push(r.q); } else if (r.sebep === "sure") sure++;
@@ -599,28 +730,17 @@ const egriTaban = (n: number): number =>
   0.94 - (0.94 - EN_ZOR) * Math.pow(Math.min(1, (n - 1) / (TABAN_BOLUM - 1)), 0.45);
 const egriDalga = (n: number): number => DALGA_GENLIK * Math.sin(2 * Math.PI * n / DALGA_PERIYOT);
 /**
- * Ritim denetiminin ayarları.
+ * Zorluk kalıntısı taramasının gecikme aralığı.
  *
- * Bu denetimin ilk hâli iki kat kusurluydu ve "düzeldi" diye rapor veriyordu:
- *   1. TEK bir gecikmeye (120) bakıyordu — yani düzeltmenin terk ettiği periyoda.
- *      Tepe 70'e taşındığında denetim bunu göremedi.
- *   2. Özilintiyi eğilimden arındırmadan hesaplıyor ve payı `N−lag`, paydayı `N`
- *      terim üzerinden alıyordu. Bu taraflı tahminci uzun gecikmeleri YAPISAL olarak
- *      küçültür; lag 840'ta yalnız 160 terim kalır ve sonuç kaçınılmaz olarak ~0
- *      çıkar. Yani metrik uzun periyotları prensip olarak bulamıyordu.
+ * Alt sınır 15: daha kısa gecikmeler zorluk eğrisinin kendi yerel dalgalanmasını
+ * ölçer, tekrarı değil. Üst sınır `LAG_UST` (N/3'e yakın): daha uzun gecikmelerde
+ * karşılaştırılacak terim sayısı düşer ve tahmin gürültüye boğulur.
  *
- * Şimdi: 25 pencereli ortalanmış hareketli ortalamayla eğilim çıkarılır, tarafsız
- * tahminci kullanılır ve 15-336 arası BÜTÜN gecikmeler taranır; rapor tepenin
- * hangi gecikmede olduğunu da yazar.
- *
- * Tavan 0,60: bu, dalga (24) ile patron (10) periyotlarının kendi hizalanmasından
- * gelen tabanı kabul eder. Nefes tarafında yapılabileceğin sonu orasıdır; daha
- * aşağısı için patron aralığını sabit 10 olmaktan çıkarmak gerekir — ayrı iş.
- * Eşiği ölçüme göre AYARLAMAK yasak: ilk hâlinde 0,30 yazılmıştı ve o değer
- * hiçbir varyantla ulaşılamıyordu, yani denetim baştan anlamsızdı.
+ * Bu denetimin tarihçesi (tek gecikmeye bakan ilk hâli, elle konmuş 0,60 tavanı,
+ * hareketli ortalamayla arındırma) MATEMATIK §8.4'te.
  */
 const RITIM_TARAMA_ALT = 15;
-const RITIM_TARAMA_UST = 336;
+
 
 /**
  * YAPI serisi taraması. Kazanma oranı dolaylı ve gürültülü bir ölçüdür; oyuncunun
@@ -631,7 +751,8 @@ const RITIM_TARAMA_UST = 336;
  * ve denetim 15'ten başladığı için onu hiç göremiyordu.
  */
 const YAPI_LAG_ALT = 2;
-const YAPI_LAG_UST = 336;
+/** Tarama üst sınırı: N/3'e yakın. Ötesinde kalan terim sayısı tahmini gürültüye boğar. */
+const LAG_UST = 336;
 /**
  * Permütasyon boş hipotezinde kaç tur.
  *
@@ -659,58 +780,18 @@ const YAPI_BASLANGIC = 21;
  */
 const ZOR_PAY = 0.07;
 
-/** Deterministik yerel RNG. play()'in `es` tohumuna DOKUNMAZ; denetim ölçümü bozulmasın. */
-function yerelRng(tohum: number): () => number {
-  let s = tohum >>> 0;
-  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
-}
-
-function seriKaristir<T>(a: readonly T[], r: () => number): T[] {
-  const b = [...a];
-  for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; }
-  return b;
-}
-
-/**
- * Tavanı elle koymak yerine BOŞ HİPOTEZDEN türetir.
- *
- * Eski denetimde tavan 0,60'tı ve bu sayının hiçbir dayanağı yoktu — ölçüm onu
- * aştığında tavanı yükseltmek, yani sınavı cevaba uydurmak cazip hale geliyordu.
- * Burada sorulan soru şu: "aynı seri rastgele sıralanmış olsaydı bu istatistik en
- * fazla ne kadar yükselirdi?" Tavan, o dağılımın %99'luk dilimi. Böylece eşik
- * serinin kendi dağılımından gelir, elden değil.
- *
- * İstatistik zaten gecikmeler üzerinde bir MAKSİMUM olduğu için çoklu karşılaştırma
- * düzeltmesi de bedava gelir: boş hipotez de aynı maksimumu alıyor.
- */
-function permutasyonTavani<T>(seri: readonly T[], olc: (d: T[]) => number, tohum: number): number {
-  const r = yerelRng(tohum);
-  const v: number[] = [];
-  for (let k = 0; k < PERM_TUR; k++) v.push(olc(seriKaristir(seri, r)));
-  v.sort((a, b) => a - b);
-  return v[Math.min(v.length - 1, Math.floor(PERM_TUR * PERM_DILIM))];
-}
-
-/** Kategorik seride tekrar ölçüsü: `s[i] === s[i+lag]` oranının gecikmeler üstündeki tepesi. */
-function eslesmeTepesi(d: readonly number[]): { lag: number; deger: number } {
-  let lag = YAPI_LAG_ALT, deger = -Infinity;
-  const ust = Math.min(YAPI_LAG_UST, d.length - 30);
-  for (let l = YAPI_LAG_ALT; l <= ust; l++) {
-    const n = d.length - l;
-    let e = 0;
-    for (let i = 0; i < n; i++) if (d[i] === d[i + l]) e++;
-    const o = e / n;
-    if (o > deger) { deger = o; lag = l; }
-  }
-  return { lag, deger };
-}
-
-/** En uzun kesintisiz `true` serisi. */
-function enUzunSeri(d: readonly boolean[]): number {
-  let en = 0, ard = 0;
-  for (const x of d) { if (x) { ard++; if (ard > en) en = ard; } else ard = 0; }
-  return en;
-}
+// Saf istatistik `tools/gen/istatistik.ts`'te yaşıyor ve orada birim testleri var
+// (`istatistik.test.ts`). Yayın kapısı olan bir hesabın test edilebilir olması şart:
+// bu kapı daha önce iki kez fark edilmeden anlamsız çalıştı.
+//
+// Buradaki sarmalayıcılar yalnız bu dosyanın ayarlarını (tarama aralığı, tur sayısı,
+// dilim) bağlar.
+const eslesmeTepesi = (d: readonly number[]): Tepe => IST.eslesmeTepesi(d, YAPI_LAG_ALT, LAG_UST);
+const ozilintiTepesi = (d: readonly number[]): Tepe =>
+  IST.tepeNoktasi(IST.ozilintiler(d, RITIM_TARAMA_ALT, LAG_UST), RITIM_TARAMA_ALT);
+const permutasyonTavani = <T,>(seri: readonly T[], olc: (d: T[]) => number, tohum: number): number =>
+  IST.permutasyonTavani(seri, olc, tohum, PERM_TUR, PERM_DILIM);
+const { enUzunSeri, yerelRng, ozilintiler } = IST;
 
 /** Bir bölümde denemelerin en çok bu kadarı saate yenilebilir (bkz. doğrulama). */
 const SURE_KAYBI_SIDDET = 0.30;
@@ -812,46 +893,39 @@ const SURE_KAYBI_ESIGI = 0.10;
 const SURE_TAVANI = 2.2;
 
 /**
- * Bir halkanın boşluğunun, sabitlenmiş kanalın üstünden geçme periyodu (saniye).
- *
- * İki kapılı halkada fırsat iki kat sık gelir. `wobble` hızı 0,3x-1,7x arasında
- * salındırır ama sinüsün ortalaması sıfırdır: ortalama açısal hızı ve dolayısıyla
- * periyodu değiştirmez. `flip` halkası ise tam tur atmayabilir — gidiş-dönüş çevrimi
- * daha uzunsa onu esas alırız, yoksa tavan o halkaya haksız yere dar gelir.
- */
-/**
  * Bir halkanın "fırsat periyodu": kanalın istenen yönüne bir boşluğun gelmesi için
  * EN KÖTÜ durumda geçen süre. γ bir TAVAN hesabı olduğu için ortalama değil en kötü
  * durum kullanılır.
  *
- * İki düzeltme:
+ * İKİ KAPILI halkada boşluklar eşit aralıklı DEĞİL. `gapOffset` medyanı 157°, yani
+ * fırsatlar `off/|ω|` ve `(2π−off)/|ω|` aralıklarıyla dönüşümlü gelir. `2π/(2|ω|)`
+ * bunların ortalamasıdır ve en uzun beklemeyi %11 (medyan) – %22 (en kötü) eksik sayar.
+ * Bu yüzden EN UZUN yay kullanılır.
  *
- * 1. İKİ KAPILI halkada boşluklar eşit aralıklı DEĞİL. `gapOffset` medyanı 157°,
- *    yani fırsatlar `off/|ω|` ve `(2π−off)/|ω|` aralıklarıyla dönüşümlü gelir.
- *    `2π/(2|ω|)` bunların ortalamasıdır ve en uzun beklemeyi %13 (medyan) – %28
- *    (en kötü) eksik sayar.
+ * FLIP'li halkada periyot `min(2·flip, temel)`. Gerekçe: flip'li halkanın açısı
+ * `2·flip` periyotlu KAPALI bir yörünge çizer, yani halka ulaştığı her açıya çevrim
+ * başına en az bir kez döner — en kötü bekleme bir çevrimdir. Halka çemberi çevrimden
+ * daha hızlı tarıyorsa (`temel < 2·flip`) beklemek daha da kısadır.
  *
- * 2. FLIP'li halka tüm çemberi taramayabilir: açısı `a0` ile `a0 + ω·f` arasında
- *    salınır. Ölçüldü: 738 flip halkasının 644'ünde (%87) `|ω|·f < 2π/g`, yani
- *    bazı kanal yönlerine fırsat HİÇ gelmez — periyot o yönler için sonsuzdur.
- *    Eski formül `max(P, 2f)` döndürüp "fırsat tam tur periyoduyla gelir" diyordu.
- *    `Infinity` dönünce `finalize` adayı eler; γ zaten sert bir eleme ölçütüdür.
+ * ÖNCEKİ SÜRÜM BURADA TERS ÇALIŞIYORDU. Çemberi hiç taramayan flip halkaları için
+ * `Infinity` döndürüp "aday elenir" diyordu. Elemiyordu: `gamaTavani` toplamı da
+ * `Infinity` oluyor, `guvenli > tavan` hiç tetiklenmiyor ve `gamaHesapla` `x/∞ = 0`
+ * veriyordu. Yani γ kapısı 1000 bölümün **334'ünde sessizce kapanmıştı** ve o bölümler
+ * "γ = 0" diye raporlanıyordu. Kapıyı sıkılaştırmak isteyen değişiklik onu gevşetmişti.
+ *
+ * Hata semantikteydi: "ulaşılmayan yönler için periyot sonsuzdur" doğru ama ilgisiz —
+ * kanalın yönünü öteki kilitler belirliyor ve çözücü zaten uygulanabilir bir yön
+ * bulmuş oluyor. Doğru soru "ULAŞILAN yönler için en kötü bekleme ne kadar", cevabı da
+ * bir flip çevrimi. Artık hiçbir dalda `Infinity` dönmüyor.
  */
 function firsatPeriyodu(r: RingDef): number {
-  const hucre = TAU / Math.max(1, r.gaps);      // iki boşluk arasındaki nominal aralık
   const w = Math.abs(r.speed);
-  // En uzun bekleme: iki kapıda geniş olan yay, tek kapıda tam tur.
+  // İki kapılı halkada kapılar eşit aralıklı değil: en uzun yay esas alınır.
   const enUzunYay = r.gaps === 2
     ? Math.max(r.gapOffset * DEG, TAU - r.gapOffset * DEG)
     : TAU;
   const temel = enUzunYay / w;
-  if (r.flip <= 0) return temel;
-  // Taranan yay: salınım genliği + boşluğun kendi genişliği. Bir hücreyi kapatamıyorsa
-  // bazı yönler erişilemez demektir.
-  const kapsam = (w * r.flip + r.gap * DEG) / hucre;
-  if (kapsam < 1) return Infinity;
-  // Kapsayan flip halkasında fırsat gidiş ve dönüşte iki kez gelir.
-  return Math.max(2 * r.flip, temel);
+  return r.flip > 0 ? Math.min(2 * r.flip, temel) : temel;
 }
 
 /**
@@ -902,7 +976,7 @@ function tune(rawRings: RawRing[], want: number, n: number, lo = 0.012, hi = 0.4
     const aday = finalize(rings, n);
     if (!aday) { lo = tol; continue; }
     let L: Finalized = aday;
-    let ev = evaluate(L, 50);
+    let ev = evaluate(L, n, 50);
     // Süre dolması baskın kayıp sebebiyse yapı değil limit yanlıştır: limiti aç.
     const tavan = gamaTavani(L.def);
     for (let tur = 0; tur < 5 && ev.sureKaybi > SURE_KAYBI_ESIGI; tur++) {
@@ -912,7 +986,7 @@ function tune(rawRings: RawRing[], want: number, n: number, lo = 0.012, hi = 0.4
       // oyuncuya ikinci turu bekleme lüksü verilmez. Aday öyleyse elenir.
       if (yeni > tavan) break;
       L = { ...L, limit: yeni };
-      ev = evaluate(L, 50);
+      ev = evaluate(L, n, 50);
     }
     const c = { ...L, ...ev, tol };
     if (L.best <= 16 && (!best || Math.abs(c.win - want) < Math.abs(best.win - want))) best = c;
@@ -962,8 +1036,15 @@ function generate(log: Log = () => {}): LevelTable {
     // bölümlerde harcanıyor. Ölçtüm: 36 denemeyle iki bölüm bantta kalamıyordu ve
     // tutturamayan bölüm kümesi koşudan koşuya değişiyordu — yani sabit bir tasarım
     // sınırı değil arama şanssızlığı.
-    const olagan = boss ? 6 : 8, enCok = boss ? 36 : 60;
-    const bant = (boss ? BAND_BOSS : BAND) * 0.9;
+    // `enCok`, `olagan`'ın TAM KATI olmalı: karar yalnız tur sonlarında veriliyor,
+    // dolayısıyla artan adaylar hiçbir zaman karara giremezdi (60/8'de son 4 aday).
+    // Bu tabloda hiç tetiklenmedi ama sessiz bir kırılganlıktı.
+    const olagan = boss ? 6 : 8, enCok = boss ? 36 : 64;
+    // Erken çıkış payı bandın kendisinden değil, bandın DENETİMDE de tutacağı
+    // mesafeden gelir. Karar ve denetim ayrı tohumlar kullandığı için aralarında
+    // `√2·SE` fark olabilir; 3σ pay bırakılır. Eski pay `BAND × 0,9` idi, yani bant
+    // sınırına yalnız 2 puan kalıyordu — ölçüm farkının standart sapmasından küçük.
+    const bant = (boss ? BAND_BOSS : BAND) - 3 * Math.SQRT2 * SECIM_SE;
     const adaylar: Candidate[] = [];
 
     /** Finalistleri bağımsız tohumla ölçüp aralarından en iyisini döndürür. */
@@ -983,24 +1064,46 @@ function generate(log: Log = () => {}): LevelTable {
       let enIyi: Candidate | null = null;
       for (const f of sirali) {
         // Aynı aday iki turda da finale kalabilir; ölçümü tekrarlamaya gerek yok.
-        if (!f.olculdu) { Object.assign(f, evaluate(f, FINALIST_DENEME, SECIM_TOHUMU), { olculdu: true }); }
+        if (!f.olculdu) { Object.assign(f, evaluate(f, n, FINALIST_DENEME, SECIM_TOHUMU), { olculdu: true }); }
         if (!enIyi || adayDahaIyi(f, enIyi, want)) enIyi = f;
       }
       return enIyi as Candidate;
     };
 
-    // Hız kolu yalnızca bant dışında kalındığında ve yalnızca KOLAY yönde devreye
-    // girer (bkz. candidate). Tur sonundaki karar dürüst ölçümle verildiği için
-    // bant içindeki bölümler buraya hiç gelmez.
-    let hizCarpani = 1;
+    // Hız kolu yalnızca KOLAY yönde devreye girer (`pick.win > want`). Tur sonunda
+    // çıkış olmadığı her durumda tetiklenir — yani bölüm bant dışındayken DE, bant
+    // içinde ama "kirli" (süre kaybı > %10) olduğunda da. Ölçüldü: üretim boyunca 156
+    // kez tetikleniyor ve bunların bir kısmı bant içi/kirli durumlar (ör. bölüm 110:
+    // %35, hedef %34, ama süre kaybı %16). Bu doğru davranış — kirli bir bölümün de
+    // düzelmesi gerekir — ama önceki yorum "bant içindeki bölümlere hiç dokunmaz"
+    // diyordu ve bu yanlıştı.
+    let hizCarpani = 1, ekHalka = 0;
     for (let k = 0; k < enCok; k++) {
-      const raw = boss ? boss.rings() : candidate(n, hizCarpani);
+      // Hız kolu patronlara da uygulanır. Patron halkaları elle tasarlandığı için
+      // ayarlayıcının tek kolu toleranstı; `merkez`, `ayna` ve `tavsanKaplumbaga`'nın
+      // üçünde de o kol kilitlendi ve üçünü de tek tek elle düzeltmek gerekti. Genel
+      // kaçış kapısı olarak hız burada da açılıyor — tasarımın oranları korunur,
+      // yalnızca ölçeği büyür.
+      const raw = boss
+        ? boss.rings().map(r => ({ ...r, speed: r.speed * hizCarpani }))
+        : candidate(n, hizCarpani, ekHalka);
       const c = tune(raw, want, n);
       if (c) adaylar.push(c);
       if (adaylar.length && (k + 1) % olagan === 0) {
-        pick = finalistSec();
+        // `pick` GERİLEYEMEZ. Eski kod her turda `pick = finalistSec()` diyerek önceki
+        // turun seçimini atıyordu; ölçüldü, 25 bölümde seçim geriledi. 21'i bilinçli
+        // takastı (kirli aday temiziyle değişti) ama 4 bölümde seçilen aday her iki
+        // eksende de önceki turdan kötüydü (ör. 410: %30/sk %12 → %35/sk %17).
+        // Eski döngünün bedavaya verdiği "seçim hiç kötüleşmez" güvencesi geri geldi.
+        const yeni = finalistSec();
+        if (!pick || adayDahaIyi(yeni, pick, want)) pick = yeni;
         if (Math.abs(pick.win - want) <= bant && pick.sureKaybi <= SURE_KAYBI_ESIGI) break;
-        if (pick.win > want) hizCarpani = Math.min(1.8, hizCarpani + 0.15);
+        if (pick.win > want) {
+          hizCarpani = Math.min(1.8, hizCarpani + 0.15);
+          // İki tur üst üste tutturulamadıysa halka da ekle: tolerans kolu insan
+          // sınırına dayanmış olabilir ve o zaman tek çare daraltan kilit sayısıdır.
+          if ((k + 1) / olagan >= 2 && ((k + 1) / olagan) % 2 === 0) ekHalka = Math.min(2, ekHalka + 1);
+        }
       }
     }
     if (!pick && adaylar.length) pick = finalistSec();
@@ -1008,10 +1111,10 @@ function generate(log: Log = () => {}): LevelTable {
 
     if (boss) Object.assign(pick, { boss: boss.anahtar });
     // Yıldız eşikleri için ustalık referansı her levelde 25 kez oynatılır (bkz. playUsta).
-    es = 4242;
+    es = bolumTohumu(USTA_TOHUMU, n);
     for (let k = 0; k < 25; k++) {
       const usta = playUsta(pick.def, pick.limit);
-      if (usta.win) allQ.push(usta.q as number);
+      if (usta.win) allQ.push(usta.q);
     }
     levels.push(pick);
   }
@@ -1065,29 +1168,25 @@ const BAND_BOSS = 0.25;
 const SURE_KAYBI_VERIFY = 0.25;
 
 /**
- * Denetim kararı nokta tahminiyle değil GÜVEN ARALIĞIYLA verilir.
+ * Bandı aşan bölüm SAYISI için tavan.
  *
- * Bant (±20 puan) bir tasarım toleransıdır ve bölümün GERÇEK kazanma oranı hakkındadır.
- * Elimizdeki ise 200 denemelik bir tahmin; `p ≈ 0,4` civarında standart hata 3,5 puan.
- * Nokta tahminini sert bir eşikle karşılaştırmak, gerçek sapması 17 puan olan bir
- * bölümün koşuların beşte birinde "ihlal" görünmesi demektir — ve `verify` yayın
- * kapısı olduğu için bu, tablonun değil ölçümün gürültüsüyle kırmızıya dönen bir kapı
- * olurdu. Ölçtüm: art arda koşularda bantta kalamayan bölüm kümesi her seferinde
- * değişiyordu (192/233/380/428/828/860/928 … 623/663 … 428), hiçbiri sabit değildi.
- *
- * Bu yüzden iki ayrı ölçü var ve ikisi farklı şeyi yakalar:
- *   • TEK BÖLÜM: ancak bandı ölçüm hatasının iki katı kadar aşarsa hata sayılır.
- *   • TOPLAM: bandı aşan bölüm SAYISI tavanı geçerse, tek tek marjinal olsalar bile
- *     hata sayılır — çünkü o, eğrinin kaymış olması demektir.
- * Gevşeyen yalnızca "bir bölüm sınıra değdi" durumudur; sistematik bir bozulma
- * eskisinden daha kesin yakalanır.
+ * Tek bölüm kuralı (±20 puan) artık sert uygulanıyor; bu ölçü onun yerine geçmez,
+ * ONA EKLENİR ve başka bir şeyi yakalar: tek tek bandın içinde kalan ama hepsi aynı
+ * yöne kaymış bir tablo. Eskiden bu sayı hiç ölçülmüyordu.
  */
-const OLCUM_SE = 0.035;
-const BANT_GUVEN = 2 * OLCUM_SE;
 const BANT_SAYI_TAVANI = Math.round(LEVEL_COUNT * 0.01);
-/** Süre şiddeti: kaç bölüm eşiği aşabilir, ve tek bir bölüm için mutlak tavan. */
+
+/**
+ * Süre şiddeti: kaç bölüm eşiği aşabilir, ve tek bölüm için mutlak tavan.
+ *
+ * Bu kuralın işi BOZUK BİR ARKETİPİ yakalamaktır ve öyle bir arketip tek tük değil
+ * onlarca bölüm üretir — ölçülen 22 (`buyukKasa` ve kapanış sürümü). Tek şanssız bir
+ * bölüm onunla aynı kovaya konmamalı, bu yüzden ölçü sayı tavanıdır. Mutlak tavan
+ * 0,50: oyuncunun denemelerinin YARIDAN FAZLASINI saate kaptırdığı bir bölüm, kaç
+ * tane olursa olsun, tek başına kusurdur.
+ */
 const SIDDET_SAYI_TAVANI = 3;
-const SIDDET_MUTLAK = 0.55;
+const SIDDET_MUTLAK = 0.50;
 const SOLVER_HEADROOM = 0.9; // çözücü, süre sınırının en fazla %90'ını kullanabilir
 
 function verify(): number {
@@ -1103,6 +1202,8 @@ function verify(): number {
   const oranlar: number[] = [];
   /** Bandı aşan bölümler; tek tek marjinal olabilirler, sayıları ayrıca denetlenir. */
   const bantDisi: string[] = [];
+  /** Patron TASARIMI başına sapmalar; tek tek bölümler değil, tasarımın kendisi denetlenir. */
+  const patronSapmalari: Partial<Record<string, number[]>> = {};
   /** Bölüm başına hedef; zor seri artık buna göre ölçülüyor (bkz. ZOR_PAY). */
   const hedefler: number[] = [];
   /** Oyuncunun gördüğü YAPI: halka sayısı, ve mekanik imzası (flip/wobble/iki kapı). */
@@ -1122,7 +1223,7 @@ function verify(): number {
     const ad = `${l.n}${l.boss ? "*" : ""}`;
     const cozum = solve(l.rings);
     const best = cozum ? cozum.t : null;
-    const ev = evaluate({ def: l.rings, limit: l.limit }, DENETIM_DENEME, DENETIM_TOHUMU);
+    const ev = evaluate({ def: l.rings, limit: l.limit }, l.n, DENETIM_DENEME, DENETIM_TOHUMU);
     const hedef = bossHedefi(l.n, !!l.boss);
     const sapma = ev.win - hedef;
     const moving = l.rings.filter(r => !r.preLocked).length;
@@ -1133,7 +1234,7 @@ function verify(): number {
     if (Math.abs(sapma) > bandi) {
       const metin = `${ad}: kazanma %${Math.round(ev.win * 100)}, hedef %${Math.round(hedef * 100)} (${sapma > 0 ? "+" : ""}${Math.round(sapma * 100)} puan)`;
       bantDisi.push(metin);
-      if (Math.abs(sapma) > bandi + BANT_GUVEN) sorunlar.push(metin);
+      sorunlar.push(metin);
     }
     // Tasarım limiti kuraldır ama bekleme bütçesi tavanı onu kesebilir (bkz. GAMA_TAVAN):
     // hızlı halkalı bir bölümde tasarım süresi oyuncuya ikinci turu bekletirdi.
@@ -1146,6 +1247,7 @@ function verify(): number {
     if (ev.sureKaybi > SURE_KAYBI_VERIFY) sureliler.push(`${ad}: denemelerin %${Math.round(ev.sureKaybi * 100)}'i süre dolmasıyla bitiyor`);
     oranlar.push(ev.win);
     hedefler.push(hedef);
+    if (l.boss) (patronSapmalari[l.boss] ??= []).push(sapma);
     // Patronlar seriye GİRMEZ. Altı patron tasarımı 10 bölümde bir dönüyor, yani
     // 60 bölümde bir aynısı geliyor — bu KASITLI ve oyuncuya görünür bir dönüm
     // noktası, şartnamede yazılı ve `levels.test.ts` ayrıca garanti ediyor. Seriye
@@ -1186,10 +1288,10 @@ function verify(): number {
   // "iyi oynamanın karşılığı" olduğu için ortalama oyuncuyla değil ustayla kalibre edilir.
   const tumQ: number[] = [];
   for (const l of data.levels) {
-    es = 4242;
+    es = bolumTohumu(USTA_DENETIM_TOHUMU, l.n);
     for (let k = 0; k < 25; k++) {
       const u = playUsta(l.rings, l.limit);
-      if (u.win) tumQ.push(u.q as number);
+      if (u.win) tumQ.push(u.q);
     }
   }
   const pay = [tumQ.filter(q => q >= data.q3).length, tumQ.filter(q => q < data.q3 && q >= data.q2).length, tumQ.filter(q => q < data.q2).length].map(v => v / tumQ.length);
@@ -1216,12 +1318,36 @@ function verify(): number {
   console.log(`γ (halka başına izlenebilen tur): ortalama ${gOrt.toFixed(2)}, en yüksek ${Math.max(...gamalar).toFixed(2)}, tavan ${GAMA_TAVAN}`);
 
   console.log(`bant: ${bantDisi.length} bölüm ±${Math.round(BAND * 100)} puan dışında ` +
-    `(sayı tavanı ${BANT_SAYI_TAVANI}, tek bölüm tavanı ±${Math.round((BAND + BANT_GUVEN) * 100)})` +
+    `(sayı tavanı ${BANT_SAYI_TAVANI}; ${DENETIM_DENEME} denemede SE ≈ ${(Math.sqrt(0.24 / DENETIM_DENEME) * 100).toFixed(1)} puan)` +
     (bantDisi.length ? " — " + bantDisi.slice(0, 6).join("; ") + (bantDisi.length > 6 ? " …" : "") : ""));
   if (bantDisi.length > BANT_SAYI_TAVANI) {
     sorunlar.push(`${bantDisi.length} bölüm hedef bandının dışında (en çok ${BANT_SAYI_TAVANI} olmalı) — ` +
       `tek tek marjinal olsalar bile bu, eğrinin kaydığı anlamına gelir`);
   }
+
+  // ---- Patron TASARIMI başına ortalama sapma --------------------------------
+  //
+  // Bant tek tek bölümlere bakar ve patronlarda ±25 puandır; bir TASARIMIN bütün
+  // örneklerinin aynı yöne 6-7 puan kayması bu kapıdan rahatça geçer. Oysa tam da o,
+  // bir tasarım kusurudur: `merkez`de kilitli zorluk kolu, `ayna`da eşzamanlı
+  // hizalanma böyle bulundu — ikisi de bant denetimine hiç takılmamıştı.
+  //
+  // Tasarım başına 16-17 örnek var, yani ortalamanın standart hatası ~0,4 puan
+  // (bölüm başına SE ≈ 1,55 / √16). 6 puanlık bir tavan gürültünün 15 katı: bu kural
+  // yanlış alarm vermez, yalnızca gerçek kaymayı yakalar.
+  const PATRON_SAPMA_TAVANI = 0.06;
+  const patronSatir: string[] = [];
+  for (const [ad, xs] of Object.entries(patronSapmalari)) {
+    if (!xs || !xs.length) continue;
+    const ort = xs.reduce((a, b) => a + b, 0) / xs.length;
+    patronSatir.push(`${ad} ${ort > 0 ? "+" : ""}${Math.round(ort * 100)}`);
+    if (Math.abs(ort) > PATRON_SAPMA_TAVANI) {
+      sorunlar.push(`patron tasarımı "${ad}" ${xs.length} örneğinin ortalamasında hedeften ` +
+        `${ort > 0 ? "+" : ""}${Math.round(ort * 100)} puan sapıyor (tavan ±${Math.round(PATRON_SAPMA_TAVANI * 100)}) — ` +
+        `tek bölüm değil TASARIM kusuru`);
+    }
+  }
+  console.log("patron tasarımı başına ortalama sapma (puan): " + patronSatir.join("  "));
 
   // ---- Ritim: oyun kendini tekrar ediyor mu? --------------------------------
   //
@@ -1262,45 +1388,18 @@ function verify(): number {
   // orada bulunan her periyot istemsizdir. Permütasyon boş hipotezi de ancak bu seri
   // için geçerlidir: süzgeçten geçmiş bir seri değişim sırasına duyarsız değildir.
   const kalinti = oranlar.map((o, i) => o - hedefler[i]);
-  const ozilintiTepesi = (d: readonly number[]): number => {
-    const ort = d.reduce((x, y) => x + y, 0) / d.length;
-    let tk = 0; for (const x of d) tk += (x - ort) ** 2;
-    let en = -Infinity;
-    for (let lag = RITIM_TARAMA_ALT; lag <= RITIM_TARAMA_UST; lag++) {
-      const n = d.length - lag;
-      let pp = 0;
-      for (let i = 0; i < n; i++) pp += (d[i] - ort) * (d[i + lag] - ort);
-      const c = pp / (tk * n / d.length);
-      if (c > en) en = c;
-    }
-    return en;
-  };
-  let tepeLag = RITIM_TARAMA_ALT, tepe = -Infinity;
-  {
-    const ort = kalinti.reduce((x, y) => x + y, 0) / kalinti.length;
-    let tk = 0; for (const x of kalinti) tk += (x - ort) ** 2;
-    for (let lag = RITIM_TARAMA_ALT; lag <= RITIM_TARAMA_UST; lag++) {
-      const n = kalinti.length - lag;
-      let pp = 0;
-      for (let i = 0; i < n; i++) pp += (kalinti[i] - ort) * (kalinti[i + lag] - ort);
-      const c = pp / (tk * n / kalinti.length);
-      if (c > tepe) { tepe = c; tepeLag = lag; }
-    }
-  }
-  const zorlukTavani = permutasyonTavani(kalinti, ozilintiTepesi, 303);
+  // Tek hesap, üç kullanım: ölçüm, tavan ve teşhis. Bu satırlar bir ara üç ayrı yerde
+  // elle yazılıydı; biri düzeltilip öbürü unutulsa ölçüm ile tavan FARKLI metrikten
+  // gelir ve denetim sessizce anlamsızlaşırdı.
+  const zorlukEgrisi = ozilintiler(kalinti, RITIM_TARAMA_ALT, LAG_UST);
+  const { lag: tepeLag, deger: tepe } = IST.tepeNoktasi(zorlukEgrisi, RITIM_TARAMA_ALT);
+  const zorlukTavani = permutasyonTavani(kalinti, d => ozilintiTepesi(d).deger, 303);
   ritimSatir.push(`zorluk lag ${tepeLag} = ${tepe.toFixed(3)} (tavan ${zorlukTavani.toFixed(3)})`);
   // Teşhis: tepe tek bir gecikmede mi, yoksa bir periyodun KATLARINDA mı? İkincisi
-  // gerçek periyodikliktir; birincisi çoğu zaman gürültüdür.
+  // gerçek periyodikliktir; birincisi çoğu zaman gürültüdür. (`merkez` patronundaki
+  // kilitli zorluk kolu böyle bulundu: tepe 120'deydi, ikincisi 240.)
   {
-    const ort = kalinti.reduce((x, y) => x + y, 0) / kalinti.length;
-    let tk = 0; for (const x of kalinti) tk += (x - ort) ** 2;
-    const hepsi: Array<[number, number]> = [];
-    for (let lag = RITIM_TARAMA_ALT; lag <= RITIM_TARAMA_UST; lag++) {
-      const nn = kalinti.length - lag;
-      let pp = 0;
-      for (let i = 0; i < nn; i++) pp += (kalinti[i] - ort) * (kalinti[i + lag] - ort);
-      hepsi.push([lag, pp / (tk * nn / kalinti.length)]);
-    }
+    const hepsi = Array.from(zorlukEgrisi, (c, i) => [RITIM_TARAMA_ALT + i, c] as [number, number]);
     hepsi.sort((x, y) => y[1] - x[1]);
     console.log("  zorluk kalıntısının en güçlü 8 gecikmesi: " +
       hepsi.slice(0, 8).map(([l, c]) => `${l}:${c.toFixed(2)}`).join("  "));
@@ -1359,7 +1458,7 @@ function verify(): number {
   }
   const cokSiddetli = siddetliler.filter(x => x.k > SIDDET_MUTLAK);
   if (cokSiddetli.length) {
-    sorunlar.push(`${cokSiddetli.length} bölümde denemelerin yarıdan fazlası saate yeniliyor: ` +
+    sorunlar.push(`${cokSiddetli.length} bölümde denemelerin yarıdan fazlası (>%${SIDDET_MUTLAK * 100}) saate yeniliyor: ` +
       listele(cokSiddetli));
   }
 

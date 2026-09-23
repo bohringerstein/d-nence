@@ -11,7 +11,7 @@
     "gen": "node tools/gen.ts",
     "verify": "node tools/gen.ts --verify",
     "verify:full": "node tools/gen.ts --verify --deterministic",
-    "test": "node --test \"src/**/*.test.ts\"",
+    "test": "node --test \"src/**/*.test.ts\" \"tools/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "sync": "node tools/sync-prototype.ts",
     "check": "npm run typecheck && npm test && npm run verify && node tools/sync-prototype.ts --check",

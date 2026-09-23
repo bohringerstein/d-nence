@@ -56,19 +56,37 @@ export const ADIM = 1 / 120;
 export function stepRings(rs: Ring[], dt: number, lt: number): void {
   for (const r of rs) {
     if (r.locked) continue;
-    r.t += dt;
-    if (r.flip) {
-      // İleri: sayaç periyodu geçince yön değişir.
-      if (r.t >= r.flip) { r.t = 0; r.dir = r.dir === 1 ? -1 : 1; }
-      // GERİ: sayaç sıfırın altına düşerse flip GERİ ALINIR. Oyun hiç negatif adım
-      // atmaz, ama level üretici "oyuncu ε saniye ERKEN dokundu" durumunu geri sararak
-      // kuruyor. Geri alma olmadan `r.t` negatife düşüyor ve `dir` flip'lenmiş kalıyordu:
-      // halka, zaman geri akarken flip SONRASI yönde dönmeye devam ediyordu. Ölçülen
-      // hata 32,5° — tipik boşluk payının neredeyse iki katı.
-      else if (r.t < 0) { r.t += r.flip; r.dir = r.dir === 1 ? -1 : 1; }
-    }
+    // wobble çarpanı `r.t`'ye de `r.dir`'e de bakmaz; sırası davranışı değiştirmez.
     const w = r.wobble ? 1 + 0.7 * Math.sin(lt * 2.3 + r.start) : 1;
-    r.angle += r.speed * r.dir * w * dt;
+    if (dt >= 0) {
+      r.t += dt;
+      // Sayaç periyodu geçince yön değişir; O ADIMIN hareketi YENİ yönle yapılır.
+      if (r.flip && r.t >= r.flip) { r.t = 0; r.dir = r.dir === 1 ? -1 : 1; }
+      r.angle += r.speed * r.dir * w * dt;
+    } else {
+      // GERİ SARMA — ileri adımın tam tersi SIRAYLA yapılmak zorunda.
+      //
+      // Oyun hiç negatif adım atmaz; level üretici "oyuncu ε saniye ERKEN dokundu"
+      // durumunu geri sararak kuruyor. İki ayrı hata vardı ve ikincisi ilkinin
+      // düzeltmesinden doğdu:
+      //
+      //   1. Hiç geri alma yoktu: `r.t` negatife düşüyor, `dir` flip'lenmiş kalıyor,
+      //      halka zaman geri akarken flip SONRASI yönde dönmeye devam ediyordu.
+      //      Ölçülen hata 32,5°.
+      //   2. Geri alma eklendi ama flip, HAREKETTEN ÖNCE geri alınıyordu. Oysa ileri
+      //      adım o adımın hareketini flip SONRASI yönle yapmıştı; geri adım flip
+      //      ÖNCESİ yönle geri alınca o tek adım iki kez sayılıyordu. Hata
+      //      `2·|ω|·dt` — 1,5 rad/sn'de 1,43°, en hızlı flip halkasında 5,38°.
+      //
+      // Doğru sıra: önce hareketi (ileri adımda kullanılan yönle) geri al, sonra flip'i.
+      r.angle += r.speed * r.dir * w * dt;
+      r.t += dt;
+      // Eşik `-1e-9`, `0` değil: ileri adım `r.t`'yi tam 0'a çektiği için geri sarmada
+      // `r.t` kayan nokta artığıyla (-3e-17 gibi) negatife düşüp OLMAMIŞ bir flip'i
+      // geri alıyordu — ölçüldü, 60 adım ileri + 60 adım geri sonunda yön tersine
+      // dönüyordu.
+      if (r.flip && r.t < -1e-9) { r.t += r.flip; r.dir = r.dir === 1 ? -1 : 1; }
+    }
   }
 }
 

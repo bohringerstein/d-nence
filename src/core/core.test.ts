@@ -151,6 +151,39 @@ test("stepRings geri sarılabilir (simülasyondaki erken dokunuş)", () => {
   yakin(r.angle, aci, 1e-12, "geri sarip ileri sarinca ayni aciya donmeli");
 });
 
+// Yukarıdaki testin halkasında `flip: 0` var, yani geri sarmanın flip dalına HİÇ
+// girmiyordu. Ölçülen iki hata da tam o daldaydı (biri 32,5°, öbürü 5,4°), ve hiçbiri
+// regresyon korumasız kalmamalı: bu test flip sınırını geçecek kadar ileri gidip geri
+// sarıyor ve açının, yönün VE sayacın başa döndüğünü sınıyor.
+test("flip'li halka geri sarıldığında açı, yön ve sayaç birebir geri gelir", () => {
+  const dt = 1 / 120;
+  for (const wobble of [false, true]) {
+    const r = live({ speed: 1.7, flip: 0.5, wobble, start: 0.3 });
+    // 90 adım = 0,75 sn: 0,5 sn'deki flip sınırı aşılıyor.
+    for (let i = 0; i < 90; i++) C.stepRings([r], dt, (i + 1) * dt);
+    const aci = r.angle, yon = r.dir, sayac = r.t;
+    // Flip sınırının üstünden geri sar, sonra aynı lt dizisiyle ileri gel.
+    for (let j = 0; j < 40; j++) C.stepRings([r], -dt, (90 - j) * dt);
+    assert.equal(r.dir, yon === 1 ? -1 : 1, "40 adim geride flip henuz olmamis olmali");
+    for (let j = 0; j < 40; j++) C.stepRings([r], dt, (51 + j) * dt);
+    yakin(r.angle, aci, 1e-12, `wobble=${wobble}: aci geri gelmeli`);
+    assert.equal(r.dir, yon, `wobble=${wobble}: yon geri gelmeli`);
+    yakin(r.t, sayac, 1e-12, `wobble=${wobble}: sayac geri gelmeli`);
+  }
+});
+
+// İleri adım `r.t`'yi tam 0'a çeker; geri sarmada kayan nokta artığı `r.t`'yi eksiye
+// düşürüp OLMAMIŞ bir flip'i geri aldırıyordu. Eşik 0 değil -1e-9 olmalı.
+test("geri sarma olmamış bir flip icat etmez", () => {
+  const dt = 1 / 120;
+  const r = live({ speed: 1.7, flip: 1.4, start: 0.3 });   // 1,4 sn: 60 adimda flip YOK
+  for (let i = 0; i < 60; i++) C.stepRings([r], dt, (i + 1) * dt);
+  assert.equal(r.dir, 1, "60 adimda (0,5 sn) flip olmamali");
+  for (let j = 0; j < 60; j++) C.stepRings([r], -dt, (60 - j) * dt);
+  assert.equal(r.dir, 1, "hic flip olmadigi icin geri sarmada da yon donmemeli");
+  yakin(r.t, 0, 1e-9, "sayac basa donmeli, tam periyoda atlamamali");
+});
+
 test("flip halkası yön değiştirir", () => {
   const r = live({ speed: 1, flip: 0.5 });
   const dt = 1 / 120;

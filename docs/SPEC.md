@@ -282,16 +282,33 @@ Formüllerin türetilmesi ve sınırların nereden geldiği ayrı bir belgededir
 Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
 
 1. **Aday üretimi.** Her level numarası için o numaraya uygun özelliklerle aday yapılar üretilir: halka sayısı `min(2 + ⌊(n−1)/4⌋, 6)`; iki kapılı halkalar 11'den, yön değiştirenler 12'den, hızlananlar 18'den, baştan kilitliler 6'dan itibaren.
-   **Halka sayısı ritmi.** Yukarıdaki formül 17. levelde 6'ya ulaşıp orada kalırdı; 60 levelin 41'i aynı yapıdaydı. 6'ya ulaşıldıktan sonra halka sayısı `[6, 6, 5, 6, 4, 6, 5, 6]` **kümesinden** seçilir; küme her 8 bölümlük blokta kendi karmasıyla yeniden sıralanır. Dağılım blok blok aynı kalır, sırası öngörülemez. Aynı blok karıştırması arketip rotasyonuna da uygulanır: dizi olarak uygulandıklarında ikisi faz kilitleniyor ve halka sayısını 8 periyotlu yapıyordu (bkz. MATEMATIK §8.4). Daha az halkalı leveller zorluğu kaybetmez: ayarlama adımı boşlukları daraltarak aynı kazanma oranını tutturur, böylece o leveller dayanıklılık yerine hassasiyet ister.
+   **Halka sayısı ritmi.** Yukarıdaki formül 17. levelde 6'ya ulaşıp orada kalırdı; 60 levelin 41'i aynı yapıdaydı. 6'ya ulaşıldıktan sonra halka sayısı `[6, 6, 5, 6, 4, 6, 5, 6]` **kümesinden** seçilir; küme her 8 bölümlük blokta kendi karmasıyla yeniden sıralanır. Dağılım blok blok aynı kalır, sırası öngörülemez. Aynı blok karıştırması arketip rotasyonuna da uygulanır: dizi olarak uygulandıklarında ikisi faz kilitleniyor ve halka sayısını 8 periyotlu yapıyordu (bkz. MATEMATIK §8.4).
+
+   **Arketip halka sayısını ezebilir.** `hassasiyet` arketipi halka sayısını [3,4],
+   `dayaniklilik` [5,6] aralığından kendi seçer ve ritim kümesini tamamen atlar.
+   `ARKETIP_SIRASI`'nın sekiz öğesinin üçü bunlardır, yani n ≥ 60 için bölümlerin
+   yaklaşık **%37,5'inde** halka sayısı ritimden değil arketipten gelir. Bu kasıtlı:
+   o iki arketibin kimliği zaten halka sayısıdır.
+
+   **Hız ekseni (son çare).** Aday araması normalde hızı değiştirmez, çünkü `sizeGaps`
+   boşluğu "tolerans × hız toplamı" ile hesaplar ve τ hızdan bağımsız çıkar. Ama
+   baştan kilitli halkası olan bölümlerde başlangıç kanalına `gerekenPay` taban koyar;
+   o zaman tolerans kolu ölür ve bölüm daha zor olamaz. Bu yüzden arama, **bant
+   dışında kaldığı** turlarda ve **yalnızca kolay yönde** hızı 0,15 adımlarla 1,8
+   katına kadar açar. Bant içinde kalan bölümler ilk turda çıktığı için bu kol onlara
+   hiç dokunmaz. (Aynı kilitlenme `merkez` patronunda elle düzeltildi: hızlar 1,5
+   katına çıkarıldı — bkz. MATEMATIK §8.5.) Daha az halkalı leveller zorluğu kaybetmez: ayarlama adımı boşlukları daraltarak aynı kazanma oranını tutturur, böylece o leveller dayanıklılık yerine hassasiyet ister.
 2. **Hata payı milisaniye cinsinden.** Boşluk genişliği sabit derece değil, tolerans süresinden hesaplanır: `gap = NEED + tolSn × (hareketli halkaların hız toplamı)`. Hızlanan halkaların hızı 1,7 katı sayılır. Böylece hız artsa da insan için hissedilen zorluk kontrol altında kalır.
    **Halka başına genişlik.** Her halkanın kendi `gapScale` çarpanı vardır (0,82 – 1,18): `halkanın gap değeri = min(gap × gapScale, 85°)`. Böylece bir leveldeki halkalar farklı genişlikte olur; dar halka oyuncuya "asıl iş burada" der. Patron levelleri elle tasarlandığı için çarpanları 1'dir. Tavan 85°: daha geniş bir boşlukta halkanın üçte biri çizilmez ve halka gibi durmaz.
 3. **Referans çözücü.** Kusursuz zamanlamalı bir oyuncu: ilk kilidi hemen vurur, kalan hata payını kalan halkalara eşit böler, dokunuşlar arasında en az 0,3 sn bekler. Levelin çözülemediği ya da 16 sn'den uzun sürdüğü adaylar elenir.
 4. **Süre sınırı.** Limit bir tasarım girdisidir, çözücünün çıktısı değil:
    ```
-   tasarımLimiti(n) = (4 + 2 × hareketli halka sayısı) × (1 − 0,22 × (n−1)/59)
-   limit = max(tasarımLimiti(n), çözücü süresi × 1,5 + 1,5)
+   tabanLimit(n)     = (4 + 2 × hareketli halka sayısı) × (1 − 0,22 × min(1, (n−1)/199))
+   tasarımLimiti(n)  = tabanLimit(n) × arketipSüreÇarpanı(n)     // 0,80 – 1,15
+   altSınır          = min(tasarımLimiti(n), γ tavanının izin verdiği limit)
+   limit             = max(altSınır, çözücü süresi × 1,5 + 1,5)
    ```
-   İlk terim kuraldır: süre halka sayısından gelir ve geç levellerde kademeli sıkılaşır (hareketli halka başına ilk on levelde ~3,7 sn, son on levelde ~2,7 sn). İkinci terim yalnızca güvenlik ağıdır — levelin bitirilebilir kalmasını garanti eder. Aday seçiminde, kazanma oranı denk (≤4 puan fark) adaylar arasında çözücünün tasarım limitine rahat sığdığı aday tercih edilir, böylece güvenlik ağı nadiren devreye girer.
+   İlk terim kuraldır: süre halka sayısından gelir ve 200. bölüme kadar kademeli sıkılaşır, sonra sabit kalır. Arketip çarpanı bunu ayrıca eğer: `dayaniklilik` 0,80 ile süreyi kısar, `hassasiyet` 1,15 ile açar. γ tavanı tasarım limitini **keser**: hızlı halkalı bir bölümde tasarım süresi oyuncuya halkaların ikinci turunu bekletirdi, o yüzden orada limit tasarım değerinin altına iner (aday sağlayamıyorsa elenir). İkinci terim yalnızca güvenlik ağıdır — levelin bitirilebilir kalmasını garanti eder. Aday seçiminde, kazanma oranı denk (≤4 puan fark) adaylar arasında çözücünün tasarım limitine rahat sığdığı aday tercih edilir, böylece güvenlik ağı nadiren devreye girer.
    *Neden:* limit eskiden doğrudan çözücü süresinden geliyordu; çözücü "uygun hizalanma ne zaman gelirse" beklediği için bu süre gürültüydü. Sonuçta komşu leveller arasında 15 sn'ye varan sıçramalar oluyor ve ekrandaki en büyük sayı zorluk hakkında ters sinyal veriyordu.
 
    **Ama iki terim de yetmez: limit, oyuncunun saate yenilmediğini göstermek zorundadır.** Her aday, insan benzeri oyuncuyla oynatıldıktan sonra kayıplarının kaç tanesinin "süre doldu" olduğuna bakılır. Denemelerin **%10'undan fazlası** saate yeniliyorsa limit %20 adımlarla açılır (tasarım limitinin en çok 2,2 katına kadar). Aday seçiminde bu ölçütü sağlayan ("temiz") bir aday, hedefe 10 puana kadar daha uzak olsa bile sağlamayanı yener. Doğrulama, denemelerinin dörtte birinden fazlasını saate kaybeden bölümleri sayar ve 20'yi (bölümlerin %2'si) aşarsa hata verir.
@@ -316,7 +333,10 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
    Üç kuralın birlikte sonucu (eski tablo → yeni tablo): saate yenilmenin baskın olduğu bölüm **123 → 4**, γ en yüksek **1,90 → 1,31**, γ ortalama 0,83 → 0,86, en dar boşluk ortalaması **38,8° → 36,1°** (zorluk saatten hassasiyete kaydı), 85° tavanına dayanan bölüm 47 → 9.
 5. **İnsan benzeri oyuncu.** Dokunuşları ortalama 0 ve standart sapma 60 ms olan normal dağılımla sapar; kalan payın %70'ini kullanmaya razıdır. Her aday 50 kez oynatılır.
    **Sapma simetrik uygulanır (zorunlu).** Erken ya da geç dokunuş, tüm halkaları birlikte ileri veya geri sarar — tek halkanın açısını kaydırmak değildir. Aksi halde `wobble` çarpanı ve `flip` sayacı hesaba katılmaz; bu hata bir önceki sürümde kazanma oranını level başına 19 puana kadar şişiriyordu.
-6. **Yön değiştiren halkanın dönüşü görülebilmeli.** Oyuncu dıştan içe gider ve her kilit kabaca 0,6 saniye alır; bir halkanın kilitlenme anı `0,3 + 0,6 × (önündeki hareketli halka sayısı)` olarak tahmin edilir. `flip` yalnızca kilitlenmesi 1,2 saniyeden geç olan halkalara verilir ve periyodu o sürenin %70'ine sığdırılır. Erken kilitlenen halkanın `flip`'i kaldırılır.
+6. **Yön değiştiren halkanın dönüşü görülebilmeli.** Oyuncu dıştan içe gider ve her kilit kabaca **1,27** saniye alır; bir halkanın kilitlenme anı `0,3 + 1,27 × (önündeki hareketli halka sayısı)` olarak tahmin edilir. `flip` yalnızca kilitlenmesi 1,2 saniyeden geç olan halkalara verilir ve periyodu o sürenin %70'ine sığdırılır; erken kilitlenen halkanın `flip`'i kaldırılır.
+   Eğim ölçümle kalibre edildi: referans çözücünün 1000 bölümdeki medyan kilit anları **0,30 / 1,94 / 3,25 / 4,54 / 5,42 / 6,65 sn**. Eski değer (0,6) ilk kilit dışında hepsini yarıdan fazla erken sayıyordu.
+   Tahmin medyana kalibre olduğu için adayların yaklaşık yarısı ondan erken kilitlenir; bu yüzden `finalize` çözücünün **ölçülmüş** kilit anlarına da bakar ve kilidinden önce hiç dönmeyen (`flip ≥ kilit anı`) bir flip'i sıfırlar. Aday elenmez, defter düzeltilir; τ, γ ve fırsat periyodu artık ekranda olan şeyi ölçer.
+   *Sınırı:* bu işlem **referans çözücünün** yörüngesini değiştirmez — sınandı, 832 bölümün 832'sinde kilit anları, süre ve kalan açıklık birebir aynı. Ama zorluğu kalibre eden insan benzeri oyuncu çözücüden farklı anlarda kilitler; kilit tahmin edilenden geç gerçekleşirse orijinal tanımda halka döner, sıfırlanmışta dönmez. Yani bulmaca **değişir**; tutarlılığı sağlayan şey sıfırlamanın `evaluate`'ten ÖNCE yapılması, yani tabloya giren sürümün ölçülen sürümün ta kendisi olmasıdır.
    *Neden:* eski tabloda 68 flip halkasının 55'i (%81) hiç dönmeden kilitleniyordu. İpucu 13. levelde çıkıyor ama dönüş ilk kez 30. levelde, Metronom patronunda görülebiliyordu — oyuncu mekaniği bir patronda, cezayla öğreniyordu. Yeni tabloda bu oran %7 (kalanlar elle tasarlanan patronlar).
 
 7. **Baştan kilitli halkalar için taban pay.** Baştan kilitli halkalar uygulandıktan sonra kalması gereken en az hata payı `6° × (1 + (kalan halka − 1) × 0,5)`'tir. Sağlamayan aday elenir.
@@ -333,7 +353,7 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
 9. **Ayarlama ve zorluk eğrisi.** Her bölüm için tolerans süresi ikili aramayla ayarlanır, böylece kazanma oranı hedef eğriye oturur. Eğri üç parçadan oluşur:
 
    ```
-   taban(n) = 0,94 − 0,59 × min(1, (n−1)/149)^0,45      // %94'ten %35'e, 150. bölümde tabanda
+   taban(n) = 0,94 − 0,59 × min(1, (n−1)/199)^0,45      // %94'ten %35'e, 200. bölümde tabanda
    dalga(n) = 0,08 × sin(2π n / 24)                      // ±8 puan, 24 bölümlük salınım
    nefes(n) = hash{3,4} yürüyüşü, patronda n+1'e kaydırılır
    hedef(n) = taban(n) + (nefes ? 0,12 : dalga(n))        // %25 ile %95 arasına sıkıştırılır
