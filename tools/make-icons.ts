@@ -84,26 +84,28 @@ const HALKALAR = [
 ];
 
 /**
- * @param boyut kenar uzunluğu (piksel)
- * @param olcek içeriğin kapladığı oran; maskable simgelerde güvenli alan için küçültülür
+ * @param boyut genişlik (piksel)
+ * @param olcek içeriğin kapladığı oran (kısa kenara göre); maskable simgelerde güvenli
+ *   alan için küçültülür
+ * @param yukseklik verilmezse kare. Paylaşım önizlemesi ve iOS açılış görselleri dikdörtgen.
  */
-function simgeCiz(boyut: number, olcek: number): Uint8Array {
+function simgeCiz(boyut: number, olcek: number, yukseklik = boyut): Uint8Array {
   const AA = 3;                       // kenar yumuşatma için alt örnekleme
-  const px = new Uint8Array(boyut * boyut * 4);
-  const merkez = boyut / 2;
-  const S = boyut * olcek;
+  const px = new Uint8Array(boyut * yukseklik * 4);
+  const merkez = boyut / 2, merkezY = yukseklik / 2;
+  const S = Math.min(boyut, yukseklik) * olcek;
   const cizgi = S * 0.075;            // halka kalınlığı
   // Oyundaki top oranı simgede çok küçük kalıyor (192 pikselde ~4 piksel yarıçap);
   // simge küçük boyutlarda da okunmalı, bu yüzden odak noktası büyütüldü.
   const topR = S * 0.115;
 
-  for (let y = 0; y < boyut; y++) {
+  for (let y = 0; y < yukseklik; y++) {
     for (let x = 0; x < boyut; x++) {
       let rT = 0, gT = 0, bT = 0;
       for (let ay = 0; ay < AA; ay++) {
         for (let ax = 0; ax < AA; ax++) {
           const px0 = x + (ax + 0.5) / AA - merkez;
-          const py0 = y + (ay + 0.5) / AA - merkez;
+          const py0 = y + (ay + 0.5) / AA - merkezY;
           const uzaklik = Math.hypot(px0, py0);
           const aci = Math.atan2(py0, px0);
 
@@ -171,6 +173,16 @@ for (const [ad, boyut, olcek] of isler) {
   const veri = png(boyut, boyut, simgeCiz(boyut, olcek));
   fs.writeFileSync(path.join(CIKTI, ad), veri);
   console.log(`${ad.padEnd(24)} ${boyut}×${boyut}  ${(veri.length / 1024).toFixed(1)} kB`);
+}
+
+// Paylaşım önizlemesi (Open Graph / Twitter): 1200×630, bağlantı WhatsApp, X, Telegram
+// gibi yerlerde paylaşıldığında görünen görsel. Metin yok: başlık ve açıklama
+// etiketlerden gelir ve iki dilde okunur; görselde yazı olsaydı tek dilde kalırdı.
+{
+  const [G, Y] = [1200, 630];
+  const veri = png(G, Y, simgeCiz(G, 0.62, Y));
+  fs.writeFileSync(path.join(CIKTI, "og.png"), veri);
+  console.log(`${"og.png".padEnd(24)} ${G}×${Y}  ${(veri.length / 1024).toFixed(1)} kB`);
 }
 
 fs.writeFileSync(path.join(CIKTI, "icon.svg"), simgeSvg());

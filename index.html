@@ -8,6 +8,23 @@
 <!-- Statik dosyalar tek dillidir: oyunun kendisi cihaz diline göre gelir, bu etiket
      yalnızca paylaşım önizlemesi ve arama için. Küresel pazar: İngilizce. -->
 <meta name="description" content="Dönence: a one-tap puzzle game. Lock the spinning rings, keep the ball a way out.">
+<!-- Paylaşım önizlemesi (Open Graph, X). Bağlantı WhatsApp, X, Telegram gibi yerlerde
+     resimli ve açıklamalı görünsün. Görsel `npm run icons` ile oyunun geometrisinden
+     üretilir (public/og.png). og:image MUTLAK adres ister; bu adresi tarayıcı değil,
+     bağlantıyı önizleyen uygulama okur, yani oyuncu adına dış istek doğmaz.
+     ALAN ADI DEĞİŞİRSE bu iki adres güncellenmeli. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Dönence">
+<meta property="og:title" content="Dönence — one-tap ring puzzle">
+<meta property="og:description" content="Lock the spinning rings one by one and keep the ball a way out. 1000 levels, no ads, works offline.">
+<meta property="og:url" content="https://d-nence.vercel.app/">
+<meta property="og:image" content="https://d-nence.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Concentric rings with gaps around a yellow ball">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="tr_TR">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <!-- iOS'ta ana ekrandan açılınca tarayıcı çubuğu olmadan, tam ekran çalışsın -->
