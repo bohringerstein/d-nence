@@ -157,33 +157,61 @@ function simgeSvg(): string {
 }
 
 // ---- Üretim ------------------------------------------------------------------
-fs.mkdirSync(CIKTI, { recursive: true });
-
-const isler: Array<[string, number, number]> = [
-  // [dosya, boyut, içerik ölçeği]
-  ["icon-192.png", 192, 0.42],
-  ["icon-512.png", 512, 0.42],
-  // Maskable: güvenli alan simgenin ortadaki %80'i; içerik küçültülür ki kırpılmasın.
-  ["icon-maskable-512.png", 512, 0.33],
-  // iOS ana ekran simgesi
-  ["apple-touch-icon.png", 180, 0.42]
+// iOS açılış görselleri. iOS, ana ekrandan açılan web uygulamasında manifest'teki açılış
+// rengini KULLANMAZ; `apple-touch-startup-image` yoksa kısa bir beyaz ekran gösterir.
+// Görsel cihazın piksel ölçüsüne birebir uymak zorunda, yoksa hiç gösterilmez; bu yüzden
+// her ölçü ayrı. Liste index.html'deki <link> etiketleriyle eşleşir (bkz. layout.test.ts).
+// Servis çalışanının önbelleğine ALINMAZ (vite.config.ts globIgnores): çevrimdışı
+// önbelleği ~1 MB şişirirdi ve iOS bu görseli zaten kendisi saklar.
+export const ACILIS_GORSELLERI: Array<[number, number, number, number, number]> = [
+  // [piksel genişlik, piksel yükseklik, CSS genişlik, CSS yükseklik, piksel oranı]
+  [1320, 2868, 440, 956, 3], [1290, 2796, 430, 932, 3], [1284, 2778, 428, 926, 3],
+  [1242, 2688, 414, 896, 3], [1206, 2622, 402, 874, 3], [1179, 2556, 393, 852, 3],
+  [1170, 2532, 390, 844, 3], [1125, 2436, 375, 812, 3], [828, 1792, 414, 896, 2],
+  [750, 1334, 375, 667, 2], [2048, 2732, 1024, 1366, 2], [1668, 2388, 834, 1194, 2],
+  [1640, 2360, 820, 1180, 2], [1620, 2160, 810, 1080, 2]
 ];
 
-for (const [ad, boyut, olcek] of isler) {
-  const veri = png(boyut, boyut, simgeCiz(boyut, olcek));
-  fs.writeFileSync(path.join(CIKTI, ad), veri);
-  console.log(`${ad.padEnd(24)} ${boyut}×${boyut}  ${(veri.length / 1024).toFixed(1)} kB`);
-}
+// Yalnız doğrudan çalıştırılınca (`npm run icons`): içe aktarmak hiçbir dosyayı yazmamalı.
+// Testler açılış görseli listesini buradan okuyor.
+if (import.meta.main) {
+  fs.mkdirSync(CIKTI, { recursive: true });
 
-// Paylaşım önizlemesi (Open Graph / Twitter): 1200×630, bağlantı WhatsApp, X, Telegram
-// gibi yerlerde paylaşıldığında görünen görsel. Metin yok: başlık ve açıklama
-// etiketlerden gelir ve iki dilde okunur; görselde yazı olsaydı tek dilde kalırdı.
-{
-  const [G, Y] = [1200, 630];
-  const veri = png(G, Y, simgeCiz(G, 0.62, Y));
-  fs.writeFileSync(path.join(CIKTI, "og.png"), veri);
-  console.log(`${"og.png".padEnd(24)} ${G}×${Y}  ${(veri.length / 1024).toFixed(1)} kB`);
-}
+  const isler: Array<[string, number, number]> = [
+    // [dosya, boyut, içerik ölçeği]
+    ["icon-192.png", 192, 0.42],
+    ["icon-512.png", 512, 0.42],
+    // Maskable: güvenli alan simgenin ortadaki %80'i; içerik küçültülür ki kırpılmasın.
+    ["icon-maskable-512.png", 512, 0.33],
+    // iOS ana ekran simgesi
+    ["apple-touch-icon.png", 180, 0.42]
+  ];
 
-fs.writeFileSync(path.join(CIKTI, "icon.svg"), simgeSvg());
-console.log("icon.svg".padEnd(24) + " ölçekten bağımsız");
+  for (const [ad, boyut, olcek] of isler) {
+    const veri = png(boyut, boyut, simgeCiz(boyut, olcek));
+    fs.writeFileSync(path.join(CIKTI, ad), veri);
+    console.log(`${ad.padEnd(24)} ${boyut}×${boyut}  ${(veri.length / 1024).toFixed(1)} kB`);
+  }
+
+  // iOS açılış görselleri (liste yukarıda).
+  for (const [g, y] of ACILIS_GORSELLERI) {
+    const ad = `apple-splash-${g}x${y}.png`;
+    // İçerik kısa kenarın %34'ü: simge ortada, küçük; açılışta göz yormasın.
+    const veri = png(g, y, simgeCiz(g, 0.34, y));
+    fs.writeFileSync(path.join(CIKTI, ad), veri);
+    console.log(`${ad.padEnd(30)} ${(veri.length / 1024).toFixed(1)} kB`);
+  }
+
+  // Paylaşım önizlemesi (Open Graph / Twitter): 1200×630, bağlantı WhatsApp, X, Telegram
+  // gibi yerlerde paylaşıldığında görünen görsel. Metin yok: başlık ve açıklama
+  // etiketlerden gelir ve iki dilde okunur; görselde yazı olsaydı tek dilde kalırdı.
+  {
+    const [G, Y] = [1200, 630];
+    const veri = png(G, Y, simgeCiz(G, 0.62, Y));
+    fs.writeFileSync(path.join(CIKTI, "og.png"), veri);
+    console.log(`${"og.png".padEnd(24)} ${G}×${Y}  ${(veri.length / 1024).toFixed(1)} kB`);
+  }
+
+  fs.writeFileSync(path.join(CIKTI, "icon.svg"), simgeSvg());
+  console.log("icon.svg".padEnd(24) + " ölçekten bağımsız");
+}

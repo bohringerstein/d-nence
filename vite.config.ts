@@ -75,6 +75,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg,json,webmanifest,woff2}"],
+        // iOS açılış görselleri (~350 kB) önbelleğe alınmaz: iOS onları kendisi saklar ve
+        // çevrimdışı önbelleği şişirmenin karşılığı yok. Paylaşım görseli de oyunun
+        // içinde hiç gösterilmiyor.
+        globIgnores: ["**/apple-splash-*.png", "**/og.png"],
         // 1000 bölümlük tablo 643 KB. Sınır 1 MB: tablo sessizce şişerse derleme
         // uyarı versin. 4 MB "geniş" bir ayardı, doğru bir ayar değil.
         maximumFileSizeToCacheInBytes: 1024 * 1024,
