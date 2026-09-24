@@ -1,0 +1,34 @@
+/* Gizlilik sayfasının stili. Satır içi değil: site sıkı bir CSP ile sunulur
+   (style-src 'self'; bkz. vercel.json), satır içi <style> engellenirdi. */
+  :root {
+    color-scheme: light dark;
+    --bg: #E9EEF0; --ink: #1D3440; --muted: #5A6E79; --cizgi: #C9D4D9; --vurgu: #B07800;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #13232B; --ink: #E7EFF2; --muted: #9FB2BB; --cizgi: #2B3F49; --vurgu: #E89B00; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 64px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 42rem; margin: 0 auto; }
+  h1 { font-size: 1.6rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1.25rem; margin: 2.5rem 0 0.75rem; padding-top: 1.5rem; border-top: 1px solid var(--cizgi); }
+  h3 { font-size: 1rem; margin: 1.75rem 0 0.4rem; }
+  p, li { color: var(--muted); }
+  li { margin-bottom: 0.4rem; }
+  strong { color: var(--ink); font-weight: 600; }
+  .tarih { font-size: 0.9rem; color: var(--muted); margin-bottom: 0; }
+  .ozet {
+    border-left: 3px solid var(--vurgu);
+    padding: 0.25rem 0 0.25rem 1rem;
+    margin: 1.5rem 0;
+  }
+  .ozet p { color: var(--ink); margin: 0; }
+  a { color: var(--ink); }
+  .geri { font-size: 0.9rem; margin: 0 0 1.5rem; }
+  footer { margin-top: 3rem; font-size: 0.9rem; color: var(--muted); }
