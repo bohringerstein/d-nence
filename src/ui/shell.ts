@@ -31,6 +31,7 @@ export interface Kabuk {
   kazanc: HTMLElement;
   kazancSatir1: HTMLElement;
   kazancSatir2: HTMLElement;
+  kazancSatir3: HTMLElement;
   duraklat: HTMLElement;
   duraklatMetin: HTMLElement;
   devamDugme: HTMLButtonElement;
@@ -127,6 +128,7 @@ export const html = (m: Metinler): string => `
         <div class="kazancYildiz"><i></i><i></i><i></i></div>
         <p class="kazancSatir" id="kazancSatir1"></p>
         <p class="kazancSatir kazancAlt" id="kazancSatir2"></p>
+        <p class="kazancSatir kazancToplam" id="kazancSatir3"></p>
       </div>
     </div>
   </div>
@@ -327,6 +329,7 @@ export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): 
     kazanc: bul(hedef, "kazanc"),
     kazancSatir1: bul(hedef, "kazancSatir1"),
     kazancSatir2: bul(hedef, "kazancSatir2"),
+    kazancSatir3: bul(hedef, "kazancSatir3"),
     duraklat: bul(hedef, "duraklat"),
     duraklatMetin: bul(hedef, "duraklatMetin"),
     devamDugme: bul<HTMLButtonElement>(hedef, "devamDugme"),

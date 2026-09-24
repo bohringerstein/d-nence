@@ -93,6 +93,8 @@ export const TR: Metinler = {
   yildizSesli: (yildiz) => `3 üzerinden ${yildiz} yıldız`,
   sonucSatiri: (etiket, yildiz, sure) => `${etiket} ${yildiz} ${sure} sn`,
   saniyeKisa: "sn",
+  toplamYildizSatiri: (yildiz, enCok) => `Toplam ${yildiz} / ${enCok} yıldız`,
+  kilometreTasi: bolum => `${bolum} bölüm geride kaldı!`,
   yildizaKalan: (yildiz, yuzde) => ` · ${yildiz} yıldıza %${yuzde} kaldı`,
   rekorEki: ", rekor",
 

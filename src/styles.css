@@ -467,6 +467,9 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 .kazancSatir { margin: 0.5rem 0 0; font-size: 1rem; font-weight: 600; color: var(--ink); }
 .kazancAlt { margin-top: 0.2rem; font-size: 0.85rem; font-weight: 400; color: var(--muted); }
 .kazancAlt:empty { display: none; }
+/* Birikim her kazançta görünür: toplam yıldız eskiden yalnız Ayarlar'daydı. */
+.kazancToplam { margin-top: 0.45rem; font-size: 0.8rem; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.kazancToplam.tas { font-size: 0.95rem; font-weight: 600; color: var(--ink); }
 .kazanc.azalt .kazancYildiz i.dolu { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .kazanc { transition: none; }

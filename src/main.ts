@@ -326,7 +326,9 @@ const KAZANC_GECIKME = 0.5;
  * bir çift dokunuşun ikincisi, yeni bölümün ilk halkasını yanlışlıkla kilitlemesin.
  */
 const ATLAMA_KORUMASI = 0.2;
-let kazancVeri: { yildiz: number; satir1: string; satir2: string } | null = null;
+/** Her bu kadar bölümde bir kilometre taşı: bölüm İLK kez bitirilince kutlanır. */
+const KILOMETRE_TASI = 50;
+let kazancVeri: { yildiz: number; satir1: string; satir2: string; satir3: string; tas: boolean } | null = null;
 let kazancGorunur = false;
 let girdiYoksay = 0;
 
@@ -344,6 +346,8 @@ function kazancGuncelle(): void {
   ui.kazanc.querySelectorAll("i").forEach((y, i) => y.classList.toggle("dolu", i < kazancVeri!.yildiz));
   ui.kazancSatir1.textContent = kazancVeri.satir1;
   ui.kazancSatir2.textContent = kazancVeri.satir2;
+  ui.kazancSatir3.textContent = kazancVeri.satir3;
+  ui.kazancSatir3.classList.toggle("tas", kazancVeri.tas);
   ui.kazanc.classList.toggle("azalt", azalt);
   ui.kazanc.classList.add("aktif");
 }
@@ -370,7 +374,11 @@ function dokunusIsle(gercekZaman: number): void {
       titret(ayarlar, "acildi"); cal(ayarlar, "acildi");
       const rekor = rekorKaydet(kayit, durum.level.n, yeni);
       kaliciKayitIste();
+      const tas = !oncekiVardi && durum.level.n % KILOMETRE_TASI === 0;
+      const b = bitirilenLevel(kayit);
       kazancVeri = {
+        tas,
+        satir3: tas ? M.kilometreTasi(durum.level.n) : M.toplamYildizSatiri(toplamYildiz(kayit), b * 3),
         yildiz: sonuc.yildiz,
         satir1: `${M.yildizEtiketi[sonuc.yildiz]} · ${sureYazisi(sonuc.sure, M)} ${M.saniyeKisa}`,
         satir2: (kalanYazisi(sonuc.q, tablo.q3, tablo.q2, M).replace(/^\s*·\s*/, "") +
@@ -378,7 +386,9 @@ function dokunusIsle(gercekZaman: number): void {
       };
       yazKoru(M.sonucSatiri(M.yildizEtiketi[sonuc.yildiz], yildizYazisi(sonuc.yildiz), sureYazisi(sonuc.sure, M)) +
           kalanYazisi(sonuc.q, tablo.q3, tablo.q2, M) +
-          (rekor && oncekiVardi ? M.rekorEki : ""));
+          (rekor && oncekiVardi ? M.rekorEki : "") +
+          // Kilometre taşı ekran okuyucuya da söylenir; sahne aria-hidden.
+          (tas ? " · " + M.kilometreTasi(durum.level.n) : ""));
       return;
     }
     if (sonuc.tip === "yok") return;

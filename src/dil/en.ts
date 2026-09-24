@@ -105,6 +105,8 @@ export const EN: Metinler = {
   yildizSesli: (yildiz) => `${yildiz} of 3 stars`,
   sonucSatiri: (etiket, yildiz, sure) => `${etiket} ${yildiz} ${sure} s`,
   saniyeKisa: "s",
+  toplamYildizSatiri: (yildiz, enCok) => `${yildiz} / ${enCok} stars in total`,
+  kilometreTasi: bolum => `${bolum} levels behind you!`,
   yildizaKalan: (yildiz, yuzde) => ` · ${yuzde}% short of ${yildiz} stars`,
   rekorEki: ", new best",
 

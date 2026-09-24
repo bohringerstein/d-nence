@@ -141,6 +141,10 @@ export interface Metinler {
   yildizEtiketi: Record<Stars, string>;
   /** Saniyenin kısaltması (kazanma sahnesi). */
   saniyeKisa: string;
+  /** Kazanma sahnesinde toplam birikim. */
+  toplamYildizSatiri: (yildiz: number, enCok: number) => string;
+  /** Her 50 bölümde bir, bölüm İLK kez bitirilince: kilometre taşı. */
+  kilometreTasi: (bolum: number) => string;
   /** ★☆☆ gliflerinin ekran okuyucu karşılığı. Glifler okunmaz ya da "siyah yıldız" diye okunur. */
   yildizSesli: (yildiz: number) => string;
   sonucSatiri: (etiket: string, yildiz: string, sure: string) => string;
