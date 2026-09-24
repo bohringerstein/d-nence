@@ -38,7 +38,9 @@ export function nasilHtml(m: Metinler): string {
   return `
 <h2 id="nasilBaslik" tabindex="-1">${m.nasil.baslik}</h2>
 
-<p class="giris">${m.nasil.giris}</p>
+<p class="giris kisaGiris">${m.nasil.kisaGiris}</p>
+
+<p class="giris tamGiris">${m.nasil.giris}</p>
 
 <ul class="gosterge">
   ${satirlar}
@@ -46,6 +48,8 @@ export function nasilHtml(m: Metinler): string {
 
 <p class="giris yildizNot">${m.nasil.yildizlar}</p>
 
-<p class="uyari">${m.nasil.uyari}</p>
+<p class="uyari kisaUyari">${m.nasil.kisaUyari}</p>
+
+<p class="uyari tamUyari">${m.nasil.uyari}</p>
 `;
 }

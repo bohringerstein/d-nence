@@ -118,6 +118,11 @@ export interface CizimSecenekleri {
   hareketAzalt: boolean;
   /** Kilitsiz halkaların opaklığı. "Deseni yumuşat" açıkken düşer (bkz. game/ayarlar.ts). */
   halkaOpakligi: number;
+  /**
+   * Arka plandaki bölüm numarası çizilmesin. Geri sayım sırasında: sayımın büyük rakamı
+   * ("3") soluk bölüm numarasının ("1") tam üstüne düşüyor ve ikisi üst üste okunuyordu.
+   */
+  numaraGizle?: boolean;
 }
 
 /** Kareden kareye değişmeyen çizim nesneleri, bağlam başına. */
@@ -132,7 +137,7 @@ function onbellekAl(ctx: CanvasRenderingContext2D): CizimOnbellegi {
   return o;
 }
 
-export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halkaOpakligi }: CizimSecenekleri): void {
+export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halkaOpakligi, numaraGizle = false }: CizimSecenekleri): void {
   const { ctx, W, H } = t;
   if (W === 0 || H === 0) return;
   const g = t.yerlesim(s.rings.length);
@@ -185,12 +190,14 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
     ob.font = `600 ${punto}px Fredoka, "Trebuchet MS", sans-serif`;
   }
   ctx.font = ob.font;
-  ctx.globalAlpha = s.level.boss ? 0.14 : 0.07;
-  ctx.fillStyle = s.level.boss ? renk.ball : renk.ink;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(metin, 0, g.S * 0.03);
-  ctx.globalAlpha = 1;
+  if (!numaraGizle) {
+    ctx.globalAlpha = s.level.boss ? 0.14 : 0.07;
+    ctx.fillStyle = s.level.boss ? renk.ball : renk.ink;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(metin, 0, g.S * 0.03);
+    ctx.globalAlpha = 1;
+  }
 
   const delikDis = g.ballR * 4;
   // Gradyan merkeze (0,0) göre tanımlı; çevirme çizim anında uygulandığı için aynı

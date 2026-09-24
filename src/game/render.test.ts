@@ -17,9 +17,10 @@ interface Kontur {
   enYakin: number;
 }
 
-function sahteTuval(): { tuval: Tuval; dolgular: Dolgu[]; konturlar: Kontur[] } {
+function sahteTuval(): { tuval: Tuval; dolgular: Dolgu[]; konturlar: Kontur[]; yazilar: string[] } {
   const dolgular: Dolgu[] = [];
   const konturlar: Kontur[] = [];
+  const yazilar: string[] = [];
   let kesikli = false;
   let yol: number[] = [];
   const ctx = {
@@ -31,7 +32,7 @@ function sahteTuval(): { tuval: Tuval; dolgular: Dolgu[]; konturlar: Kontur[] } 
     moveTo(x: number, y: number) { yol.push(Math.hypot(x, y)); },
     lineTo(x: number, y: number) { yol.push(Math.hypot(x, y)); },
     arc(_x: number, _y: number, r: number) { yol.push(r); },
-    rect() {}, clearRect() {}, fillRect() {}, fillText() {},
+    rect() {}, clearRect() {}, fillRect() {}, fillText(t: string) { yazilar.push(t); },
     measureText: (t: string) => ({ width: t.length * 20 }),
     createRadialGradient: () => ({ addColorStop() {} }),
     setLineDash(d: number[]) { kesikli = d.length > 0; },
@@ -48,7 +49,7 @@ function sahteTuval(): { tuval: Tuval; dolgular: Dolgu[]; konturlar: Kontur[] } 
     yerlesim: (n: number) => layout(400, 700, n),
     boyutla() {}, birak() {}, sonYari: 0
   } as unknown as Tuval;
-  return { tuval, dolgular, konturlar };
+  return { tuval, dolgular, konturlar, yazilar };
 }
 
 const RENK = { bg: "#E9EEF0", ink: "#1D3440", ball: "#E89B00", fail: "#E5484D", win: "#2E9E6A", muted: "#5A6E79" };
@@ -188,4 +189,13 @@ test("kama konturu halkaların içine girmez (merkezden çıkan 'tel' yok)", () 
         `${acik} dilim: kontur merkeze ${x.enYakin.toFixed(1)} px kadar giriyor (dış halka ${yer.outer.toFixed(1)})`);
     }
   }
+});
+
+test("geri sayım sırasında arka plandaki bölüm numarası çizilmez", () => {
+  const a = sahteTuval();
+  ciz(a.tuval, createLevel(level(), 1), RENK, SECENEK);
+  assert.ok(a.yazilar.includes("5"), "normalde bölüm numarası çizilmeli");
+  const b = sahteTuval();
+  ciz(b.tuval, createLevel(level(), 1), RENK, { ...SECENEK, numaraGizle: true });
+  assert.ok(!b.yazilar.includes("5"), "geri sayımda numara sayımın rakamıyla üst üste binmemeli");
 });

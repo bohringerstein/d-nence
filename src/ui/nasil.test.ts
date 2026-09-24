@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { nasilHtml } from "./nasil.ts";
 import { TR } from "../dil/tr.ts";
+import { EN } from "../dil/en.ts";
 
 const css = fs.readFileSync(
   path.join(import.meta.dirname, "..", "styles.css"), "utf8");
@@ -88,4 +89,20 @@ test("simgeler tema değişkenlerini kullanıyor, sabit renk gömülü değil", 
 test("simgeler ekran okuyucudan gizli", () => {
   const svgler = NASIL_HTML.match(/<svg[^>]*>/g) || [];
   for (const s of svgler) assert.ok(s.includes('aria-hidden="true"'), `simge gizlenmemiş: ${s}`);
+});
+
+test("ilk açılış kartı: kısa kural ve kısa uyarı görünür, tam metin ve gösterge gizli", () => {
+  for (const kural of [".nasilKutu.kisa .tamGiris", ".nasilKutu.kisa .tamUyari", ".nasilKutu.kisa .gosterge",
+    ".nasilKutu:not(.kisa) .kisaGiris", ".nasilKutu:not(.kisa) .kisaUyari"]) {
+    assert.ok(css.includes(kural), `eksik kural: ${kural}`);
+  }
+  for (const m of [TR, EN]) {
+    const h = nasilHtml(m);
+    assert.ok(h.includes('class="uyari kisaUyari"') && h.includes('class="uyari tamUyari"'));
+    // Kısa uyarı üç şeyi söylemeli: risk, iki ayarın ADI (Ayarlar'daki etiketle birebir), bırakma.
+    const u = m.nasil.kisaUyari;
+    assert.ok(u.includes(m.desen.baslik) && u.includes(m.hareket.baslik), `${m.kod}: iki ayar adı geçmeli`);
+    assert.ok(/bırak|stop playing/.test(u), `${m.kod}: rahatsızlıkta bırakmayı söylemeli`);
+    assert.ok(/parlama|flash/.test(u), `${m.kod}: ekran parlamasını adlandırmalı`);
+  }
 });

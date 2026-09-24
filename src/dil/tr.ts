@@ -18,6 +18,7 @@ export const TR: Metinler = {
   bastanBaslaAciklama: "1. bölüme döner ve açtığın bölümler kilitlenir. Yıldızların kalır.",
   bastanBaslaOnay: level => `Emin misin? ${level}. bölüme kadar açtıkların kilitlenir`,
   anladim: "Anladım",
+  oyna: "Oyna",
 
   bolumSec: "Bölüm seç",
   bolumSecAciklama: "Açtığın her bölüme dönebilirsin. İlerlemen bozulmaz.",
@@ -138,7 +139,10 @@ genişse o kadar yıldız alırsın. Hızlı bitirmek tek başına yıldız kaza
 eşit yıldızda rekoru belirler.`,
     uyari: `Dönence'de iç içe dönen halkalar var. Işığa duyarlı epilepsi ya da desenlerden
 rahatsız olma geçmişin varsa, <b>Ayarlar</b>'dan &ldquo;Deseni yumuşat&rdquo; seçeneğini açabilir
-ve ara vererek oynayabilirsin.`
+ve ara vererek oynayabilirsin. Kayıptaki sarsıntıyı ve ekran parlamasını &ldquo;Hareketi azalt&rdquo;
+kapatır. Rahatsızlık duyarsan oynamayı bırak.`,
+    kisaGiris: `Dokun: halkalar <b>dıştan içe</b> sırayla kilitlenir. <b>Sarı kama</b> topun çıkış yolu; her kilit onu daraltır. Kapanmadan tüm halkaları kilitle.`,
+    kisaUyari: `Dönen halka deseni ve kısa ekran parlaması içerir. Işığa ya da desenlere duyarlıysan <b>Ayarlar</b>'dan &ldquo;Deseni yumuşat&rdquo; ve &ldquo;Hareketi azalt&rdquo;ı aç; rahatsızlık duyarsan oynamayı bırak.`
   },
 
   rekorlarYenilendi: "Bölümler güncellendi: ilerlemen yerinde, yıldız rekorları sıfırlandı",

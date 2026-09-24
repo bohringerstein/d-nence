@@ -51,6 +51,8 @@ export interface Metinler {
   /** İlk basıştan sonra düğmenin aldığı hal: hangi bölümün kaybolacağını söyler. */
   bastanBaslaOnay: (level: number) => string;
   anladim: string;
+  /** İlk açılış kartının düğmesi. */
+  oyna: string;
 
   // ---- Bölüm seçimi ----
   bolumSec: string;
@@ -156,6 +158,14 @@ export interface Metinler {
     satir: Record<GostergeAnahtari, { baslik: string; metin: string }>;
     yildizlar: string;
     uyari: string;
+    /** İlk açılış kartının tek cümlelik kuralı (tam anlatım Ayarlar'dan açılır). */
+    kisaGiris: string;
+    /**
+     * İlk açılış kartındaki ışığa duyarlılık uyarısı. Kısa ama üç şeyi söylemek zorunda:
+     * riski adlandırır (desen + parlama), yapılacak işi söyler (iki ayar), rahatsızlıkta
+     * oynamayı bırakmasını söyler.
+     */
+    kisaUyari: string;
   };
 
   // ---- Hata ekranı ----

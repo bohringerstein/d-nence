@@ -28,6 +28,7 @@ export const EN: Metinler = {
   bastanBaslaAciklama: "Goes back to level 1 and locks the levels you opened. Your stars stay.",
   bastanBaslaOnay: level => `Are you sure? You will lose level ${level}`,
   anladim: "Got it",
+  oyna: "Play",
 
   bolumSec: "Choose a level",
   bolumSecAciklama: "You can go back to any level you have opened. Your progress stays.",
@@ -150,7 +151,10 @@ vault opens, the more stars you get. Finishing fast earns no stars on its own; t
 breaks ties between equal stars.`,
     uyari: `Dönence has rings turning inside one another. If you have photosensitive epilepsy
 or a history of discomfort from patterns, you can turn on &ldquo;Soften the pattern&rdquo; in
-<b>Settings</b> and take breaks while you play.`
+<b>Settings</b> and take breaks while you play. &ldquo;Reduce motion&rdquo; turns off the shake and
+screen flash on a loss. Stop playing if you feel unwell.`,
+    kisaGiris: `Tap: the rings lock one by one, <b>outside in</b>. The <b>yellow wedge</b> is the ball's way out; every lock narrows it. Lock every ring before it closes.`,
+    kisaUyari: `Contains a rotating ring pattern and a brief screen flash. If you are sensitive to light or patterns, turn on &ldquo;Soften the pattern&rdquo; and &ldquo;Reduce motion&rdquo; in <b>Settings</b>, and stop playing if you feel unwell.`
   },
 
   rekorlarYenilendi: "Levels updated: your progress is kept, star records were reset",

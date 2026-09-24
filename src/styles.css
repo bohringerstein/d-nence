@@ -500,6 +500,17 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 }
 .nasilKutu.kisa .yildizNot { display: none; }
 
+/* İlk açılış bir KART: tek cümlelik kural, kısa ışığa duyarlılık uyarısı ve "Oyna".
+   Yayın öncesi incelemede ilk ekran "metin duvarı" bulundu: oyuncu ilk dokunuşa ~10 sn
+   sonra varıyordu. Tam anlatım ve tam uyarı Ayarlar → Nasıl oynanır'da. Kısa uyarının
+   metni erişilebilirlik incelemesiyle yazıldı: riski adlandırır, iki ayarı söyler,
+   rahatsızlıkta bırakmayı söyler. */
+.nasilKutu.kisa .tamGiris,
+.nasilKutu.kisa .tamUyari,
+.nasilKutu.kisa .gosterge { display: none; }
+.nasilKutu:not(.kisa) .kisaGiris,
+.nasilKutu:not(.kisa) .kisaUyari { display: none; }
+
 /* Kısaltmanın YAN ETKİSİ: uyarı en altta olduğu için, satırlar gizlenince bile
    320x568 bir telefonda görünen alanın altında kalıyordu (metin 529 pikselde
    başlıyor, görünen alan 512'de bitiyor) — üstelik "Anladım" düğmesi görünüyordu.

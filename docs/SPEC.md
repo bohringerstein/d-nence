@@ -268,7 +268,7 @@ Desen üç ölçütü işaretliyor ama en belirleyicisini kaçırıyor: telefond
 
 Bunun üzerine iki şey zorunludur:
 
-1. **İlk açılışta bir kez uyarı gösterilir** ve ayarlar paneliyle birlikte sunulur. Panel açıkken **oyun durur**: uyarıyı okumak oyuncunun süresini yakmamalıdır.
+1. **İlk açılışta bir kez uyarı gösterilir.** İlk açılış bir karttır: tek cümlelik kural, kısa uyarı ve "Oyna" düğmesi (eskiden tam anlatım + gösterge + uzun uyarı açılıyordu; oyuncu ilk dokunuşa ~10 sn sonra varıyordu). Kısa uyarı üç şeyi söyler: riski adlandırır (dönen desen, kısa parlama), iki ayarı adıyla söyler ("Deseni yumuşat", "Hareketi azalt") ve rahatsızlıkta oynamayı bırakmasını söyler. Tam metin Ayarlar → Nasıl oynanır'dadır. Kart yalnız düğmeyle kapanır. Geri sayım sırasında arka plandaki bölüm numarası çizilmez; sayımın rakamıyla üst üste biniyordu. Panel açıkken **oyun durur**: uyarıyı okumak oyuncunun süresini yakmamalıdır.
 2. **"Deseni yumuşat" ayarı** kilitsiz halkaların opaklığını 0,40'tan 0,25'e indirir. Ölçülen etki: açık temada halka/zemin kontrastı 0,40 → **0,24** (eşiğin altına iner), koyu temada 0,82 → 0,69. Koyu temada eşiğin altına inmek halkaları oynanamayacak kadar görünmez yapardı; açık-üstüne-koyu çizim doğası gereği yüksek kontrastlıdır ve bu dürüstçe kabul edilir. Cihazı koyu temada olan ışığa duyarlı oyuncu artık oyunu elle **Açık** temaya alıp yumuşatmayı açarak eşiğin altına inebilir.
 
 Ayrıca **"Hareketi azalt"** ayarı, sistem tercihinden bağımsız olarak sarsıntıyı ve flaşı kapatır (ikisinden biri açıksa kapalıdır).

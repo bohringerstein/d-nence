@@ -305,7 +305,7 @@ function saatiGuncelle(): void {
 
 let sonFlas = -1;
 function cizVeYaz(): void {
-  ciz(tuval, durum, renk, { hareketAzalt: azalt, halkaOpakligi: halkaOpakligi(ayarlar) });
+  ciz(tuval, durum, renk, { hareketAzalt: azalt, halkaOpakligi: halkaOpakligi(ayarlar), numaraGizle: geriSayim > 0 });
   // Flaş canvas yerine ayrı bir katmanda: tam ekran dolgu geniş ekranda 4 ms tutuyordu.
   const f = azalt ? 0 : durum.flash * 0.18;
   if (f !== sonFlas) {
@@ -648,6 +648,7 @@ ui.ayarAc.addEventListener("click", e => { e.stopPropagation(); if (mod !== "bit
 function nasilAc(kisa = false): void {
   mod = "panel";
   ui.nasilIcerik.classList.toggle("kisa", kisa);
+  ui.nasilKapat.textContent = kisa ? M.oyna : M.anladim;
   ui.ayarPanel.hidden = true;
   // Önce odak (kaydırmadan), sonra başa sar: ters sırada tarayıcı kutuyu aşağı kaydırıyor.
   // Odak başlıkta, kapatma düğmesinde değil: düğme en altta ve oradan Tab, metnin
