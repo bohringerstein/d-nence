@@ -225,3 +225,16 @@ test("dil değişimiyle yenilemeden önce devam noktası yazılıyor", () => {
   const yaz = govde.indexOf("devamNoktasiYaz("), yenile = govde.indexOf("location.reload()");
   assert.ok(yaz >= 0 && yenile > yaz, "devamNoktasiYaz, location.reload'dan önce çağrılmalı");
 });
+
+test("kazanma sahnesi: dokunuş atlatır, atlatan dokunuş yeni bölüme geçmez", () => {
+  const govde = main.slice(main.indexOf("function dokunusIsle("), main.indexOf("// ---- Döngü"));
+  const ates = govde.indexOf('if (durum.asama === "fire")');
+  assert.ok(ates >= 0 && govde.slice(ates, ates + 200).includes("durum.endTimer = 0"),
+    "kazanç aşamasında dokunuş sahneyi bitirmeli");
+  assert.ok(ates < govde.indexOf("tap(durum"), "atlatma kontrolü kilit işlenmeden önce olmalı");
+  assert.ok(/if \(girdiYoksay > 0\) \{ girdi\.al\(/.test(govde), "koruma süresinde dokunuşlar tüketilip atılmalı");
+  const kazanma = main.slice(main.indexOf("levelYukle(sonraki.n);"));
+  assert.ok(kazanma.slice(0, 120).includes("girdiYoksay = ATLAMA_KORUMASI"),
+    "kazanmadan sonraki bölümde kısa bir dokunuş koruması olmalı");
+  assert.ok(/function levelYukle[\s\S]{0,400}kazancKapat\(\)/.test(main), "bölüm yüklenince sahne kapanmalı");
+});

@@ -28,6 +28,9 @@ export interface Kabuk {
   flas: HTMLElement;
   /** Devam ederken çalışan 3-2-1 sayacı. */
   gerisayim: HTMLElement;
+  kazanc: HTMLElement;
+  kazancSatir1: HTMLElement;
+  kazancSatir2: HTMLElement;
   duraklat: HTMLElement;
   duraklatMetin: HTMLElement;
   devamDugme: HTMLButtonElement;
@@ -117,6 +120,15 @@ export const html = (m: Metinler): string => `
     <canvas id="c" tabindex="0" aria-label="${m.oyunAlani}"></canvas>
     <div class="flas" id="flas" aria-hidden="true"></div>
     <div class="gerisayim" id="gerisayim" aria-hidden="true"></div>
+    <!-- Kazanma sahnesi. aria-hidden: aynı sonuç alt çubuktaki canlı bölgede sözle
+         duyuruluyor (yıldızlar dahil); burası yalnızca gözün ödülü. -->
+    <div class="kazanc" id="kazanc" aria-hidden="true">
+      <div class="kazancKutu">
+        <div class="kazancYildiz"><i></i><i></i><i></i></div>
+        <p class="kazancSatir" id="kazancSatir1"></p>
+        <p class="kazancSatir kazancAlt" id="kazancSatir2"></p>
+      </div>
+    </div>
   </div>
   <footer>
     <span id="hint" role="status" aria-live="polite"></span>
@@ -312,6 +324,9 @@ export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): 
     bitisSecim: bul<HTMLButtonElement>(hedef, "bitisSecim"),
     flas: bul(hedef, "flas"),
     gerisayim: bul(hedef, "gerisayim"),
+    kazanc: bul(hedef, "kazanc"),
+    kazancSatir1: bul(hedef, "kazancSatir1"),
+    kazancSatir2: bul(hedef, "kazancSatir2"),
     duraklat: bul(hedef, "duraklat"),
     duraklatMetin: bul(hedef, "duraklatMetin"),
     devamDugme: bul<HTMLButtonElement>(hedef, "devamDugme"),

@@ -8,7 +8,7 @@ import type { LevelTable, Best } from "./core/index.ts";
 // Servis çalışanı dosyayı önbelleğe aldığı için çevrimdışı çalışma etkilenmez.
 import tabloUrl from "../data/levels.json?url";
 
-import { createLevel, tap, step, decay, kalanSure } from "./game/state.ts";
+import { createLevel, tap, step, decay, kalanSure, FIRE_SURE } from "./game/state.ts";
 import type { LevelState } from "./game/state.ts";
 import { dongu, ADIM } from "./game/loop.ts";
 import { girdiBagla, girdiEsigi } from "./game/input.ts";
@@ -218,6 +218,7 @@ function levelYukle(n: number, denemeyiKoru = false): void {
   durum = createLevel(level, deneme);
   girdi.temizle();
   geriSayimDurdur();
+  kazancKapat();
 
   // Numara kalın, geri kalanı künye tonunda: "patron" da sonekin içinde, çünkü kalın
   // 1,4 rem içinde 320 piksellik telefonda üst çubuğu taşırıyordu.
@@ -306,6 +307,7 @@ function saatiGuncelle(): void {
 let sonFlas = -1;
 function cizVeYaz(): void {
   ciz(tuval, durum, renk, { hareketAzalt: azalt, halkaOpakligi: halkaOpakligi(ayarlar), numaraGizle: geriSayim > 0 });
+  kazancGuncelle();
   // Flaş canvas yerine ayrı bir katmanda: tam ekran dolgu geniş ekranda 4 ms tutuyordu.
   const f = azalt ? 0 : durum.flash * 0.18;
   if (f !== sonFlas) {
@@ -316,7 +318,43 @@ function cizVeYaz(): void {
 }
 
 // ---- Dokunuş ---------------------------------------------------------------
+// ---- Kazanma sahnesi ----------------------------------------------------------
+/** Top çıktıktan sonra sahnenin belirdiği an (kazanç aşamasının başından, sn). */
+const KAZANC_GECIKME = 0.5;
+/**
+ * Yeni bölümün ilk bu kadar saniyesinde dokunuşlar yok sayılır. Sahneyi atlatan hızlı
+ * bir çift dokunuşun ikincisi, yeni bölümün ilk halkasını yanlışlıkla kilitlemesin.
+ */
+const ATLAMA_KORUMASI = 0.2;
+let kazancVeri: { yildiz: number; satir1: string; satir2: string } | null = null;
+let kazancGorunur = false;
+let girdiYoksay = 0;
+
+function kazancKapat(): void {
+  kazancVeri = null;
+  kazancGorunur = false;
+  ui.kazanc.classList.remove("aktif");
+}
+
+/** Kazanç aşamasında, zamanı gelince sahneyi gösterir. Her karede çağrılır. */
+function kazancGuncelle(): void {
+  if (!kazancVeri || kazancGorunur || durum.asama !== "fire") return;
+  if (FIRE_SURE - durum.endTimer < KAZANC_GECIKME) return;
+  kazancGorunur = true;
+  ui.kazanc.querySelectorAll("i").forEach((y, i) => y.classList.toggle("dolu", i < kazancVeri!.yildiz));
+  ui.kazancSatir1.textContent = kazancVeri.satir1;
+  ui.kazancSatir2.textContent = kazancVeri.satir2;
+  ui.kazanc.classList.toggle("azalt", azalt);
+  ui.kazanc.classList.add("aktif");
+}
+
 function dokunusIsle(gercekZaman: number): void {
+  // Kazanç aşamasında dokunuş sahneyi atlatır: sonraki bölüm hemen gelir.
+  if (durum.asama === "fire") {
+    if (girdi.al(gercekZaman) > 0) durum.endTimer = 0;
+    return;
+  }
+  if (girdiYoksay > 0) { girdi.al(gercekZaman); return; }
   const n = girdi.al(gercekZaman);
   for (let i = 0; i < n; i++) {
     const sonuc = tap(durum, tablo.q3, tablo.q2);
@@ -332,6 +370,12 @@ function dokunusIsle(gercekZaman: number): void {
       titret(ayarlar, "acildi"); cal(ayarlar, "acildi");
       const rekor = rekorKaydet(kayit, durum.level.n, yeni);
       kaliciKayitIste();
+      kazancVeri = {
+        yildiz: sonuc.yildiz,
+        satir1: `${M.yildizEtiketi[sonuc.yildiz]} · ${sureYazisi(sonuc.sure, M)} ${M.saniyeKisa}`,
+        satir2: (kalanYazisi(sonuc.q, tablo.q3, tablo.q2, M).replace(/^\s*·\s*/, "") +
+          (rekor && oncekiVardi ? M.rekorEki : "")).replace(/^,\s*/, "")
+      };
       yazKoru(M.sonucSatiri(M.yildizEtiketi[sonuc.yildiz], yildizYazisi(sonuc.yildiz), sureYazisi(sonuc.sure, M)) +
           kalanYazisi(sonuc.q, tablo.q3, tablo.q2, M) +
           (rekor && oncekiVardi ? M.rekorEki : ""));
@@ -345,6 +389,7 @@ function dokunusIsle(gercekZaman: number): void {
 const oyun = dongu({
   adim(dt, gercekZaman) {
     if (oyunDonuk()) { girdi.temizle(); return false; }
+    if (girdiYoksay > 0) girdiYoksay = Math.max(0, girdiYoksay - dt);
     dokunusIsle(girdiEsigi(gercekZaman));
     const s = step(durum, dt);
     if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); cal(ayarlar, "kayip"); yazKoru(M.sureDoldu(durum.rings.filter(r => !r.locked).length)); return true; }
@@ -363,6 +408,7 @@ const oyun = dongu({
         // takılıp kalmaz. Erken çıkış, yenilemenin kesin olduğunu varsayıyordu.
         guncellemeyiIste(sonraki.n);
         levelYukle(sonraki.n);
+        girdiYoksay = ATLAMA_KORUMASI;
       }
       return false;   // level değişti: bu karede daha fazla adım atma
     }

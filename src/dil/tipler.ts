@@ -139,6 +139,8 @@ export interface Metinler {
 
   // ---- Kazanma ----
   yildizEtiketi: Record<Stars, string>;
+  /** Saniyenin kısaltması (kazanma sahnesi). */
+  saniyeKisa: string;
   /** ★☆☆ gliflerinin ekran okuyucu karşılığı. Glifler okunmaz ya da "siyah yıldız" diye okunur. */
   yildizSesli: (yildiz: number) => string;
   sonucSatiri: (etiket: string, yildiz: string, sure: string) => string;

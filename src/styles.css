@@ -429,6 +429,50 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 }
 .gerisayim.aktif { opacity: 0.85; transform: scale(1); }
 
+/* Kazanma sahnesi (yayın öncesi incelemede "ödül var, sahnesi yok" bulundu: yıldızlar
+   yalnız alt çubukta 15 px metindi). Top çıktıktan sonra ortada üç yuva belirir, kazanılan
+   yıldızlar 120 ms arayla dolar. Toplam süre değişmez (1,4 sn); dokunmak atlatır. */
+.kazanc {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+}
+.kazanc.aktif { opacity: 1; }
+.kazancKutu {
+  text-align: center;
+  padding: 0.75rem 1.25rem 0.9rem;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+}
+.kazancYildiz { display: flex; gap: 0.25em; justify-content: center; font-size: clamp(2.4rem, 12vmin, 4.2rem); line-height: 1; }
+/* Dolu/boş ayrımı ŞEKİLLE taşınır (★ / ☆), renkle değil: amber açık zeminde 1,97:1
+   ölçülüyor, grafik öğe eşiği 3:1 (bkz. contrast.test "amber arayüz öğelerinde
+   kullanılmıyor"). Dolu yıldız mürekkep renginde; amber yalnızca süs olarak halede. */
+.kazancYildiz i { font-style: normal; color: var(--muted); }
+.kazancYildiz i::before { content: "☆"; }
+.kazancYildiz i.dolu { color: var(--ink); text-shadow: 0 0 0.3em color-mix(in srgb, var(--ball) 75%, transparent); }
+.kazancYildiz i.dolu::before { content: "★"; }
+.kazanc.aktif .kazancYildiz i.dolu { animation: yildizDol 0.3s ease-out both; }
+.kazanc.aktif .kazancYildiz i:nth-child(2) { animation-delay: 120ms; }
+.kazanc.aktif .kazancYildiz i:nth-child(3) { animation-delay: 240ms; }
+@keyframes yildizDol {
+  from { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  to { transform: scale(1); opacity: 1; }
+}
+.kazancSatir { margin: 0.5rem 0 0; font-size: 1rem; font-weight: 600; color: var(--ink); }
+.kazancAlt { margin-top: 0.2rem; font-size: 0.85rem; font-weight: 400; color: var(--muted); }
+.kazancAlt:empty { display: none; }
+.kazanc.azalt .kazancYildiz i.dolu { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .kazanc { transition: none; }
+  .kazanc.aktif .kazancYildiz i.dolu { animation: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gerisayim { transition: none; transform: none; }
   .gerisayim.aktif { transform: none; }
