@@ -145,6 +145,10 @@ export interface Metinler {
   toplamYildizSatiri: (yildiz: number, enCok: number) => string;
   /** Her 50 bölümde bir, bölüm İLK kez bitirilince: kilometre taşı. */
   kilometreTasi: (bolum: number) => string;
+  /** Duraklatma ekranındaki günün bölümü düğmesi. */
+  gununBolumu: (bolum: number, tamam: boolean) => string;
+  /** Günün bölümü bitince: seri. */
+  gunlukTamam: (seri: number) => string;
   /** ★☆☆ gliflerinin ekran okuyucu karşılığı. Glifler okunmaz ya da "siyah yıldız" diye okunur. */
   yildizSesli: (yildiz: number) => string;
   sonucSatiri: (etiket: string, yildiz: string, sure: string) => string;

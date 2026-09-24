@@ -107,6 +107,8 @@ export const EN: Metinler = {
   saniyeKisa: "s",
   toplamYildizSatiri: (yildiz, enCok) => `${yildiz} / ${enCok} stars in total`,
   kilometreTasi: bolum => `${bolum} levels behind you!`,
+  gununBolumu: (bolum, tamam) => `Level of the day: ${bolum}` + (tamam ? " ✓" : ""),
+  gunlukTamam: seri => `Level of the day done · ${seri}-day streak`,
   yildizaKalan: (yildiz, yuzde) => ` · ${yuzde}% short of ${yildiz} stars`,
   rekorEki: ", new best",
 

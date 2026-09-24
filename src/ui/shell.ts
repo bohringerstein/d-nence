@@ -37,6 +37,7 @@ export interface Kabuk {
   devamDugme: HTMLButtonElement;
   /** Duraklatma örtüsünden bölüm seçimine giden düğme. */
   duraklatSecim: HTMLButtonElement;
+  gunlukDugme: HTMLButtonElement;
   ayarAc: HTMLButtonElement;
   ayarPanel: HTMLElement;
   /** Panel başlığı; açılışta odak buraya verilir (bkz. markup). */
@@ -272,6 +273,8 @@ export const html = (m: Metinler): string => `
            zaten süzülüyor — ve niyet yolu doğru: bölüm değiştirmek isteyen oyuncu
            zaten duraklatmış oyuncudur. -->
       <button id="duraklatSecim" type="button">${m.bolumSec}</button>
+      <!-- Günün bölümü (bkz. game/gunluk.ts). Oyuncu yeterince bölüm açmadıysa gizli. -->
+      <button id="gunlukDugme" type="button" hidden></button>
     </div>
   </div>
   <div class="ortu" id="bitis" hidden role="dialog" aria-modal="true" aria-labelledby="bitisBaslik">
@@ -334,6 +337,7 @@ export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): 
     duraklatMetin: bul(hedef, "duraklatMetin"),
     devamDugme: bul<HTMLButtonElement>(hedef, "devamDugme"),
     duraklatSecim: bul<HTMLButtonElement>(hedef, "duraklatSecim"),
+    gunlukDugme: bul<HTMLButtonElement>(hedef, "gunlukDugme"),
     ayarAc: bul<HTMLButtonElement>(hedef, "ayarAc"),
     ayarPanel: bul(hedef, "ayarPanel"),
     ayarBaslik: bul(hedef, "ayarBaslik"),

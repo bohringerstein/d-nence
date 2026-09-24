@@ -238,3 +238,10 @@ test("kazanma sahnesi: dokunuş atlatır, atlatan dokunuş yeni bölüme geçmez
     "kazanmadan sonraki bölümde kısa bir dokunuş koruması olmalı");
   assert.ok(/function levelYukle[\s\S]{0,400}kazancKapat\(\)/.test(main), "bölüm yüklenince sahne kapanmalı");
 });
+
+test("günün bölümü: duraklatmada sunulur, kazanınca seri yazılır, başka bölümde düşer", () => {
+  const ac = main.slice(main.indexOf("function duraklatmaAc("), main.indexOf("function duraklatmaKapat("));
+  assert.ok(ac.includes("gunlukDugmesiniKur()"), "duraklatma açılınca düğme güncellenmeli");
+  assert.ok(/if \(gunlukBolum !== n\) gunlukBolum = null;/.test(main), "başka bölüm yüklenince işaret düşmeli");
+  assert.ok(/gunlukBolum === durum\.level\.n[\s\S]{0,300}gunuTamamla\(/.test(main), "günün bölümü kazanılınca seri güncellenmeli");
+});

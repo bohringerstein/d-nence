@@ -9,6 +9,7 @@ import type { LevelTable, Best } from "./core/index.ts";
 import tabloUrl from "../data/levels.json?url";
 
 import { createLevel, tap, step, decay, kalanSure, FIRE_SURE } from "./game/state.ts";
+import { gunAnahtari, gununBolumu, gunlukOku, gunlukYaz, gunuTamamla } from "./game/gunluk.ts";
 import type { LevelState } from "./game/state.ts";
 import { dongu, ADIM } from "./game/loop.ts";
 import { girdiBagla, girdiEsigi } from "./game/input.ts";
@@ -219,6 +220,7 @@ function levelYukle(n: number, denemeyiKoru = false): void {
   girdi.temizle();
   geriSayimDurdur();
   kazancKapat();
+  if (gunlukBolum !== n) gunlukBolum = null;
 
   // Numara kalın, geri kalanı künye tonunda: "patron" da sonekin içinde, çünkü kalın
   // 1,4 rem içinde 320 piksellik telefonda üst çubuğu taşırıyordu.
@@ -376,9 +378,21 @@ function dokunusIsle(gercekZaman: number): void {
       kaliciKayitIste();
       const tas = !oncekiVardi && durum.level.n % KILOMETRE_TASI === 0;
       const b = bitirilenLevel(kayit);
+      // Günün bölümü bitti mi? Seri ayrı anahtarda; aynı gün ikinci kez sayılmaz.
+      let gunlukMetni = "";
+      if (gunlukBolum === durum.level.n) {
+        const bugun = gunAnahtari(new Date());
+        const onceki = gunlukOku();
+        if (onceki.son !== bugun) {
+          const g = gunuTamamla(onceki, bugun);
+          gunlukYaz(g);
+          gunlukMetni = M.gunlukTamam(g.seri);
+        }
+        gunlukBolum = null;
+      }
       kazancVeri = {
-        tas,
-        satir3: tas ? M.kilometreTasi(durum.level.n) : M.toplamYildizSatiri(toplamYildiz(kayit), b * 3),
+        tas: tas || gunlukMetni !== "",
+        satir3: gunlukMetni || (tas ? M.kilometreTasi(durum.level.n) : M.toplamYildizSatiri(toplamYildiz(kayit), b * 3)),
         yildiz: sonuc.yildiz,
         satir1: `${M.yildizEtiketi[sonuc.yildiz]} · ${sureYazisi(sonuc.sure, M)} ${M.saniyeKisa}`,
         satir2: (kalanYazisi(sonuc.q, tablo.q3, tablo.q2, M).replace(/^\s*·\s*/, "") +
@@ -388,7 +402,8 @@ function dokunusIsle(gercekZaman: number): void {
           kalanYazisi(sonuc.q, tablo.q3, tablo.q2, M) +
           (rekor && oncekiVardi ? M.rekorEki : "") +
           // Kilometre taşı ekran okuyucuya da söylenir; sahne aria-hidden.
-          (tas ? " · " + M.kilometreTasi(durum.level.n) : ""));
+          (tas ? " · " + M.kilometreTasi(durum.level.n) : "") +
+          (gunlukMetni ? " · " + gunlukMetni : ""));
       return;
     }
     if (sonuc.tip === "yok") return;
@@ -513,8 +528,31 @@ function duraklatmaAc(): void {
   geriSayimDurdur();
   girdi.temizle();
   ui.duraklatMetin.textContent = M.duraklatAciklama(sureYazisi(kalanSure(durum), M));
+  gunlukDugmesiniKur();
   ortuAc(ui.duraklat, ui.devamDugme, ui.arka);
 }
+
+// ---- Günün bölümü (bkz. game/gunluk.ts) ---------------------------------------
+/** Şu an oynanan bölüm günün bölümü olarak mı açıldı? Başka bölüm yüklenince düşer. */
+let gunlukBolum: number | null = null;
+
+function gunlukDugmesiniKur(): void {
+  const bugun = gunAnahtari(new Date());
+  const n = gununBolumu(bugun, kayit.enUzak);
+  ui.gunlukDugme.hidden = n === null;
+  if (n !== null) ui.gunlukDugme.textContent = M.gununBolumu(n, gunlukOku().son === bugun);
+}
+
+ui.gunlukDugme.addEventListener("click", () => {
+  const n = gununBolumu(gunAnahtari(new Date()), kayit.enUzak);
+  if (n === null) return;
+  ortuKapat(ui.duraklat, ui.canvas, ui.arka);
+  mod = "oyun";
+  ipucuKilidiSifirla();
+  levelYukle(n);
+  gunlukBolum = n;
+  geriSayimBaslat();
+});
 
 function duraklatmaKapat(): void {
   // Duraklatmadan dönüş güvenli an DEĞİL: yenileme bölümü baştan başlatıyordu, oysa
