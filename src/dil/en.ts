@@ -46,6 +46,8 @@ export const EN: Metinler = {
   ses: { baslik: "Sound", aciklama: "A short note on each lock; the pitch rises as the path narrows." },
   titresim: { baslik: "Vibration", aciklama: "The phone vibrates on a lock and on a loss." },
   dil: "Language",
+  tema: "Theme",
+  temaSecenek: { sistem: "Match device", acik: "Light", koyu: "Dark" },
   grupOyun: "Game",
   grupGorunum: "Look and feel",
   yedek: "Back up progress",

@@ -46,6 +46,7 @@ export interface Kabuk {
   /** Tarayıcı ses üretemiyorsa satır hiç gösterilmez. */
   sesSatir: HTMLElement;
   dilKutu: HTMLSelectElement;
+  temaKutu: HTMLSelectElement;
   uyari: HTMLElement;
   /** Ayarlar panelindeki ilerleme özeti (bölüm + yıldız). */
   ozet: HTMLElement;
@@ -163,6 +164,14 @@ export const html = (m: Metinler): string => `
       <label class="secenek" id="titresimSatir">
         <input type="checkbox" id="titresimKutu">
         <span><b>${m.titresim.baslik}</b><small>${m.titresim.aciklama}</small></span>
+      </label>
+      <label class="secenek dilSecim">
+        <span><b>${m.tema}</b></span>
+        <select id="temaKutu">
+          <option value="sistem">${m.temaSecenek.sistem}</option>
+          <option value="acik">${m.temaSecenek.acik}</option>
+          <option value="koyu">${m.temaSecenek.koyu}</option>
+        </select>
       </label>
       <label class="secenek dilSecim">
         <span><b>${m.dil}</b></span>
@@ -314,6 +323,7 @@ export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): 
     sesKutu: bul<HTMLInputElement>(hedef, "sesKutu"),
     sesSatir: bul(hedef, "sesSatir"),
     dilKutu: bul<HTMLSelectElement>(hedef, "dilKutu"),
+    temaKutu: bul<HTMLSelectElement>(hedef, "temaKutu"),
     uyari: bul(hedef, "uyari"),
     ozet: bul(hedef, "ozet"),
     yedek: bul(hedef, "yedek"),

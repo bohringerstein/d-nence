@@ -13,7 +13,7 @@ import type { LevelState } from "./game/state.ts";
 import { dongu, ADIM } from "./game/loop.ts";
 import { girdiBagla, girdiEsigi } from "./game/input.ts";
 import { tuvalKur, ciz } from "./game/render.ts";
-import { renkleriOku, renklerHazir, hareketAzalt, tercihleriIzle } from "./game/theme.ts";
+import { renkleriOku, renklerHazir, hareketAzalt, tercihleriIzle, temayiUygula } from "./game/theme.ts";
 import { ogreticiTablosu, patronIlkGorunus, ipucu, yildizYazisi, yildizParcalari, sureYazisi, kayipYazisi, kalanYazisi } from "./game/hints.ts";
 import { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, tabloSurumuUygula, disaAktar, iceAktar, kaydiDegistir,
   devamNoktasiYaz, devamNoktasiOku } from "./game/storage.ts";
@@ -110,6 +110,8 @@ if (semaHatalari.length) {
 const tablo = ham as LevelTable;
 
 const ayarlar = ayarlariOku();
+// Tema ilk çizimden ÖNCE: canvas renkleri aşağıda bir kez okunuyor.
+temayiUygula(ayarlar.tema);
 // Oyuncunun seçimi varsa o, yoksa cihazın dili (bkz. dil/index.ts cihazDili).
 const dilKodu = gecerliDilMi(ayarlar.dil) ? ayarlar.dil : cihazDili();
 const M = DILLER[dilKodu];
@@ -603,6 +605,7 @@ function ayarPaneliAc(): void {
   ui.sesKutu.checked = ayarlar.ses;
   ui.sesSatir.hidden = !sesVarMi();
   ui.dilKutu.value = dilKodu;
+  ui.temaKutu.value = ayarlar.tema;
   // Cihaz titreşimi desteklemiyorsa (iOS Safari) seçeneği hiç gösterme.
   ui.titresimSatir.hidden = !titresimVarMi();
   ui.secim.hidden = true;
@@ -830,6 +833,17 @@ ui.titresimKutu.addEventListener("change", () => { ayarlariUygula(); titret(ayar
 // Dil değişince sayfa yeniden yüklenir. Ekran metinleri bir kez kuruluyor; canlı
 // değiştirmek bütün kabuğu yeniden kurup dinleyicileri yeniden bağlamak demek olurdu
 // ve yarı çevrilmiş ekran riski doğururdu. Seyrek bir eylem, yeniden yükleme temiz yol.
+// Tema anında değişir, sayfa yenilenmez: renkler CSS değişkenlerinden, canvas onları
+// yeniden okuyarak izler. Dil değişiminden farkı bu — metinler kabuğa gömülü.
+ui.temaKutu.addEventListener("change", () => {
+  const secilen = ui.temaKutu.value;
+  if (secilen !== "sistem" && secilen !== "acik" && secilen !== "koyu") return;
+  ayarlar.tema = secilen;
+  temayiUygula(secilen);
+  renk = renkleriOku();
+  sonFlas = -1;
+  ayarlariYaz(ayarlar);
+});
 ui.dilKutu.addEventListener("change", () => {
   const secilen = ui.dilKutu.value;
   if (!gecerliDilMi(secilen) || secilen === dilKodu) return;

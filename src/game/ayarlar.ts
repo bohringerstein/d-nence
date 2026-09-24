@@ -37,9 +37,23 @@ export interface Ayarlar {
    * null ile cihaz ne diyorsa o gelir; oyuncu isterse üstüne yazar ve seçimi kalır.
    */
   dil: DilKodu | null;
+  /**
+   * Renk teması. **"sistem" = cihazın açık/koyu tercihini izle** (varsayılan).
+   *
+   * Neden elle seçim de var: cihaz ayarı her zaman oyuncunun o anki isteği değil —
+   * gece yatakta koyu, güneş altında açık ekran. Ayrıca ışığa duyarlı oyuncu için:
+   * "Deseni yumuşat" halka/zemin kontrastını açık temada eşiğin altına (0,24)
+   * indiriyor, koyu temada indiremiyor (0,69; bkz. SPEC §7). Sistemi koyu olan biri
+   * oyunu yalnız bu yüzden açık oynamak isteyebilir.
+   */
+  tema: Tema;
 }
 
-const varsayilan = (): Ayarlar => ({ desenYumusat: false, hareketAzalt: false, titresim: true, ses: true, uyariGoruldu: false, dil: null });
+export const TEMALAR = ["sistem", "acik", "koyu"] as const;
+export type Tema = typeof TEMALAR[number];
+const gecerliTemaMi = (x: unknown): x is Tema => (TEMALAR as readonly unknown[]).includes(x);
+
+const varsayilan = (): Ayarlar => ({ desenYumusat: false, hareketAzalt: false, titresim: true, ses: true, uyariGoruldu: false, dil: null, tema: "sistem" });
 
 export function ayarlariOku(): Ayarlar {
   try {
@@ -53,6 +67,7 @@ export function ayarlariOku(): Ayarlar {
     if (typeof o.ses === "boolean") a.ses = o.ses;
     if (typeof o.uyariGoruldu === "boolean") a.uyariGoruldu = o.uyariGoruldu;
     if (gecerliDilMi(o.dil)) a.dil = o.dil;
+    if (gecerliTemaMi(o.tema)) a.tema = o.tema;
     if (!localStorage.getItem(KEY)) ayarlariYaz(a);
     return a;
   } catch {

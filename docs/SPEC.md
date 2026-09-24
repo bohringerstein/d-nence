@@ -152,7 +152,7 @@ Oyun alanında çizim sırası:
 
 **Renklerin tek kaynağı CSS'tir**, canvas onları hesaplanmış değerlerden okur. Ancak okuma **her zaman yedeğe düşebilmelidir**: canvas'ta `ctx.fillStyle = ""` hata vermez, sessizce yok sayılır ve önceki değer (varsayılan siyah) kalır. CSS henüz uygulanmamışken renkler okunursa tüm oyun siyah beyaz çizilir — telefonda tam olarak bu oldu, çünkü geliştirme sunucusunda CSS ayrı bir istekle geliyor ve yavaş bağlantıda ilk okumaya yetişmiyordu. Bu yüzden `src/game/theme.ts` aynı paletin bir kopyasını yedek olarak taşır (bir test ikisinin aynı kaldığını denetler) ve CSS hazır olur olmaz renkler bir kez daha okunur.
 
-**Renkler** (açık ve koyu tema, sistem ayarına göre):
+**Renkler** (açık ve koyu tema). Varsayılan **cihaza göre**dir; oyuncu Ayarlar → Görünüm ve his → **Tema** ile *Cihaza göre / Açık / Koyu* seçebilir. Seçim anında uygulanır (sayfa yenilenmez), kaydedilir ve tarayıcı çubuğunun rengi (`theme-color`) de eşlenir. Seçim oyun alanında değil Ayarlar'dadır: ekranın tamamı dokunma alanıdır, oyun alanındaki bir tema düğmesi yanlışlıkla kilide dönüşürdü; tema da bir kez seçilip unutulan bir ayardır.
 
 | Belirteç | Açık | Koyu |
 |---|---|---|
@@ -269,7 +269,7 @@ Desen üç ölçütü işaretliyor ama en belirleyicisini kaçırıyor: telefond
 Bunun üzerine iki şey zorunludur:
 
 1. **İlk açılışta bir kez uyarı gösterilir** ve ayarlar paneliyle birlikte sunulur. Panel açıkken **oyun durur**: uyarıyı okumak oyuncunun süresini yakmamalıdır.
-2. **"Deseni yumuşat" ayarı** kilitsiz halkaların opaklığını 0,40'tan 0,25'e indirir. Ölçülen etki: açık temada halka/zemin kontrastı 0,40 → **0,24** (eşiğin altına iner), koyu temada 0,82 → 0,69. Koyu temada eşiğin altına inmek halkaları oynanamayacak kadar görünmez yapardı; açık-üstüne-koyu çizim doğası gereği yüksek kontrastlıdır ve bu dürüstçe kabul edilir.
+2. **"Deseni yumuşat" ayarı** kilitsiz halkaların opaklığını 0,40'tan 0,25'e indirir. Ölçülen etki: açık temada halka/zemin kontrastı 0,40 → **0,24** (eşiğin altına iner), koyu temada 0,82 → 0,69. Koyu temada eşiğin altına inmek halkaları oynanamayacak kadar görünmez yapardı; açık-üstüne-koyu çizim doğası gereği yüksek kontrastlıdır ve bu dürüstçe kabul edilir. Cihazı koyu temada olan ışığa duyarlı oyuncu artık oyunu elle **Açık** temaya alıp yumuşatmayı açarak eşiğin altına inebilir.
 
 Ayrıca **"Hareketi azalt"** ayarı, sistem tercihinden bağımsız olarak sarsıntıyı ve flaşı kapatır (ikisinden biri açıksa kapalıdır).
 

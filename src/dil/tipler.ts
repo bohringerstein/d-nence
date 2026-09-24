@@ -72,6 +72,8 @@ export interface Metinler {
   ses: Secenek;
   titresim: Secenek;
   dil: string;
+  tema: string;
+  temaSecenek: Record<"sistem" | "acik" | "koyu", string>;
   /** Ayarlar panelindeki grup başlıkları. */
   grupOyun: string;
   grupGorunum: string;

@@ -35,6 +35,8 @@ export const TR: Metinler = {
   ses: { baslik: "Ses", aciklama: "Kilitte kısa bir nota; kanal daraldıkça perde yükselir." },
   titresim: { baslik: "Titreşim", aciklama: "Kilitte ve kayıpta telefon titreşir." },
   dil: "Dil",
+  tema: "Tema",
+  temaSecenek: { sistem: "Cihaza göre", acik: "Açık", koyu: "Koyu" },
   grupOyun: "Oyun",
   grupGorunum: "Görünüm ve his",
   yedek: "İlerlemeyi yedekle",

@@ -27,6 +27,25 @@ const koyuMu = (): boolean => {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 };
 
+/**
+ * Seçilen temayı belgeye uygular. "sistem"de işaret kaldırılır ve CSS cihaz tercihini
+ * izler (styles.css: `@media (prefers-color-scheme: dark)` yalnız `data-theme` yokken).
+ *
+ * Tarayıcı çubuğunun rengi (`theme-color`) de eşlenir: iki etiket cihaz tercihine
+ * göre seçiliyor; elle seçimde ikisi de seçilen zemine çevrilir, yoksa koyu oyunun
+ * üstünde açık bir sistem çubuğu kalırdı.
+ */
+export function temayiUygula(tema: "sistem" | "acik" | "koyu"): void {
+  const kok = document.documentElement;
+  if (tema === "sistem") kok.removeAttribute("data-theme");
+  else kok.setAttribute("data-theme", tema === "koyu" ? "dark" : "light");
+  for (const m of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+    const koyuEtiketi = (m.media || "").includes("dark");
+    const renk = tema === "sistem" ? YEDEK[koyuEtiketi ? "koyu" : "acik"].bg : YEDEK[tema].bg;
+    m.content = renk;
+  }
+}
+
 /** Geçerli bir CSS rengi mi? Boş ya da bozuk değerler yedeğe düşmeli. */
 const gecerli = (v: string): boolean => v.length > 0 && v !== "transparent";
 

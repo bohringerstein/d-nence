@@ -70,8 +70,8 @@ test("localStorage erişilemezse oyun düşmez", () => {
 });
 
 test("deseni yumuşat kilitsiz halkaların opaklığını düşürür", () => {
-  const kapali = { desenYumusat: false, hareketAzalt: false, titresim: true, ses: true, dil: null, uyariGoruldu: true };
-  const acik = { desenYumusat: true, hareketAzalt: false, titresim: true, ses: true, dil: null, uyariGoruldu: true };
+  const kapali = { desenYumusat: false, hareketAzalt: false, titresim: true, ses: true, dil: null, uyariGoruldu: true, tema: "sistem" as const };
+  const acik = { desenYumusat: true, hareketAzalt: false, titresim: true, ses: true, dil: null, uyariGoruldu: true, tema: "sistem" as const };
   assert.equal(halkaOpakligi(kapali), 0.4);
   assert.ok(halkaOpakligi(acik) < halkaOpakligi(kapali), "yumuşatma opaklığı düşürmeli");
   assert.ok(halkaOpakligi(acik) > 0.15, "halkalar tamamen kaybolmamalı");
@@ -93,7 +93,7 @@ function vibrateKur(destek: boolean): number[][] {
   return cagrilar;
 }
 
-const ayar = (titresim: boolean) => ({ desenYumusat: false, hareketAzalt: false, titresim, ses: true, dil: null, uyariGoruldu: true });
+const ayar = (titresim: boolean) => ({ desenYumusat: false, hareketAzalt: false, titresim, ses: true, dil: null, uyariGoruldu: true, tema: "sistem" as const });
 
 test("titreşim desteği doğru algılanıyor", () => {
   vibrateKur(true);
@@ -158,4 +158,13 @@ test("ses kapalı kaydediliyor ve geri okunuyor", () => {
   depo.temizle();
   depo.setItem("donence:ayarlar:v1", JSON.stringify({ ses: false }));
   assert.equal(ayarlariOku().ses, false);
+});
+
+test("tema varsayılanı cihaza göre; seçim saklanır, bozuk değer yok sayılır", () => {
+  depo.temizle();
+  assert.equal(ayarlariOku().tema, "sistem");
+  const a = ayarlariOku(); a.tema = "koyu"; ayarlariYaz(a);
+  assert.equal(ayarlariOku().tema, "koyu");
+  depo.setItem("donence:ayarlar:v1", JSON.stringify({ tema: "mor" }));
+  assert.equal(ayarlariOku().tema, "sistem");
 });
