@@ -32,3 +32,11 @@
   a { color: var(--ink); }
   .geri { font-size: 0.9rem; margin: 0 0 1.5rem; }
   footer { margin-top: 3rem; font-size: 0.9rem; color: var(--muted); }
+
+/* Lisans metinleri (lisanslar.html): uzun satırlar kırılır, sayfa yatay kaymaz. */
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}

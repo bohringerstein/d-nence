@@ -18,19 +18,24 @@
 <p class="geri"><a href="./">&larr; Oyuna dön / Back to the game</a></p>
 
 <h1>Dönence</h1>
-<p class="tarih">Gizlilik Politikası · Privacy Policy — 22 Eylül 2026 / 22 September 2026</p>
+<p class="tarih">Gizlilik Politikası · Privacy Policy — 24 Eylül 2026 / 24 September 2026</p>
 
 <div class="ozet">
-  <p><strong>Dönence hiçbir veri toplamaz.</strong> Sunucu yoktur, hesap yoktur, ölçümleme
-  yoktur, reklam yoktur. Oyun ilerlemeniz yalnızca kendi cihazınızda durur.</p>
+  <p><strong>Dönence hiçbir veri toplamaz.</strong> Hesap yoktur, ölçümleme yoktur, reklam
+  yoktur. Oyun ilerlemeniz yalnızca kendi cihazınızda durur. Oyun dosyaları Vercel'de
+  barındırılır; ayrıntı aşağıda.</p>
 </div>
 
 <section lang="tr">
 <h2>Türkçe</h2>
 
 <h3>Toplanan veri</h3>
-<p><strong>Hiçbir kişisel veri toplanmaz, işlenmez ya da paylaşılmaz.</strong> Dönence'nin
-bir sunucusu yoktur. Uygulamanın size ait hiçbir bilgiyi gönderebileceği bir adres yoktur.</p>
+<p><strong>Biz hiçbir kişisel veri toplamayız, işlemeyiz ya da paylaşmayız.</strong> Oyunun
+veri toplayan bir sunucusu yoktur; uygulama size ait hiçbir bilgiyi bir yere göndermez.</p>
+<p><strong>Barındırma.</strong> Oyun dosyaları Vercel Inc. (ABD) tarafından barındırılır.
+Dosyaları size iletebilmek için IP adresiniz ve tarayıcı bilgileriniz Vercel'in
+sunucularında kısa süreli kayda geçer (bkz. Vercel'in gizlilik politikası). Biz bu kayıtlara
+erişmiyor ve onları saklamıyoruz.</p>
 <ul>
   <li>Hesap açılmaz, kayıt istenmez, e-posta ya da isim sorulmaz.</li>
   <li>Reklam ağı, ölçümleme (analytics) aracı ya da çökme raporlama servisi kullanılmaz.</li>
@@ -38,16 +43,22 @@ bir sunucusu yoktur. Uygulamanın size ait hiçbir bilgiyi gönderebileceği bir
   <li>Konum, kişiler, fotoğraflar, mikrofon, kamera ya da rehber gibi hiçbir cihaz iznine
       erişilmez. Ayarlardan açılabilen titreşim, tarayıcının izin gerektirmeyen titreşim
       özelliğidir ve dışarıya hiçbir şey göndermez.</li>
-  <li>Üçüncü taraf hiçbir kod (SDK) uygulamanın içinde yer almaz.</li>
+  <li>Üçüncü taraf hiçbir izleme ya da reklam kodu (SDK) uygulamanın içinde yer almaz.
+      Çevrimdışı çalışma için açık kaynak Workbox kitaplığı (MIT lisansı) kullanılır;
+      dışarıya bir şey göndermez.</li>
 </ul>
 
 <h3>Cihazınızda duran bilgiler</h3>
 <p>Oyun, kaldığınız yeri hatırlayabilmek için birkaç değeri <strong>yalnızca cihazınızın
 kendi yerel deposunda</strong> (tarayıcının <em>localStorage</em> alanı) saklar:</p>
 <ul>
-  <li>son oynadığınız bölüm numarası,</li>
-  <li>bölüm başına en iyi sonucunuz (yıldız sayısı ve süre),</li>
-  <li>ayarlarınız: dil, deseni yumuşatma, hareketi azaltma, ses, titreşim.</li>
+  <li>son oynadığınız ve ulaştığınız en uzak bölüm numarası,</li>
+  <li>bölüm başına en iyi sonucunuz (yıldız sayısı ve süre) ve o bölümün kısa bir özeti,</li>
+  <li>kaydın hangi bölüm tablosuna ait olduğunu ve kaç kez sıfırlandığını gösteren iki sayı,</li>
+  <li>ayarlarınız: dil, tema, deseni yumuşatma, hareketi azaltma, ses, titreşim ve ilk açılış
+      uyarısını gördüğünüz,</li>
+  <li>sekme kapanana kadar, oyun kendini güncellerken kaldığınız bölüm (tarayıcının
+      <em>sessionStorage</em> alanı).</li>
 </ul>
 <p>Bu bilgiler cihazınızdan <strong>hiçbir zaman çıkmaz</strong>. Bize, bir sunucuya ya da
 üçüncü bir tarafa iletilmez; cihazlar arasında eşitlenmez. Hiçbiri sizi tanımlamaya yaramaz.
@@ -57,7 +68,8 @@ Oyun içindeki <strong>Ayarlar → Baştan başla</strong> ilerlemenizi sıfırl
 <h3>Ağ bağlantısı</h3>
 <p>Oyun ilk açılışta yalnızca kendi dosyalarını indirir ve bundan sonra çevrimdışı çalışır.
 Yazı tipi de dahil olmak üzere her şey uygulamanın içine gömülüdür; <strong>başka hiçbir
-alan adına istek atılmaz</strong>, dolayısıyla IP adresiniz üçüncü bir sunucuya ulaşmaz.</p>
+alan adına istek atılmaz</strong>. Oyun yalnızca kendi adresine, saatte bir ve öne
+geldiğinde, yeni bir sürüm olup olmadığını sorar; bu istek hakkınızda bilgi taşımaz.</p>
 
 <h3>Çocuklar</h3>
 <p>Dönence hiç kimseden veri toplamadığı için çocuklardan da veri toplamaz.</p>
@@ -75,8 +87,11 @@ Soru ya da talepleriniz için: <strong>[İLETİŞİM E-POSTASI]</strong></p>
 <h2>English</h2>
 
 <h3>Data we collect</h3>
-<p><strong>Dönence collects, processes and shares no personal data.</strong> The game has no
-server. There is no address the app could send anything about you to.</p>
+<p><strong>We collect, process and share no personal data.</strong> The game has no server
+that collects data; the app sends nothing about you anywhere.</p>
+<p><strong>Hosting.</strong> The game files are hosted by Vercel Inc. (USA). To deliver the
+files to you, your IP address and browser details are briefly logged on Vercel's servers
+(see Vercel's privacy policy). We do not access or keep these logs.</p>
 <ul>
   <li>No account, no sign-up, no email address or name is ever requested.</li>
   <li>No advertising network, no analytics, no crash reporting.</li>
@@ -84,16 +99,22 @@ server. There is no address the app could send anything about you to.</p>
   <li>No device permissions are used — no location, contacts, photos, microphone or camera.
       The optional vibration is the browser's permission-free vibration feature and sends
       nothing anywhere.</li>
-  <li>No third-party code (SDK) is bundled in the app.</li>
+  <li>No third-party tracking or advertising code (SDK) is bundled in the app. The
+      open-source Workbox library (MIT licence) is used for offline play; it sends nothing
+      anywhere.</li>
 </ul>
 
 <h3>What stays on your device</h3>
 <p>So the game can remember where you left off, a few values are kept
 <strong>only in your device's own local storage</strong> (the browser's <em>localStorage</em>):</p>
 <ul>
-  <li>the number of the last level you played,</li>
-  <li>your best result per level (star count and time),</li>
-  <li>your settings: language, soften pattern, reduce motion, sound, vibration.</li>
+  <li>the last level you played and the furthest level you reached,</li>
+  <li>your best result per level (star count and time) and a short digest of that level,</li>
+  <li>two numbers telling which level table the save belongs to and how often it was reset,</li>
+  <li>your settings: language, theme, soften pattern, reduce motion, sound, vibration, and
+      whether you have seen the first-launch notice,</li>
+  <li>until the tab is closed, the level you were on while the game updates itself (the
+      browser's <em>sessionStorage</em>).</li>
 </ul>
 <p>This information <strong>never leaves your device</strong>. It is not sent to us, to any
 server or to a third party, and it is not synced between devices. None of it identifies you.
@@ -103,7 +124,8 @@ It is deleted entirely when you uninstall the app or clear the site data in your
 <h3>Network</h3>
 <p>On first launch the game downloads only its own files, and works offline after that.
 Everything, including the typeface, is embedded in the app; <strong>no request is made to
-any other domain</strong>, so your IP address never reaches a third-party server.</p>
+any other domain</strong>. The game only asks its own address, once an hour and when it
+comes to the foreground, whether a new version exists; that request carries nothing about you.</p>
 
 <h3>Children</h3>
 <p>Because Dönence collects no data from anyone, it collects no data from children.</p>

@@ -51,6 +51,8 @@ export const TR: Metinler = {
   yedekBos: "Bu yedek boş; ilerlemenin üstüne yazılmadı",
   yedekYuklendi: bolum => `İlerleme yüklendi: ${bolum} bölüm`,
   gizlilik: "Gizlilik politikası",
+  erisilebilirlik: "Erişilebilirlik",
+  lisanslar: "Lisanslar",
 
   duraklatildi: "Duraklatıldı",
   duraklatAciklama: kalan => `${kalan} saniyen kaldı. Halkalar tam durduğun yerde bekliyor.`,

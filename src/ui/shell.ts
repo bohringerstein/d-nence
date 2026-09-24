@@ -195,7 +195,9 @@ export const html = (m: Metinler): string => `
            target="_blank" YOK: PWA ana ekrandan açıldığında yeni sekme, sayfayı
            uygulamanın DIŞINDA açar (iOS'ta Safari'ye atar) ve oyuncu kurulu
            uygulamasına dönemez. -->
-      <p class="gizlilikSatir"><a href="./gizlilik.html">${m.gizlilik}</a></p>
+      <p class="gizlilikSatir"><a href="./gizlilik.html">${m.gizlilik}</a> ·
+        <a href="./erisilebilirlik.html">${m.erisilebilirlik}</a> ·
+        <a href="./lisanslar.html">${m.lisanslar}</a></p>
       <div class="kutuAlt"><button id="ayarKapat" type="button">${m.tamam}</button></div>
     </div>
   </div>

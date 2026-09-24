@@ -62,6 +62,8 @@ export const EN: Metinler = {
   yedekBos: "This backup is empty; your progress was not replaced",
   yedekYuklendi: bolum => `Progress restored: ${cogul(bolum, "level", "levels")}`,
   gizlilik: "Privacy policy",
+  erisilebilirlik: "Accessibility",
+  lisanslar: "Licences",
 
   duraklatildi: "Paused",
   duraklatAciklama: kalan => `${kalan} seconds left. The rings are waiting exactly where you stopped them.`,

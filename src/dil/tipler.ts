@@ -100,6 +100,10 @@ export interface Metinler {
 
   /** Ayarlardaki gizlilik politikası bağlantısı (public/gizlilik.html). */
   gizlilik: string;
+  /** Erişilebilirlik beyanı bağlantısı (public/erisilebilirlik.html). */
+  erisilebilirlik: string;
+  /** Açık kaynak lisansları bağlantısı (public/lisanslar.html, üretilir). */
+  lisanslar: string;
 
   // ---- Duraklatma ----
   duraklatildi: string;
