@@ -111,24 +111,44 @@ test("halkalar arka plandan ayırt edilebiliyor (en soluk halka dahil)", () => {
   assert.deepEqual(sorun, [], sorun.join("; "));
 });
 
-/** render.ts'teki geçer kama opaklığı. Geçmez kama doldurulmaz. */
+/** render.ts'teki geçer kama dolgu ve kontur opaklıkları. Geçmez kama doldurulmaz. */
 const KAMA_OPAKLIK = 0.35;
+const KAMA_KONTUR_OPAKLIK = 0.7;
+
+test("geçer kama zeminden WCAG 1.4.11 eşiğiyle ayrılıyor", () => {
+  // Eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15). Açık temada zemine göre
+  // 1,17 ve 1,20 çıkıyorlardı, yani aralarındaki fark 1,03:1 idi.
+  //
+  // Sonra ayrım DOLGU VAR/YOK'a çevrildi ve testin eşiği 1,2 yapıldı. O eşik bir
+  // standarttan değil ÖLÇÜLEN DEĞERİN (1,28) hemen altından seçilmişti: test
+  // gerilemeyi yakalıyordu ama ölçüte uygunluğu doğrulamıyordu, ve yeşil olması
+  // güven veriyordu. Bir erişilebilirlik incelemesi bunu yakaladı.
+  //
+  // DOLGU TEK BAŞINA YETMEZ VE ARTIRILAMAZ: amber ile açık zeminin parlaklığı
+  // neredeyse aynı; opaklığı 0,35 → 0,70 yapmak oranı yalnız 1,62'ye taşır. Bu yüzden
+  // render.ts kamaya MÜREKKEP KONTURU çiziyor ve ölçülen şey artık o kontur.
+  const sorun: string[] = [];
+  for (const [ad, t] of temalar) {
+    const kontur = harmanla(t.ink, t.bg, KAMA_KONTUR_OPAKLIK);
+    const o = kontrast(kontur, t.bg);
+    if (o < 3.0) sorun.push(`${ad} tema: kama konturu / zemin = ${o.toFixed(2)}:1 (WCAG 1.4.11, en az 3,0 gerek)`);
+  }
+  assert.deepEqual(sorun, [], sorun.join("; "));
+});
 
 test("geçer ve geçmez kama birbirinden ayırt edilebiliyor", () => {
-  // Eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15). Açık temada zemine göre
-  // 1,17 ve 1,20 çıkıyorlardı, yani aralarındaki fark 1,03:1 idi: fiilen ayırt
-  // edilemiyorlardı ve "geçer mi" bilgisi tamamen renk tonuna kalıyordu.
-  //
-  // Artık ayrım DOLGU VAR/YOK: geçmez kama boş bırakılıp yalnızca kesik konturla
-  // çevriliyor (render.ts). Ayrım hem parlaklığa hem doluluğa bağlı, yani renkten
-  // bağımsız iki kanal taşıyor. Geçmez kamanın rengi çıplak zemindir.
+  // Ayrım üç bağımsız kanal taşır ve hiçbiri renge dayanmaz:
+  //   1. dolgu var / yok
+  //   2. kontur düz / kesik
+  //   3. kayıpta geçmez kama kırmızıyla dolar
+  // Burada ölçülen birinci kanal: dolgunun zeminden ayırt edilebilir olması.
+  // Eşik 1,2 — bu bir WCAG ölçütü DEĞİL, yalnızca "dolgu fark ediliyor mu" gerileme
+  // koruması. Ölçüte uygunluğu yukarıdaki kontur testi doğruluyor.
   const sorun: string[] = [];
   for (const [ad, t] of temalar) {
     const gecer = harmanla(t.ball, t.bg, KAMA_OPAKLIK);
     const ayrim = kontrast(gecer, t.bg);
-    if (ayrim < 1.2) {
-      sorun.push(`${ad} tema: geçer/geçmez kama ayrımı ${ayrim.toFixed(2)}:1 (en az 1,2 gerek)`);
-    }
+    if (ayrim < 1.2) sorun.push(`${ad} tema: dolgu / zemin = ${ayrim.toFixed(2)}:1 (gerileme eşiği 1,2)`);
   }
   assert.deepEqual(sorun, [], sorun.join("; "));
 });

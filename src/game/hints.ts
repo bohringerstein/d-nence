@@ -33,7 +33,17 @@ export const yildizYazisi = (s: Stars): string => "★".repeat(s) + "☆".repeat
  */
 export function kayipYazisi(payDerece: number, m: Metinler): string {
   if (!Number.isFinite(payDerece) || payDerece < 0) return m.aciklikKapandi;
-  if (payDerece < 0.05) return m.kilPayiKayip;
+  // EŞİK TEK DİLİM (0,5°). Eskiden 0,05 idi ve bu mesaj MATEMATİKSEL OLARAK HİÇ
+  // TETİKLENEMİYORDU: oyun kanalı 0,5°'lik maske dilimleriyle ölçer ve NEED_PASS
+  // (18,0°) tam sayı dilim olduğu için kayıpta pay her zaman en az 0,5°. Ölçüldü:
+  // 991 "açıklık kapandı" kaybının SIFIRI bu mesajı aldı. İki dile çevrilmiş,
+  // test edilmiş bir cümle hiç görünmüyordu — ve kaybın en yakın hâli, oyuncuyu
+  // "bir daha" dedirtecek tek an, "0,5° dar kaldı" gibi soğuk bir sayıyla geçiyordu.
+  //
+  // Bu mesaj ancak 1 yıldızlı kazanma etiketi "Kıl payı"dan "Açıldı"ya çevrildikten
+  // SONRA canlandırılabildi: ikisi aynı sözü kullandığında kazanan ve kaybeden oyuncu
+  // aynı iki kelimeyi görüyordu. Artık "kıl payı" yalnız kıl payı KAYBIN adı.
+  if (payDerece < 0.6) return m.kilPayiKayip;
   if (payDerece > 10) return m.erkenDaraldi;
   return m.darKaldi(payDerece < 1 ? sayi(m, payDerece, 1) : sayi(m, Math.round(payDerece), 0));
 }

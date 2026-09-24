@@ -79,6 +79,35 @@ test("kayıp mesajı payı söyler", () => {
   assert.ok(kayipYazisi(25, TR).includes("erken daraldı"), kayipYazisi(25, TR));
 });
 
+// OYUNUN GERÇEKTE ÜRETTİĞİ DEĞERLERLE sınanır. Yukarıdaki test 0,02 ile çağırıyor —
+// ama oyunda o pay HİÇ OLUŞAMAZ: kanal 0,5°'lik maske dilimleriyle ölçülür ve NEED_PASS
+// (18,0°) tam sayı dilim, dolayısıyla kayıpta pay her zaman 0,5'in katıdır. O test bu
+// yüzden mesaj ölüyken de yeşil yanıyordu: 991 kayıplık bir ölçümde mesaj SIFIR kez
+// göründü. Bu test gerçek dilim değerlerini kullanır, mesaj bir daha sessizce ölemez.
+test("kıl payı kayıp mesajı oyunun gerçek dilim değerlerinde görünüyor", () => {
+  const DILIM = 0.5;   // derece; src/core/geometry.ts BIN
+  // Tek dilim kısa kalmak: gerçekte oluşabilen EN YAKIN kayıp.
+  for (const m of [TR, EN]) {
+    assert.equal(kayipYazisi(1 * DILIM, m), m.kilPayiKayip,
+      `${m.yerel}: tek dilimlik kayıp "kıl payı" demeli, "${kayipYazisi(DILIM, m)}" dedi`);
+  }
+  // İki dilim ve ötesi artık kıl payı değil, dereceyle söylenir.
+  assert.notEqual(kayipYazisi(2 * DILIM, TR), TR.kilPayiKayip, "iki dilim kıl payı sayılmamalı");
+  assert.ok(kayipYazisi(2 * DILIM, TR).includes("1°"), kayipYazisi(2 * DILIM, TR));
+});
+
+test("kazanma etiketi ile kayıp mesajı aynı sözü paylaşmıyor", () => {
+  // 1 yıldızlı kazanma eskiden "Kıl payı" idi — kıl payı KAYBIN adıyla aynı söz.
+  // Ölçüldü: 60 ms'lik bir oyuncu kazandığı bölümlerin %72'sinde bu etiketi görüyordu,
+  // yani kazanan ve kaybeden oyuncu aynı iki kelimeyi okuyordu.
+  for (const m of [TR, EN]) {
+    const kazanma = m.yildizEtiketi[1].toLocaleLowerCase(m.yerel);
+    const kayip = m.kilPayiKayip.toLocaleLowerCase(m.yerel);
+    assert.ok(!kayip.includes(kazanma),
+      `${m.yerel}: 1 yıldız etiketi "${m.yildizEtiketi[1]}" kayıp mesajında da geçiyor`);
+  }
+});
+
 test("ölçülemeyen pay sayı uydurmaz", () => {
   // Süre dolduğunda "şu kadar dar kaldı" diye bir şey yoktur.
   for (const v of [-1, NaN, Infinity]) {
@@ -126,7 +155,7 @@ test("kalan eki bir ÜST yıldızı ve ona olan mesafeyi söyler", () => {
   const q3 = 0.67, q2 = 0.42;
   // 1 yıldız bölgesi: hedef 2 yıldız.
   assert.equal(kalanYazisi(0.33, q3, q2, TR), " · 2 yıldıza %9 kaldı");
-  assert.equal(kalanYazisi(0.33, q3, q2, EN), " · 9% from 2 stars");
+  assert.equal(kalanYazisi(0.33, q3, q2, EN), " · 9% short of 2 stars");
   // 2 yıldız bölgesi: hedef 3 yıldız.
   assert.equal(kalanYazisi(0.60, q3, q2, TR), " · 3 yıldıza %7 kaldı");
 });

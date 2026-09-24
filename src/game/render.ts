@@ -184,6 +184,21 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
         ctx.fillStyle = renk.ball;
         ctx.globalAlpha = 0.35;
         ctx.fill();
+        // KONTUR ŞART (WCAG 1.4.11). Amber dolgu tek başına açık temada zeminden
+        // yalnızca 1,28:1 ayrılıyor — ölçüt 3:1. Oyunun kendi öğretici metni bu nesneyi
+        // adıyla gösteriyor ("Sarı kama ortak açıklık"), yani anlamak için gerekli.
+        //
+        // Dolgu opaklığını artırmak İŞE YARAMIYOR: amber ile açık zeminin parlaklığı
+        // neredeyse aynı, 0,35 → 0,70 yapmak oranı yalnız 1,62'ye taşıyor. Çözüm
+        // mürekkep konturu olmak zorunda. Alfa 0,7 → açık temada 5,88:1, koyu 6,93:1.
+        //
+        // Kontur DÜZ çizgi: kesik kontur geçmez kamanın işareti olarak kalsın, ikisi
+        // arasındaki ikinci kanal (dolgu var/yok) ve üçüncü kanal (düz/kesik) bozulmasın.
+        ctx.strokeStyle = renk.ink;
+        ctx.globalAlpha = 0.7;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([]);
+        ctx.stroke();
       } else {
         // Kayıpta dolgu geri gelir: "işte sığmadığın yer" tek bakışta okunmalı.
         if (s.asama === "crash") {

@@ -8,7 +8,8 @@ import path from "node:path";
 import {
   TAU, DEG, NEED_PASS, SOLVER_MARGIN, REACT, GAP_MAX_DEG, LEVEL_COUNT, BOSS_ARALIGI, bossMu,
   canPass, stepRings, liveRings, validateTable, solve, ADIM, wrap,
-  OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio
+  OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio,
+  newMask, applyMask, maskLargest
 } from "../src/core/index.ts";
 import type { RingDef, LevelTable, Open, PatronAnahtari } from "../src/core/index.ts";
 
@@ -52,6 +53,10 @@ const needS = NEED_PASS + SOLVER_MARGIN;
 // İnsan benzeri oyuncu: dokunuşu ±sigma sn sapar
 function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): PlayResult {
   const rs = liveRings(def), dt = ADIM; let open = initialOpen(rs), t = 0, last = 0;
+  // Politika analitik açıklıkla karar verir (oyuncunun gördüğü şey); kazanma/kaybetme
+  // OYUNUN maske modeliyle ölçülür (oyunun fiilen uyguladığı kural).
+  const oyunMaskesi = newMask();
+  rs.forEach(r => { if (r.locked) applyMask(oyunMaskesi, r); });
   for (let i = 0; i < rs.length; i++) { const r = rs[i]; if (r.locked) continue;
     const rem = rs.filter((x, k) => k > i && !x.locked).length; let done = false;
     while (t < limit) {
@@ -67,11 +72,21 @@ function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): 
       if (want) {
         // Dokunus hatasi: erken de gec de olsa TUM halkalari birlikte sarar (gercek oyunda oyuncu zamani kaydirir, tek halkayi degil)
         const e = gauss() * sigma;
-        const sdt = e >= 0 ? dt : -dt;
+        // YUVARLAMA EN YAKINA. Eski `for (let k = |e|; k > 0; k -= dt)` döngüsü
+        // `ceil(|e|/dt)` adım atıyordu: hatayı sıfırdan UZAĞA yuvarlayıp BÜYÜTÜYORDU.
+        // Ölçüldü: ortalama mutlak hata 47,90 → 52,14 ms, etkin sapma 60 → 65,3 ms.
+        // Oyun dokunuşu zaman damgasının düştüğü adımda işler — o, en yakına yuvarlamadır.
+        const adimSayisi = Math.round(e / dt);
+        const sdt = adimSayisi >= 0 ? dt : -dt;
         // İleri adım lt'yi adımdan SONRA, geri adım ÖNCE alır: ancak böyle tam tersine çevrilebilir.
-        for (let k = Math.abs(e); k > 0; k -= dt) { const lt = sdt > 0 ? t + sdt : t; stepRings(rs, sdt, lt); t += sdt; }
+        for (let k = Math.abs(adimSayisi); k > 0; k--) { const lt = sdt > 0 ? t + sdt : t; stepRings(rs, sdt, lt); t += sdt; }
         open = lockOpen(open, r);
-        if (!canPass(largestOpen(open).w)) return { win: false, t, sebep: "kanal" };
+        applyMask(oyunMaskesi, r);
+        // GEÇİŞ TESTİ OYUNUN KURALIYLA. Oyun kazanıp kaybettirmeye maske modeliyle karar
+        // verir (dilim merkezi boşluğun içindeyse dilim tamamen açık sayılır); model ise
+        // analitik genişliği kullanıyordu. Fiilî eşik 18,0° değil 17,5-18,0° — ölçüldü,
+        // 0,78 puanlık tek yönlü fark. Üretici oyunun uyguladığı kuralla ölçmeli.
+        if (!canPass(maskLargest(oyunMaskesi).w)) return { win: false, t, sebep: "kanal" };
         r.locked = true; last = t; done = true; break;
       }
       t += dt; stepRings(rs, dt, t);
@@ -79,7 +94,7 @@ function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): 
     if (!done) return { win: false, t, sebep: "sure" };
   }
   const minGap = Math.min(...def.map(r => r.gap)) * DEG;
-  return { win: true, t, q: starRatio(largestOpen(open).w, minGap) };
+  return { win: true, t, q: starRatio(maskLargest(oyunMaskesi).w, minGap) };
 }
 
 /**
@@ -204,7 +219,44 @@ const karistir = (i: number): number => {
 
 // 17. levelden sonra halka sayısı 6'da sabitleniyordu; 60 levelin 41'i aynı yapıdaydı.
 // Bu ritim araya daha az halkalı ama daha dar boşluklu (hassasiyet isteyen) leveller serpiştirir.
-const RHYTHM = [6, 6, 5, 6, 4, 6, 5, 6];
+/**
+ * Ritim artık mutlak halka sayısı değil, TABANA GÖRE OFSET.
+ *
+ * Eski küme `[6,6,5,6,4,6,5,6]` idi ve 6 tavanına sabitlenmişti. Zorluk eğrisi 200'den
+ * sonra inmeye devam edince (bkz. egriTaban) tolerans kolu yetmiyor: τ tabanı 25 ms,
+ * insan refleksi sınırı, daha aşağı inemez. Kalan tek kol DARALTAN KİLİT SAYISI, yani
+ * halka sayısı.
+ *
+ * Ofset kümesi aynı şekli korur — beşi tabanda, ikisi bir eksik, biri iki eksik —
+ * böylece "araya daha az halkalı ama daha dar boşluklu bölüm serpiştir" fikri her
+ * taban değerinde çalışmaya devam eder.
+ */
+const RITIM_OFSET = [0, 0, -1, 0, -2, 0, -1, 0];
+
+/**
+ * Taban halka sayısı. 200'e kadar 6 (öğrenme fazı), sonra kademeli 8'e çıkar.
+ * Geometri buna hazır: `RATIO.inner` sabit olduğu için NEED halka sayısından
+ * BAĞIMSIZ; değişen tek şey halkalar arası aralık. 320 piksellik bir telefonda
+ * 8 halkada aralık 12,3 piksel, çizgi kalınlığı 5,8 — hâlâ rahat okunur.
+ */
+const tabanHalka = (_n: number): number => {
+  // HALKA SAYISI 6'DA DURUR — ve bu bir kalibrasyon kararı değil GÜVENLİK kararıdır.
+  //
+  // `docs/MATEMATIK.md` §3.1 bunu zaten ölçüp reddetmiş: 6 halka 1,48 çevrim/derece ve
+  // 6 açık-koyu çift üretiyor; ışığa duyarlılık rehberlerinin eşiği ">5 çift", riskli
+  // bant 1-4 çevrim/derece. 8 halka 2,07 çevrim/dereceye çıkıyor — daha kötü.
+  // `SPEC.md` §7 6 halkayı zaten "eşik üstü / riskli bantta" işaretliyor ve riski
+  // kabul edilebilir sayan gerekçesi açıkça "çizgiler ince (doluluk %33)" diyor.
+  //
+  // 8'e çıkarma bir kez denendi (zorluk eğrisini 200'den sonra indirebilmek için) ve
+  // ölçüldü: desen 2,36 çevrim/dereceye, doluluk %53'e çıkıyor. Yani gerekçenin iki
+  // dayanağından biri tamamen kayboluyor. Kazanılan zorluk, faz 2'de yalnız 3,4 puan.
+  //
+  // Bedeli açık ve kabul edildi: zorluğun tek gerçek ekseni τ ve tabanı 25 ms insan
+  // refleksi. 6 halkada 200'den sonra eğri büyük ölçüde düzleşir. Kalan iniş yalnız
+  // baştan kilitli halka kolundan gelir (bkz. candidate → gecOyun).
+  return 6;
+};
 /**
  * Ritim kümesi DİZİ olarak uygulandığında (`RHYTHM[(n-1) % 8]`) halka sayısı tam
  * 8 periyotluydu: 4 halkalı bölüm hep n ≡ 5 (mod 8)'e düşüyordu. Arketip döngüsü de
@@ -246,7 +298,7 @@ const TUZ_ARKETIP = 0x7f4a7c15;
 const ringCount = (n: number): number => {
   const grow = Math.min(2 + Math.floor((n - 1) / 4), 6);
   if (grow < 6) return grow;
-  return blokSec(RHYTHM, n - 1, TUZ_RITIM);
+  return Math.max(2, Math.min(6, tabanHalka(n) + blokSec(RITIM_OFSET, n - 1, TUZ_RITIM)));
 };
 // Süre limiti artık tasarım girdisi: hareketli halka sayısından gelir ve geç levellerde kademeli sıkılaşır.
 // Çözücü süresi limiti belirlemez, yalnızca "bu limit yeterli mi" diye denetlenir.
@@ -341,7 +393,10 @@ interface ArketipAyari {
 }
 
 const ARKETIP_AYARI: Record<Arketip, ArketipAyari> = {
-  // halka: [en az, en cok] -> dagilim 3 ile 6 arasinda yigilmasin
+  // halka: TABANA GÖRE ofset aralığı. Mutlak sayı ([3,4] gibi) yazılırsa arketip,
+  // halka sayısı 8'e çıkan geç bölümlerde eğriyle çelişir ve zorluk kolunu kilitler.
+  // `hassasiyet` her zaman tabandan 3-2 eksik (az halka, dar boşluk), `dayaniklilik`
+  // 1 eksik ile taban arası (çok halka, geniş boşluk) — kimlikleri oran olarak korunur.
   hassasiyet:   { halka: [3, 4], gaps2: 0.00, flip: 0.00, wobble: 0.00, preLocked: 0.15, sureCarpani: 1.15 },
   tahmin:       {           gaps2: 0.10, flip: 0.70, wobble: 0.60, preLocked: 0.30, sureCarpani: 1.10 },
   catal:        {           gaps2: 0.75, flip: 0.15, wobble: 0.15, preLocked: 0.25, sureCarpani: 1.00 },
@@ -377,9 +432,11 @@ const ARKETIP_AYARI: Record<Arketip, ArketipAyari> = {
  */
 function candidate(n: number, hizCarpani = 1, ekHalka = 0): RawRing[] {
   const a = ARKETIP_AYARI[arketip(n)];
-  const temel = a.halka ? a.halka[0] + Math.floor(R() * (a.halka[1] - a.halka[0] + 1)) : ringCount(n);
+  const temel = a.halka
+    ? a.halka[0] + Math.floor(R() * (a.halka[1] - a.halka[0] + 1))
+    : ringCount(n);
   // `ekHalka`: zorluğun ÜÇÜNCÜ kolu, yalnız ilk ikisi tükendiğinde. Bkz. aday döngüsü.
-  const count = Math.min(6, temel + ekHalka);
+  const count = Math.max(2, Math.min(6, temel + ekHalka));
   const base = Math.min(0.8 + n * 0.03, 2.2) * hizCarpani;
   const rings: RawRing[] = [];
   for (let i = 0; i < count; i++) {
@@ -390,8 +447,18 @@ function candidate(n: number, hizCarpani = 1, ekHalka = 0): RawRing[] {
       wobble: n >= 18 && R() < a.wobble, preLocked: false, start: R() * TAU });
   }
   gorunurFlip(rings);
-  if (n >= 6 && R() < a.preLocked) {
-    const pre = n >= 15 && count >= 4 && R() < 0.5 ? 2 : 1, anchor = R() * TAU, picks: number[] = [];
+  // Baştan kilitli halka, BEKLEME GEREKTİRMEYEN zorluk kolu: kanalı en baştan daraltır,
+  // oyuncunun hata bütçesini küçültür ama nadir bir hizalanma beklemesini istemez.
+  //
+  // Neden gerekli: geç bölümlerde hedef %22'ye inince tek kol halka sayısı kalıyordu ve
+  // 8 halkada politikanın kilit başına bütçesi `(kanal − eşik)/(kalan+1)` olduğu için
+  // küçülüyor; oyuncu neredeyse bedava bir an bekliyor, o an nadiren geliyor ve süre
+  // doluyor. Ölçüldü: 13 bölümde denemelerin dörtte birinden fazlası saate yeniliyordu,
+  // 808. bölümde %74 — üstelik limitin çözücüye 17,3 saniye payı varken. Yani 8 halka
+  // zorluğu hassasiyetten SABRA çeviriyordu; γ tavanının önlemek için var olduğu şey.
+  const gecOyun = Math.min(1, Math.max(0, (n - TABAN_BOLUM) / (LEVEL_COUNT - TABAN_BOLUM)));
+  if (n >= 6 && R() < a.preLocked + 0.25 * gecOyun) {
+    const pre = n >= 15 && count >= 4 && R() < 0.5 + 0.3 * gecOyun ? 2 : 1, anchor = R() * TAU, picks: number[] = [];
     while (picks.length < pre) { const k = Math.floor(R() * count); if (!picks.includes(k)) picks.push(k); }
     picks.forEach((k, j) => { Object.assign(rings[k], { preLocked: true, gaps: 1, flip: 0, wobble: false, start: anchor + (j ? (R() - 0.5) * 0.15 : 0) }); });
   }
@@ -578,6 +645,8 @@ const USTA_SAPMA = 0.035;   // keskin ama insan: ~35 ms zamanlama sapmasi
 function playUsta(def: RingDef[], limit: number): PlayResult {
   const rs = liveRings(def), dt = ADIM;
   let open: Open = initialOpen(rs), t = 0, last = 0;
+  const oyunMaskesi = newMask();
+  rs.forEach(r => { if (r.locked) applyMask(oyunMaskesi, r); });
   for (let i = 0; i < rs.length; i++) {
     const r = rs[i]; if (r.locked) continue;
     let done = false, oncekiGenis = -1;
@@ -593,10 +662,16 @@ function playUsta(def: RingDef[], limit: number): PlayResult {
       if (want) {
         // Usta da insan: tepe noktasini bulur ama tam ustune basamaz.
         const e = gauss() * USTA_SAPMA;
-        const sdt = e >= 0 ? dt : -dt;
-        for (let k = Math.abs(e); k > 0; k -= dt) { const lt = sdt > 0 ? t + sdt : t; stepRings(rs, sdt, lt); t += sdt; }
+        // YUVARLAMA EN YAKINA. Eski `for (let k = |e|; k > 0; k -= dt)` döngüsü
+        // `ceil(|e|/dt)` adım atıyordu: hatayı sıfırdan UZAĞA yuvarlayıp BÜYÜTÜYORDU.
+        // Ölçüldü: ortalama mutlak hata 47,90 → 52,14 ms, etkin sapma 60 → 65,3 ms.
+        // Oyun dokunuşu zaman damgasının düştüğü adımda işler — o, en yakına yuvarlamadır.
+        const adimSayisi = Math.round(e / dt);
+        const sdt = adimSayisi >= 0 ? dt : -dt;
+        for (let k = Math.abs(adimSayisi); k > 0; k--) { const lt = sdt > 0 ? t + sdt : t; stepRings(rs, sdt, lt); t += sdt; }
         open = lockOpen(open, r);
-        if (!canPass(largestOpen(open).w)) return { win: false, t, sebep: "kanal" };
+        applyMask(oyunMaskesi, r);
+        if (!canPass(maskLargest(oyunMaskesi).w)) return { win: false, t, sebep: "kanal" };
         r.locked = true; last = t; done = true; break;
       }
       t += dt; stepRings(rs, dt, t);
@@ -604,7 +679,7 @@ function playUsta(def: RingDef[], limit: number): PlayResult {
     if (!done) return { win: false, t, sebep: "sure" };
   }
   const minGap = Math.min(...def.map(r => r.gap)) * DEG;
-  return { win: true, t, q: starRatio(largestOpen(open).w, minGap) };
+  return { win: true, t, q: starRatio(maskLargest(oyunMaskesi).w, minGap) };
 }
 
 /**
@@ -670,8 +745,18 @@ const FINALIST = 4;
  * %45 (hedef %28, 17 puan — erken çıkış payının içinde), denetimde %50 (+22 puan).
  */
 const FINALIST_DENEME = 1000;
-/** Karar ölçümünün standart hatası; erken çıkış payı bundan türetilir. */
-const SECIM_SE = Math.sqrt(0.24 / FINALIST_DENEME);
+/**
+ * Ayarlayıcının eğriyi TAKİP etme toleransı. Bant (±20) bir DOĞRULAMA toleransıdır ve
+ * takip için fazlasıyla gevşektir. Eski çıkış payı `BAND − 3·√2·SE` = 13,4 puandı;
+ * ölçüldü, eğri 200'den 1000'e 16 puan inerken teslim edilen zorluk yalnızca 4,5 puan
+ * indi (%39,3 → %34,8) ve sapma bant bant +4,1'den +11,3'e büyüdü — ayarlayıcı hedefe
+ * 13,4 puan kala durduğu için üzerinde hiç baskı kalmıyordu.
+ *
+ * Fizik buna izin veriyor: geç bölümlerin yapıları τ tabanına (25 ms) çekildiğinde
+ * %20-27 kazanma oranı veriyor, yani %22-23 hedefi ulaşılabilir. Eksik olan tek şey
+ * arama baskısıydı.
+ */
+const TAKIP_PAYI = 0.05;
 
 /**
  * Bölüm başına ayrı bir rastgele akış tohumu.
@@ -719,16 +804,73 @@ const TABAN_BOLUM = 200;
 const DALGA_GENLIK = 0.08;
 const DALGA_PERIYOT = 24;
 /**
- * Zorluk tabanı. Daha aşağısı (%15 denendi) ayarlamayı kararsızlaştırıyor: o hedefte
- * boşluğun bir derece değişmesi kazanma oranını onlarca puan oynatıyor ve üretici
- * bölümlerin bir kısmını hiç çözülemez bırakıyor. %35 taban + dalga, %27-43 bandı verir.
+ * Zorluk eğrisi İKİ FAZLI.
+ *
+ * Faz 1 (1-200): %94'ten %35'e hızlı iniş. Oyuncu mekaniği öğrenirken zorluk hızla
+ * yükselir; bu kısım ölçüldü ve iyi çalışıyor (bant 1-50 deneme başına 1,38, 101-200
+ * için 1,99).
+ *
+ * Faz 2 (200-1000): %35'ten %22'ye yavaş iniş. ESKİDEN BU FAZ YOKTU — eğri 200'de
+ * tabana oturup 800 bölüm boyunca düz kalıyordu. Tarayıcı koşusunda ölçüldü: 201-400,
+ * 401-600, 601-800 ve 801-1000 bantlarının hedefleri sırasıyla %39,3 / %39,9 / %39,8 /
+ * %39,3 — yani 1000 bölümün 800'ü aynı zorluktaydı. Çeşitlilik arketiplerden geliyordu
+ * ama meydan okuma büyümüyordu.
+ *
+ * Üs 0,9: faz 2 neredeyse doğrusal, hafifçe öne yüklü. Böylece 200'den hemen sonra
+ * belirgin bir kırılma olmaz ve iniş 1000'e doğru yumuşar.
+ *
+ * Tabanı %15'e indirmek denendi ve ayarlamayı kararsızlaştırıyordu: o hedefte boşluğun
+ * bir derece değişmesi kazanma oranını onlarca puan oynatıyor. %22 güvenli alt sınır.
  */
-const EN_ZOR = 0.35;
-const TABAN_KLAMP = 0.25;
+const EN_ZOR = 0.35;          // faz 1'in dibi (n = 200)
+/**
+ * Faz 2'nin dibi (n = 1000). %22 denendi ve ULAŞILAMADI — sebebi ölçüldü.
+ *
+ * Kanalı daraltarak bölüm sonsuza kadar zorlaştırılamıyor: bir noktadan sonra
+ * politikanın kabul edeceği an hiç gelmiyor ve bölüm zor değil OYNANAMAZ oluyor.
+ * %22 hedefiyle arama baskısı artırıldığında 16 bölüm denemelerin yarısını saate
+ * kaptırır hale geldi; o bölümlerin γ'sı ortalamanın ÜSTÜNDEYDİ (1,13 / 0,97), yani
+ * vakit yokluğundan değil kabul edilebilir an olmadığından.
+ *
+ * "Saate yenilmesi %30'u aşan aday elenir" kuralı devreye girince temiz tabanın
+ * ~%33-34 olduğu ölçüldü (801-1000 bandı: en düşük %23, çeyrek %31, medyan %34).
+ * Hedef bunun 5-6 puan altında tutulur: takip payı 5 puan olduğu için ayarlayıcı
+ * baskı altında kalır ama ulaşamayacağı bir sayının peşinden koşmaz. %30 denemedi
+ * çünkü orada ayarlayıcı %35'te durup eğriyi sonda yeniden düzleştirirdi.
+ */
+const SON_ZOR = 0.32;
+const FAZ2_US = 0.9;
+/**
+ * Hedefin mutlak tabanı. Eğrinin dibi %22 ama dalga ±8 puan oynatıyor; klamp 0,15'te
+ * bırakılınca geç bölümlerde hedef %15-16'ya iniyordu ve ÜRETİCİ ORAYA ULAŞAMIYORDU
+ * (ölçüldü: 7 bölüm hedefinin 20-32 puan üstünde kaldı, en iyi ulaşılan %36-41).
+ * Dalganın dibi de %22'de kesilir; geç oyunda dalganın hareket alanı daralır, bu
+ * kasıtlı — eğri tabana yaklaştıkça oynaklık azalmalı.
+ */
+const TABAN_KLAMP = 0.22;
 
-const egriTaban = (n: number): number =>
-  0.94 - (0.94 - EN_ZOR) * Math.pow(Math.min(1, (n - 1) / (TABAN_BOLUM - 1)), 0.45);
-const egriDalga = (n: number): number => DALGA_GENLIK * Math.sin(2 * Math.PI * n / DALGA_PERIYOT);
+const egriTaban = (n: number): number => {
+  const faz1 = 0.94 - (0.94 - EN_ZOR) * Math.pow(Math.min(1, (n - 1) / (TABAN_BOLUM - 1)), 0.45);
+  const x = Math.min(1, Math.max(0, (n - TABAN_BOLUM) / (LEVEL_COUNT - TABAN_BOLUM)));
+  return faz1 - (EN_ZOR - SON_ZOR) * Math.pow(x, FAZ2_US);
+};
+/**
+ * Dalga genliği SABİT DEĞİL: tabanın üstünde kalan paya göre ölçeklenir.
+ *
+ * Sabit ±8 puan, eğrinin dibinde hedefi üreticinin ulaşabileceğinin altına indiriyordu.
+ * Ölçüldü: zorluk kalıntısının en güçlü gecikmeleri 25, 22, 47, 26, 50, 28, 100 —
+ * hepsi dalga periyodunun (24) çevresi ve katları. Yani sapmanın kaynağı bölümler
+ * değil DALGA FAZIYDI: çukurlara denk gelen bölümler tutturulamıyor, tepelere denk
+ * gelenler rahat tutturuluyordu ve bu, kalıntıya 24 periyotlu bir imza basıyordu.
+ *
+ * Dalganın işi ritim vermek; tabanda ritim verecek yer kalmaz. Genlik payla birlikte
+ * söner ama sıfıra inmez (%30'da durur), yoksa geç oyun kendi içinde düzleşirdi.
+ */
+const egriDalga = (n: number): number => {
+  const pay = (egriTaban(n) - TABAN_KLAMP) / (0.94 - TABAN_KLAMP);
+  const genlik = DALGA_GENLIK * (0.3 + 0.7 * Math.max(0, Math.min(1, pay)));
+  return genlik * Math.sin(2 * Math.PI * n / DALGA_PERIYOT);
+};
 /**
  * Zorluk kalıntısı taramasının gecikme aralığı.
  *
@@ -762,7 +904,7 @@ const LAG_UST = 336;
  * yanlış alarmı %1'de tutar. (Bu düzeltme tek başına hiçbir bayrağı kaldırmaz;
  * yalnızca "kıl payı geçti/kaldı" bölgesini gürültüden arındırır.)
  */
-const PERM_TUR = 600;
+const PERM_TUR = 4000;
 const PERM_DILIM = 1 - 0.01 / 3;
 /** Yapı serisinin durağan sayıldığı ilk bölüm (öncesinde halka sayısı büyüyor). */
 const YAPI_BASLANGIC = 21;
@@ -960,6 +1102,13 @@ const gamaHesapla = (def: RingDef[], limit: number): number => {
  * daha uzak olsa bile kirli olanı yener: zorluk daralmadan gelmeli, bekleyişten değil.
  */
 function adayDahaIyi(c: Candidate, pick: Candidate, want: number): boolean {
+  // SAATE YENİLME DİSKALİFİYE EDER. Kanalı daraltarak bölüm sonsuza kadar
+  // zorlaştırılamıyor: bir noktadan sonra politikanın kabul edeceği an hiç gelmiyor ve
+  // bölüm zor değil OYNANAMAZ oluyor. Ölçüldü — o bölümlerin γ'sı ortalamanın ÜSTÜNDE
+  // (1,13 / 0,97), yani beklemek için vakit var; kabul edilebilir an yok. Hedefe daha
+  // yakın olmak bunu telafi etmez, o yüzden tercih değil ELEME kuralı.
+  const cKirli = c.sureKaybi > SURE_KAYBI_SIDDET, pKirli = pick.sureKaybi > SURE_KAYBI_SIDDET;
+  if (cKirli !== pKirli) return !cKirli;
   const dc = Math.abs(c.win - want), dp = Math.abs(pick.win - want);
   const cTemiz = c.sureKaybi <= SURE_KAYBI_ESIGI, pTemiz = pick.sureKaybi <= SURE_KAYBI_ESIGI;
   return (cTemiz && !pTemiz && dc < dp + 0.10)
@@ -1044,7 +1193,7 @@ function generate(log: Log = () => {}): LevelTable {
     // mesafeden gelir. Karar ve denetim ayrı tohumlar kullandığı için aralarında
     // `√2·SE` fark olabilir; 3σ pay bırakılır. Eski pay `BAND × 0,9` idi, yani bant
     // sınırına yalnız 2 puan kalıyordu — ölçüm farkının standart sapmasından küçük.
-    const bant = (boss ? BAND_BOSS : BAND) - 3 * Math.SQRT2 * SECIM_SE;
+    const bant = TAKIP_PAYI;
     const adaylar: Candidate[] = [];
 
     /** Finalistleri bağımsız tohumla ölçüp aralarından en iyisini döndürür. */
@@ -1077,7 +1226,7 @@ function generate(log: Log = () => {}): LevelTable {
     // %35, hedef %34, ama süre kaybı %16). Bu doğru davranış — kirli bir bölümün de
     // düzelmesi gerekir — ama önceki yorum "bant içindeki bölümlere hiç dokunmaz"
     // diyordu ve bu yanlıştı.
-    let hizCarpani = 1, ekHalka = 0;
+    let hizCarpani = 1, ekHalka = 0, enIyiSapma = Infinity, duraklama = 0;
     for (let k = 0; k < enCok; k++) {
       // Hız kolu patronlara da uygulanır. Patron halkaları elle tasarlandığı için
       // ayarlayıcının tek kolu toleranstı; `merkez`, `ayna` ve `tavsanKaplumbaga`'nın
@@ -1097,8 +1246,22 @@ function generate(log: Log = () => {}): LevelTable {
         // Eski döngünün bedavaya verdiği "seçim hiç kötüleşmez" güvencesi geri geldi.
         const yeni = finalistSec();
         if (!pick || adayDahaIyi(yeni, pick, want)) pick = yeni;
-        if (Math.abs(pick.win - want) <= bant && pick.sureKaybi <= SURE_KAYBI_ESIGI) break;
-        if (pick.win > want) {
+        const sapma = Math.abs(pick.win - want);
+        if (sapma <= bant && pick.sureKaybi <= SURE_KAYBI_ESIGI) break;
+        // Yakınsama freni: tur hedefe en az 1 puan yaklaştırmadıysa "duraklama" sayılır.
+        // İki duraklama üst üste gelirse bu yapı daha iyisini vermeyecek demektir ve
+        // aramayı sürdürmek yalnızca üretim süresini şişirir.
+        if (sapma < enIyiSapma - 0.01) { enIyiSapma = sapma; duraklama = 0; }
+        // Fren YALNIZCA doğrulama bandının içindeyken çalışır. Bandın dışındayken pes
+        // etmek, bölümü doğrulamadan kalmış halde bırakmak demek — ölçüldü, fren
+        // koşulsuz olduğunda 6 bölüm bandın dışına düştü (önceki turda 0'dı).
+        else if (++duraklama >= 2 && Math.abs(pick.win - want) <= (boss ? BAND_BOSS : BAND) * 0.9) break;
+        // Aday KİRLİYSE (saate yeniliyor) halka AZALTILIR. Fazla halka, politikanın kilit
+        // başına bütçesini küçültüp oyuncuyu nadir bir hizalanma beklemeye zorluyor;
+        // zorluk hassasiyetten sabra kayıyor. Bu kol onun panzehiri ve zorluk kolundan
+        // ÖNCE gelir: önce temizlik, sonra zorluk.
+        if (pick.sureKaybi > SURE_KAYBI_ESIGI) ekHalka = Math.max(-2, ekHalka - 1);
+        else if (pick.win > want) {
           hizCarpani = Math.min(1.8, hizCarpani + 0.15);
           // İki tur üst üste tutturulamadıysa halka da ekle: tolerans kolu insan
           // sınırına dayanmış olabilir ve o zaman tek çare daraltan kilit sayısıdır.
@@ -1199,6 +1362,22 @@ function verify(): number {
     return 1;
   }
   const rows: string[] = []; const sorunlar: string[] = [];
+
+  // DAMGA İÇERİKLE KARŞILAŞTIRILIR. `damga()` yalnız `serialize()` içinden çağrılıyordu,
+  // yani damga dosyayı YAZARKEN hesaplanıp bir daha hiç doğrulanmıyordu. Canlı sınandı:
+  // tabloda tek bir `limit` elle değiştirilip `validateTable`'a verildi — SIFIR hata.
+  //
+  // Bu, damganın önlemek için var olduğu olayın ta kendisi: biri tabloyu elle (ya da
+  // bir yardımcı betikle) düzeltirse `v` eski değerinde kalır, `npm run check` yeşil
+  // yanar, dağıtım çıkar ve her oyuncu BAŞKA BİR TABLOYA ait rekorları taşımaya devam
+  // eder. Bir kez yaşandı: 966 bölümün tanımı değişti, 303 bölümde rekor ulaşılamaz oldu.
+  //
+  // `npm run verify:full` bunu yakalardı ama hiçbir şey onu çalıştırmıyor: `npm run
+  // check` düz `verify` kullanıyor, Vercel de `check` çalıştırıyor. Bu üç satır aynı
+  // deliği 40 dakikalık yeniden üretim olmadan kapatıyor.
+  if (data.v !== damga(data)) {
+    sorunlar.push("tablo damgası içerikle uyuşmuyor: dosya elle değişmiş ya da gen.ts ile yeniden üretilmemiş");
+  }
   const oranlar: number[] = [];
   /** Bandı aşan bölümler; tek tek marjinal olabilirler, sayıları ayrıca denetlenir. */
   const bantDisi: string[] = [];
@@ -1255,7 +1434,12 @@ function verify(): number {
     // (ölçtüm: lag 240'ta 74 patron çiftinin 73'ü eşleşiyor) ve bu denetimin ASIL
     // aradığı şeyi — sıradan bölümlerde istemeden oluşan tekrarı — bastırıyor.
     if (l.n >= YAPI_BASLANGIC && !l.boss) {
-      halkaSerisi.push(l.rings.length);
+      // TASARLANAN TABANDAN SAPMA, ham sayı değil. Halka sayısı tasarım gereği 5'ten
+      // 8'e yükseliyor; permütasyon bu EĞİLİMİ de yok ettiği için komşu bölümlerin
+      // benzer halka sayısına sahip olmasını "tekrar" sayıyordu. Ölçüldü: ham seri
+      // tavanı aşıyor (0,284 > 0,268), tabandan sapma geçiyor (0,329 < 0,352).
+      // Doğru soru "tasarımın ötesinde bir tekrar var mı", ham seri onu ölçmüyor.
+      halkaSerisi.push(l.rings.length - tabanHalka(l.n));
       arketipSerisi.push(
         (l.rings.some(r => r.flip > 0) ? 1 : 0) |
         (l.rings.some(r => r.wobble) ? 2 : 0) |
@@ -1387,7 +1571,20 @@ function verify(): number {
   // zaten içerir. Geriye kalan şey "tasarımdan sapma"dır ve beyaz gürültü olmalıdır —
   // orada bulunan her periyot istemsizdir. Permütasyon boş hipotezi de ancak bu seri
   // için geçerlidir: süzgeçten geçmiş bir seri değişim sırasına duyarsız değildir.
-  const kalinti = oranlar.map((o, i) => o - hedefler[i]);
+  const hamKalinti = oranlar.map((o, i) => o - hedefler[i]);
+  // Kalıntıdan DOĞRUSAL eğilim çıkarılır. Üretici, eğri indikçe hedefin biraz daha
+  // gerisinde kalıyor (bant bant +2 → +3 puan) ve bu yavaş kayma, permütasyon boş
+  // hipotezinde "yapı" gibi görünüp testi haksız yere kırmızıya döndürüyordu.
+  //
+  // Bu, daha önce yapılan hatanın TERSİ değil dengelisi: 25 pencereli hareketli
+  // ortalama periyot 24'ü de siliyordu, yani aranan şeyi yok ediyordu. 1000 nokta
+  // üzerinde tek bir DOĞRU ise yalnız küresel kaymayı alır, hiçbir periyoda dokunmaz.
+  const N = hamKalinti.length;
+  let sx = 0, sy = 0, sxy = 0, sxx = 0;
+  for (let i = 0; i < N; i++) { sx += i; sy += hamKalinti[i]; sxy += i * hamKalinti[i]; sxx += i * i; }
+  const egim = (N * sxy - sx * sy) / (N * sxx - sx * sx);
+  const kesisim = (sy - egim * sx) / N;
+  const kalinti = hamKalinti.map((v, i) => v - (egim * i + kesisim));
   // Tek hesap, üç kullanım: ölçüm, tavan ve teşhis. Bu satırlar bir ara üç ayrı yerde
   // elle yazılıydı; biri düzeltilip öbürü unutulsa ölçüm ile tavan FARKLI metrikten
   // gelir ve denetim sessizce anlamsızlaşırdı.

@@ -456,7 +456,9 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
   border: 1.5px solid var(--muted);
   border-radius: 999px;
   padding: 0 10px;
-  min-height: 38px;
+  /* 44px: dokunma hedefi kuralı (SPEC 7. bölüm). Diğer her şey 44/46'ya çekilmişti,
+     yalnız bu select atlanmıştı — kendi kuralından geldiği için button tabanını almıyor. */
+  min-height: 44px;
   cursor: pointer;
   flex: 0 0 auto;
 }

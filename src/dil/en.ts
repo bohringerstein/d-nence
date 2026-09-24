@@ -94,10 +94,10 @@ export const EN: Metinler = {
   erkenDaraldi: "Path closed · it narrowed too early",
   darKaldi: derece => `Path closed · missed by ${derece}°`,
 
-  yildizEtiketi: { 3: "Clean open", 2: "Good open", 1: "By a hair" },
+  yildizEtiketi: { 3: "Clean open", 2: "Good open", 1: "Opened" },
   sonucSatiri: (etiket, yildiz, sure) => `${etiket} ${yildiz} ${sure} s`,
-  yildizaKalan: (yildiz, yuzde) => ` · ${yuzde}% from ${yildiz} stars`,
-  rekorEki: ", record",
+  yildizaKalan: (yildiz, yuzde) => ` · ${yuzde}% short of ${yildiz} stars`,
+  rekorEki: ", new best",
 
   patron: {
     ayna: { ad: "Mirror", ipucu: "They all line up at the same moment — wait for it, then tap fast" },

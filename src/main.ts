@@ -185,6 +185,26 @@ ui.kok.addEventListener("pointerdown", () => { if (ayarlar.ses) sesiAc(); });
 // da çözüyor — o yüzden haber döngüden geliyor (bkz. dongu `cozuldu`).
 document.addEventListener("visibilitychange", () => { if (document.hidden) sesiDuraklat(); });
 
+// ---- Geliştirme kancası ----------------------------------------------------
+//
+// YALNIZCA `npm run dev`'de var; `import.meta.env.DEV` üretim paketinde `false`
+// olduğu için bu blok bundle'dan tamamen düşer (tree-shaking).
+//
+// Varlık sebebi: oyunun zorluğu 60 ms'lik insan dokunuş sapmasına göre kalibre
+// ediliyor ve bu simülasyonda doğrulanıyor. Ama simülasyon oyunun KENDİ döngüsünü
+// değil, üreticinin modelini çalıştırıyor. Bu kanca, gerçek tarayıcıda gerçek
+// `pointerdown` olaylarıyla, gerçek fizik döngüsüne karşı aynı oyuncuyu oynatmayı
+// mümkün kılıyor — yani girdi hattının (zaman damgası kuyruğu dahil) kalibrasyonu
+// bozmadığını uçtan uca sınamayı.
+if (import.meta.env.DEV) {
+  (globalThis as unknown as { __donence: unknown }).__donence = {
+    get durum() { return durum; },
+    get kayit() { return kayit; },
+    levelYukle: (n: number) => levelYukle(n),
+    tablo
+  };
+}
+
 // ---- Level yükleme: tek nesne toptan değişir, alan alan sıfırlama yok -------
 function levelYukle(n: number, denemeyiKoru = false): void {
   const deneme = denemeyiKoru ? durum.deneme + 1 : 1;
@@ -376,6 +396,16 @@ function geriSayimBaslat(): void {
 
 function geriSayimDurdur(): void {
   geriSayim = 0;
+  // KUYRUĞU BURADA DA TEMİZLE. Kuyruğu temizleyen tek yer `adim()` idi, ama `adim()`
+  // yalnız `birikim >= ADIM` iken çalışır. Kare süresi fizik adımından (8,33 ms) kısa
+  // olduğunda bazı karelerde `adim()` HİÇ çalışmaz; geri sayım o karelerin birinde
+  // `cizim()` içinde sıfıra inerse, bir sonraki `adim()` artık canlıdır ve geri sayım
+  // sırasında basılmış dokunuşu işler — oyun canlanır canlanmaz bedava bir kilit.
+  //
+  // Ölçüldü (döngü aritmetiği birebir taklit edilerek, 2000 deneme/hız): 60 Hz %0,0 ·
+  // 90 Hz %0,0 · 120 Hz %10,8 · 144 Hz %16,6 · 165 Hz %18,0. 60 ve 90'da hiç
+  // görünmediği için elle sınamayla yakalanamaz.
+  girdi.temizle();
   sonGeriSayimRakami = -1;
   ui.gerisayim.classList.remove("aktif");
   ui.gerisayim.textContent = "";

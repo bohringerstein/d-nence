@@ -145,9 +145,56 @@ Diğer eksenler neden yardımcı olmuyor:
   güvenliği izin vermez: 6 halka zaten 1,48 çevrim/derece ve 6 açık-koyu çift üretir;
   ışığa duyarlılık rehberlerinin eşiği ">5 çift" ve riskli bant 1–4 çevrim/derecedir
   (bkz. `SPEC.md` 7. bölüm). 8 halka 2,07 çevrim/dereceye çıkar — daha kötüdür.
+  **Bu karar bir kez unutuldu ve pahalıya öğrenildi.** Zorluk eğrisini 200'den sonra
+  indirebilmek için halka sayısı 8'e çıkarıldı; bu paragraf gözden kaçmıştı. Beş
+  uzmanlı incelemede uzmanlardan ikisi bağımsız olarak yakaladı. Ölçüm: 8 halkada desen
+  2,36 çevrim/derece, doluluk %53 — SPEC §7'nin riski kabul edilebilir sayan
+  gerekçesi ("çizgiler ince, doluluk %33") tamamen geçersizleşiyor. Kazanılan zorluk
+  ise yalnız **1,7 puandı** (801-1000 bandı %37,1 → %35,4). Geri alındı.
 - **Hız** artırmak işe yaramaz. `gap = NEED_PASS + tol·Σ|ω|` olduğundan hız artınca
   boşluk da orantılı büyür: τ değişmez, yalnızca her şey büyür ve 85° tavanına dayanır.
   Denendi, 420. bölüm hiç üretilemedi.
+
+---
+
+### 3.2 İkinci duvar: kabul oranı ρ
+
+τ'nun tabanı (25 ms) bir duvar, ama tek duvar değil. Kanalı daraltarak bölüm sonsuza
+kadar zorlaştırılamıyor: bir noktadan sonra bölüm **zor değil oynanamaz** oluyor.
+Sebep γ (bekleme bütçesi) değil — ölçüldü, saate yenilen bölümlerin γ'sı ortalamanın
+*üstünde* (1,09 / 0,96). Vakit var; kabul edilebilir an yok.
+
+**Türetme.** Kanal genişliği `W`, halkanın boşluk yarım genişliği `h`, kalan halka
+`rem`, açgözlülük `tol`. Politika `p.w ≥ needS` **ve** `kayıp ≤ tol·(W − needS)/(rem+1)`
+isterse basar; `tol ≤ 1` için ikinci koşul bağlar. Kabul açısal yarım genişliği:
+
+```
+Δθ = (h − W/2) + tol · (W − needS) / (rem + 1)
+```
+
+Fırsat periyoduna (`2π / (g·|ω|)`) bölünce **kabul oranı**:
+
+```
+ρ = g · Δθ / π          (g = kapı sayısı)
+```
+
+**ρ hızdan bağımsızdır.** Bu yüzden "hızı artır" kolu bu duvarı kaldırmaz; yalnızca
+γ'yı rahatlatır. Tüm tablo ρ_min'e göre kovalandığında (1000 bölüm × 1000 deneme):
+
+| ρ_min | bölüm | süre kaybı | kazanma | γ |
+|---|---|---|---|---|
+| < %1 | 54 | **%12,3** | %32,9 | 1,03 |
+| %1–2 | 269 | %7,4 | %38,1 | 0,94 |
+| %3–5 | 287 | %6,4 | %43,4 | 0,95 |
+| > %8 | 9 | **%3,6** | %59,7 | 1,13 |
+
+γ bütün aralıkta düz; süre kaybını ρ belirliyor (`r(sk, log ρ) = −0,36`, `r(sk, γ) = +0,10`).
+Pratikte **ρ_min ≈ %1–2** altında bölüm hassasiyet sınavı olmaktan çıkar. Bu yüzden
+üretici denemelerin %30'undan fazlasını saate kaptıran adayı tercih etmez (bkz. `SPEC.md` 8. bölüm, "Saate yenilen aday tercih edilmez").
+
+Sert duvar da var ama bağlamıyor: `minGap < needS` olursa halka hiç basılamaz; bu,
+`τ < SOLVER_MARGIN / Σ'|ω|` demek, tipik `Σ'|ω| ≈ 6 rad/sn` için **2,9 ms** — 25 ms
+tabanının dokuz katı altında.
 
 ---
 
@@ -559,30 +606,34 @@ oranda ama bağımsız dağılmış zor bölümlerle en uzun kesintisiz serinin 
 
 ## 9. Ölçülen son durum (1000 bölüm)
 
-Damga `9137476bb7e1`. Bütün sayılar **üretimden bağımsız bir tohumla** ölçülmüştür
-(bkz. §8.1) ve `npm run verify` çıktısından kopyalanmıştır.
+Damga `78eda215621c`. Bütün sayılar **üretimden bağımsız bir tohumla** ölçülmüştür
+(bkz. §8.1) ve `npm run verify` çıktısından alınmıştır.
 
 | | |
 |---|---|
-| Hassasiyet τ | en düşük **25,0 ms**, medyan 29 ms, en yüksek 184 ms |
-| 25 ms altında bölüm | **0** |
-| Halka dağılımı | 2:4, 3:120, 4:191, 5:250, 6:435 |
-| Mekanik | iki kapılı 522, flip 491, hızlanan 549, baştan kilitli 348 bölüm |
-| Patron | 100 (altı tasarım dönüşümlü + kapanış) |
-| Yıldız eşikleri | q3 = 0,69, q2 = 0,41 |
-| Yıldız dağılımı (usta) | %25 / %35 / %39 |
-| Süre sınırı | 5,2–28,7 sn, ortalama 11,6 sn |
-| γ (bütün bölümlerde) | ortalama 0,92, en yüksek 1,31 (tavan 1,3) |
-| Bant dışı bölüm | **0** / 1000 (sayı tavanı 10) |
-| Patron tasarımı başına sapma | −1 … +3 puan (tavan ±6) |
-| Saate yenilme | baskın olduğu bölüm **0**/1000 |
-| Ritim | halka 0,350/0,384 — arketip 0,252/0,261 — zorluk 0,110/0,150 (hepsi tavan altı) |
-| Zor seri | en uzun 1 (tavan 3) |
+| Hassasiyet τ | en düşük **25,0 ms**, medyan 27,1 ms, en yüksek 214 ms |
+| 25 ms altında bölüm | **0** — ama %70'i 30 ms altında, yani kütle tabana yaslı |
+| Halka dağılımı | 2:4, 3:113, 4:176, 5:250, 6:457 — **en fazla 6** (bkz. §3.1) |
+| Mekanik | iki kapılı 496, flip 467, hızlanan 521, baştan kilitli 497 bölüm |
+| Yıldız eşikleri | q3 = 0,69, q2 = 0,40 |
+| Yıldız dağılımı (usta) | %26 / %35 / %40 |
+| Süre sınırı | 4,3–23,9 sn, ortalama 11,1 sn |
+| γ | ortalama 0,98, en yüksek 1,31 (tavan 1,3 + 0,05 tolerans) |
+| Bant dışı bölüm | **0** / 1000 |
+| Patron tasarımı başına sapma | +1 … +3 puan (tavan ±6) |
+| Saate yenilmenin baskın olduğu bölüm | **0** / 1000 |
+| Ritim | halka 0,387/0,396 — arketip 0,211/0,238 — zorluk 0,110/0,148 |
+| Damga denetimi | içerikle karşılaştırılıyor (elle düzenleme yakalanıyor) |
 | Doğrulama | **0 sorun** |
 
-> **γ satırı önceki sürümde "ortalama 0,58" diyordu ve bu sayı yalandı.** `Infinity`
-> dönen fırsat periyotları yüzünden 334 bölümün γ'sı 0 sayılıyordu (bkz. §6b). Artık
-> 1000 bölümde de ölçülüyor; gerçek ortalama 0,92.
+**Teslim edilen eğri** (bant ortalaması):
+
+| 1–50 | 51–100 | 101–200 | 201–400 | 401–600 | 601–800 | 801–1000 |
+|---|---|---|---|---|---|---|
+| %74,7 | %58,5 | %45,9 | %39,0 | %38,3 | %37,9 | **%37,1** |
+
+İlk tablo 201-400 / 401-600 / 601-800 / 801-1000'de %39 / %40 / %40 / %39 veriyordu —
+yani ortada *kolaylaşıyordu*. Şimdi tek yönlü iniyor; ama §3'ün öngördüğü gibi yavaş.
 
 ---
 

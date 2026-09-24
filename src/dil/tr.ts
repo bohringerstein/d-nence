@@ -82,7 +82,7 @@ export const TR: Metinler = {
   erkenDaraldi: "Açıklık kapandı · yol erken daraldı",
   darKaldi: derece => `Açıklık kapandı · ${derece}° dar kaldı`,
 
-  yildizEtiketi: { 3: "Temiz açılış", 2: "İyi açılış", 1: "Kıl payı" },
+  yildizEtiketi: { 3: "Temiz açılış", 2: "İyi açılış", 1: "Açıldı" },
   sonucSatiri: (etiket, yildiz, sure) => `${etiket} ${yildiz} ${sure} sn`,
   yildizaKalan: (yildiz, yuzde) => ` · ${yildiz} yıldıza %${yuzde} kaldı`,
   rekorEki: ", rekor",

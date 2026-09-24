@@ -290,14 +290,20 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
    yaklaşık **%37,5'inde** halka sayısı ritimden değil arketipten gelir. Bu kasıtlı:
    o iki arketibin kimliği zaten halka sayısıdır.
 
-   **Hız ekseni (son çare).** Aday araması normalde hızı değiştirmez, çünkü `sizeGaps`
-   boşluğu "tolerans × hız toplamı" ile hesaplar ve τ hızdan bağımsız çıkar. Ama
-   baştan kilitli halkası olan bölümlerde başlangıç kanalına `gerekenPay` taban koyar;
-   o zaman tolerans kolu ölür ve bölüm daha zor olamaz. Bu yüzden arama, **bant
-   dışında kaldığı** turlarda ve **yalnızca kolay yönde** hızı 0,15 adımlarla 1,8
-   katına kadar açar. Bant içinde kalan bölümler ilk turda çıktığı için bu kol onlara
-   hiç dokunmaz. (Aynı kilitlenme `merkez` patronunda elle düzeltildi: hızlar 1,5
-   katına çıkarıldı — bkz. MATEMATIK §8.5.) Daha az halkalı leveller zorluğu kaybetmez: ayarlama adımı boşlukları daraltarak aynı kazanma oranını tutturur, böylece o leveller dayanıklılık yerine hassasiyet ister.
+   **Aramanın üç kolu.** Ayarlayıcı hedefe takip payı (5 puan) içinde kalamadığında,
+   yalnızca **kolay yönde**, sırayla:
+   - **Tolerans** — birincil kol, boşluğu daraltır. τ tabanına (25 ms) kadar iner.
+   - **Hız** — 0,15 adımlarla 1,8 katına kadar. Normalde nötrdür (`sizeGaps` boşluğu
+     hızla orantılı büyütür, τ değişmez), ama baştan kilitli halkalarda `gerekenPay`
+     başlangıç kanalına taban koyunca tolerans kolu ölür ve o zaman hız bir kol olur.
+     **Bu kol ρ duvarını kaldırmaz** (ρ hızdan bağımsızdır, bkz. MATEMATİK §3.2),
+     yalnız γ'yı rahatlatır.
+   - **Halka sayısı** — iki tur üst üste tutturulamazsa +1, **6 tavanına kadar**.
+     Aday saate yeniliyorsa ters yönde çalışır ve halka azaltır: fazla halka kilit
+     başına bütçeyi küçültüp oyuncuyu nadir bir hizalanma beklemeye zorlar.
+   Bant içinde ve temiz kalan bölümler ilk turda çıktığı için bu kollar onlara hiç
+   dokunmaz. (`merkez` patronunda aynı kilitlenme elle düzeltildi: hızlar 1,5 katına
+   çıkarıldı — bkz. MATEMATİK §8.5.) Daha az halkalı leveller zorluğu kaybetmez: ayarlama adımı boşlukları daraltarak aynı kazanma oranını tutturur, böylece o leveller dayanıklılık yerine hassasiyet ister.
 2. **Hata payı milisaniye cinsinden.** Boşluk genişliği sabit derece değil, tolerans süresinden hesaplanır: `gap = NEED + tolSn × (hareketli halkaların hız toplamı)`. Hızlanan halkaların hızı 1,7 katı sayılır. Böylece hız artsa da insan için hissedilen zorluk kontrol altında kalır.
    **Halka başına genişlik.** Her halkanın kendi `gapScale` çarpanı vardır (0,82 – 1,18): `halkanın gap değeri = min(gap × gapScale, 85°)`. Böylece bir leveldeki halkalar farklı genişlikte olur; dar halka oyuncuya "asıl iş burada" der. Patron levelleri elle tasarlandığı için çarpanları 1'dir. Tavan 85°: daha geniş bir boşlukta halkanın üçte biri çizilmez ve halka gibi durmaz.
 3. **Referans çözücü.** Kusursuz zamanlamalı bir oyuncu: ilk kilidi hemen vurur, kalan hata payını kalan halkalara eşit böler, dokunuşlar arasında en az 0,3 sn bekler. Levelin çözülemediği ya da 16 sn'den uzun sürdüğü adaylar elenir.
@@ -350,24 +356,36 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
    *Neden dalgayı ezer:* hizalanma nefesleri hep uygun dalga evresinde tutuyordu; yalnız aralığı değiştirmek bir kısmını dalga çukuruna düşürüyor ve zor seriyi uzatıyordu.
    *Ölçülen (1000 bölüm, kazanma oranları, eğilimden arındırılmış, tam tarama):* en güçlü tekrar 0,84 (lag 120) → **0,49 (lag 240)**; en uzun zor seri %45 altında 19 → **12**, %40 altında 9 → **4**, %35 altında 7 → **4**. `npm run verify` bütün gecikmeleri tarar ve üç eşikte seri uzunluğunu denetler.
 
-9. **Ayarlama ve zorluk eğrisi.** Her bölüm için tolerans süresi ikili aramayla ayarlanır, böylece kazanma oranı hedef eğriye oturur. Eğri üç parçadan oluşur:
+9. **Ayarlama ve zorluk eğrisi.** Her bölüm için tolerans süresi ikili aramayla ayarlanır, böylece kazanma oranı hedef eğriye oturur. Eğri **iki fazlı**:
 
    ```
-   taban(n) = 0,94 − 0,59 × min(1, (n−1)/199)^0,45      // %94'ten %35'e, 200. bölümde tabanda
-   dalga(n) = 0,08 × sin(2π n / 24)                      // ±8 puan, 24 bölümlük salınım
+   faz1(n)  = 0,94 − 0,59 × min(1, (n−1)/199)^0,45                    // %94 → %35, n = 200
+   faz2(n)  = 0,03 × max(0, (n−200)/800)^0,9                         // n = 200'den sonra
+   taban(n) = faz1(n) − faz2(n)                                       // %35 → %32, n = 1000
+   pay(n)   = (taban(n) − 0,22) / (0,94 − 0,22)
+   dalga(n) = 0,08 × (0,3 + 0,7 × pay(n)) × sin(2π n / 24)            // ±8,0 → ±2,9 puan
    nefes(n) = hash{3,4} yürüyüşü, patronda n+1'e kaydırılır
-   hedef(n) = taban(n) + (nefes ? 0,12 : dalga(n))        // %25 ile %95 arasına sıkıştırılır
+   hedef(n) = taban(n) + (nefes ? 0,12 : dalga(n))                    // %22 ile %95 arasına sıkıştırılır
    ```
 
-   **Üs 0,45**: iniş başta diktir. Oyuncu 11. bölümde %80'in, 39'da %60'ın altına düşer. Eski 60 bölümlük eğri %80'e ancak 21. bölümde iniyordu ve "zorluk çok yavaş artıyor" şikâyetinin sebebi buydu.
+   **Üs 0,45 (faz 1)**: iniş başta diktir. Oyuncu 11. bölümde %80'in, 39'da %60'ın altına düşer.
 
-   **Dalga**: 150. bölümden sonra eğri düz kalsaydı geriye kalan 350 bölüm tek bir duvar olurdu.
+   **Faz 2 neden var ve neden bu kadar sığ.** Eğri eskiden 200'de tabana oturup 800 bölüm düz kalıyordu; bir tarayıcı koşusu 201-400 / 401-600 / 601-800 / 801-1000 bantlarının hedeflerini %39,3 / %39,9 / %39,8 / %39,3 ölçtü. Faz 2 zorluğu yükseltmeye devam ettirir, ama **fiziğin izin verdiği kadar**: zorluğun tek gerçek ekseni τ ve tabanı 25 ms insan refleksi (bkz. MATEMATİK §3). Hedef bir kez %22'ye, sonra %28'e çekildi ve ikisinde de **ulaşılamadı** — teslim edilen %35'te durdu, açık bant bant büyüdü. %32 ölçülen ulaşılabilir tabandır; eğri artık bir havuç değil bir ölçü.
 
-   **Taban %35'in altına inmez.** Daha aşağısı (%15 denendi) ayarlamayı kararsızlaştırıyor: o hedefte boşluğun bir derece değişmesi kazanma oranını onlarca puan oynatıyor ve bölümlerin bir kısmı hiç çözülemez kalıyor.
+   **Dalga genliği payla söner.** Sabit ±8 puan eğrinin dibinde hedefi üreticinin ulaşabileceğinin altına indiriyordu; o bölümler hem tutturulamıyor hem de oyuncuyu beklemeye zorluyordu. Dalganın işi ritim vermek; tabanda ritim verecek yer kalmaz. Genlik %30'da durur, sıfıra inmez.
 
-   **Katı monotonluk yoktur.** Eğri dalgalı olduğu için tek tek bölümler birbirinden kolay olabilir; `npm run verify` bunun yerine 20 bölümlük hareketli ortalamanın düştüğünü ve hiçbir yerde belirgin geri gitmediğini denetler.
+   **Hedef %22'nin altına inmez** (TABAN_KLAMP). Daha aşağısı (%15 denendi) ayarlamayı kararsızlaştırıyor: o hedefte boşluğun bir derece değişmesi kazanma oranını onlarca puan oynatıyor.
 
-   **Hız artırılmaz.** Bu tasarımda hız ve boşluk genişliği birbirine bağlıdır: `sizeGaps` boşluğu "tolerans süresi × hız toplamı" ile hesaplar, yani hızlı halka aynı hata payı için daha geniş boşluk ister. Hızı artırmak zorluğu artırmaz, yalnızca her şeyi büyütüp 85° tavanına dayar. Zorluğun gerçek kolu tolerans süresidir.
+   **Katı monotonluk yoktur.** Eğri dalgalı olduğu için tek tek bölümler birbirinden kolay olabilir.
+
+   **Model oyunun kuralıyla ölçer.** Üreticinin insan benzeri oyuncusu (`play()`) iki noktada oyundan ayrışıyordu ve ikisi de aynı yöne itiyordu — tablo hedefinden **4,5 + 0,7 puan kolay** çıkıyordu:
+   - Dokunuş hatası `ceil(|e|/dt)` adımla, yani **sıfırdan uzağa** yuvarlanıyordu; etkin sapma 60 → 63,4 ms. Oyun dokunuşu zaman damgasının düştüğü adımda işler, bu **en yakına** yuvarlamadır. Model artık `Math.round(e/dt)` kullanır.
+   - Geçiş testi analitik genişlikle yapılıyordu, oyun 0,5°'lik **maskeyle** karar verir. Model artık maskeyi kullanır.
+
+   **Aramanın takip payı 5 puan** (TAKIP_PAYI). Eskiden erken çıkış doğrulama bandından türetiliyordu (13,4 puan); eğri indikçe ayarlayıcı hedefe o kadar uzakta duruyordu ve üzerinde hiç baskı kalmıyordu. Bant bir *doğrulama* toleransı, *takip* toleransı değil.
+
+   **Saate yenilen aday tercih edilmez.** Kanalı daraltarak bölüm sonsuza kadar zorlaştırılamıyor: bir noktadan sonra politikanın kabul edeceği an seyrekleşiyor ve bölüm zor değil **oynanamaz** oluyor. Sınırı kabul oranı ρ belirler (bkz. MATEMATİK §3.2) ve ρ hızdan bağımsızdır, yani hızı artırmak bu duvarı kaldırmaz. Denemelerin %30'undan fazlasını saate kaptıran bir aday, hedefe daha yakın olsa bile temiz bir adaya karşı kaybeder.
+
 10. **Patron bölümleri** (her 10 bölümde bir) elle tasarlanmıştır: Ayna, Merkez, Metronom, Çatal, Tavşan ile kaplumbağa, Büyük kasa. Altı tasarım sırayla tekrar eder. Tasarımları `tools/gen.ts` içindeki `BOSSES` nesnesindedir.
     Hedefleri **hedef eğrinin %75'idir** (sabit puan farkı değil, oran), en az %22. Sebep: patronların halka sayıları ve hızları sabittir, ayarlayıcının elinde yalnızca boşluk genişliği vardır. Eğrinin dibinde bu yapılar sabit puanlı bir hedefi tutturamıyor, en fazla `%40'a inebiliyorlardı. Doğrulamada da patronlara daha geniş bant tanınır (±20 puan, normalde ±15).
 

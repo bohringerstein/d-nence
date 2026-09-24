@@ -60,8 +60,41 @@ export function dongu({ adim, cizim, cozuldu }: DonguGeriCagirmalari): Dongu {
    */
   let pencereDisinda = false;
 
-  const kare = (now: number): void => {
-    requestAnimationFrame(kare);
+  /**
+   * YALNIZCA `npm run dev`: gizli sekmede de kare üretmek için Web Worker zamanlayıcısı.
+   *
+   * Uzun otomatik oynanış testleri saatler sürüyor ve tarayıcı, sekme görünür
+   * olmadığında `requestAnimationFrame`'i TAMAMEN durduruyor — `setTimeout` da gizli
+   * sekmede saniyede bire, bir süre sonra dakikada bire kısılıyor. Kısılmayan tek
+   * zamanlayıcı Worker içindekidir. Bu dal yalnızca `__odakYoksay` açıkken kurulur ve
+   * `import.meta.env.DEV` false olduğu için üretim paketinde hiç yer almaz.
+   *
+   * Fizik, girdi ve zamanlama aynen çalışır; değişen tek şey kareyi kimin tetiklediği.
+   */
+  let worker: Worker | null = null;
+  const workerKur = (): void => {
+    // Koşul SABİT olmak zorunda. Eskiden `!donmaYoksay()` yazıyordu; esbuild fonksiyon
+    // çağrısını satır içine almadığı için gövde ölü kod sayılmıyordu ve `new Worker`,
+    // `URL.createObjectURL`, Blob kodu ile `donence:tik` ÜRETİM PAKETİNDE kalıyordu
+    // (doğrulandı). Çalışma zamanında zararsızdı ama bu dosyanın kendi yorumu
+    // "üretim paketinde hiç yer almaz" diyor; o yorum yanlış hale gelmişti.
+    if (!import.meta.env.DEV) return;
+    if (worker || !donmaYoksay()) return;
+    const kod = "let id; onmessage = e => { clearInterval(id);" +
+      " if (e.data) id = setInterval(() => postMessage(0), 4); };";
+    worker = new Worker(URL.createObjectURL(new Blob([kod], { type: "text/javascript" })));
+    worker.onmessage = () => {
+      if (document.hidden) kare(performance.now(), true);
+      // Otomatik oynanış testinin zamanlayıcısı. Gizli sekmede `setTimeout` 1 saniyeye
+      // kısılıyor (ölçüldü: 10 ms istendi, 1000 ms geldi) ve test robotunun 60 ms'lik
+      // hassasiyeti buna dayanamaz. Worker mesajları kısılmadığı için tik buradan verilir.
+      window.dispatchEvent(new Event("donence:tik"));
+    };
+    worker.postMessage(true);
+  };
+
+  const kare = (now: number, workerdan = false): void => {
+    if (!workerdan) requestAnimationFrame(kare as FrameRequestCallback);
     const gercek = Math.min((now - son) / 1000, EN_COK_BIRIKME);
     son = now;
     if (gizli) return;
@@ -87,7 +120,7 @@ export function dongu({ adim, cizim, cozuldu }: DonguGeriCagirmalari): Dongu {
     // başlamak üzere olan oyun ayırt edilemiyordu.
     const oncekiGizli = gizli;
     pencereDisinda = odaksizMi();
-    gizli = document.hidden || pencereDisinda;
+    gizli = donmaYoksay() ? false : (document.hidden || pencereDisinda);
     // Geri dönüşte biriken süre atılır: oyuncu yokken geçen zaman levele yazılmaz.
     if (!gizli) {
       son = performance.now();
@@ -97,10 +130,36 @@ export function dongu({ adim, cizim, cozuldu }: DonguGeriCagirmalari): Dongu {
   };
 
   /** Başlangıç durumu; hasFocus her ortamda tanımlı değil. */
-  const odaksizMi = (): boolean =>
-    typeof document.hasFocus === "function" ? !document.hasFocus() : false;
+  /**
+   * YALNIZCA `npm run dev`: donma (hem odak hem görünürlük kaynaklı) atlanır.
+   *
+   * Uzun otomatik oynanış testlerinde pencerenin saatlerce ön planda tutulması
+   * gerekmesin diye. Fizik, girdi ve zamanlama aynen çalışır; atlanan tek şey
+   * duraklatmanın kendisidir — ki onun doğru çalıştığı ayrıca sınanıyor. Üretim
+   * paketinde `import.meta.env.DEV` false olduğu için bu dal tamamen düşer.
+   */
+  const donmaYoksay = (): boolean => {
+    if (!import.meta.env.DEV) return false;
+    if ((globalThis as unknown as { __odakYoksay?: boolean }).__odakYoksay) return true;
+    // Sayfa yüklenirken global henüz kurulamaz; bayrak localStorage'da da tutulur.
+    try { return localStorage.getItem("donence:odakYoksay") === "1"; } catch { return false; }
+  };
 
-  const odakGitti = (): void => { pencereDisinda = true; gizli = true; };
+  const odaksizMi = (): boolean => {
+    if (donmaYoksay()) return false;
+    return typeof document.hasFocus === "function" ? !document.hasFocus() : false;
+  };
+
+  const odakGitti = (): void => {
+    // Yalnız DEV geçersiz kılması bu dalı atlar. Eskiden `odaksizMi() === false`
+    // yazıyordu ve bu ÜRETİMDE de davranışı değiştiriyordu: `document.hasFocus`
+    // tanımsız olan ortamlarda `odaksizMi()` false döndüğü için donma tamamen
+    // kapanıyordu, ve `blur` anında `hasFocus()` hâlâ true dönen tarayıcılarda donma
+    // bir `visibilitychange`'e kadar gecikiyordu — oysa bu kolun var olma sebebi tam
+    // olarak `visibilitychange`'in YAKALAMADIĞI durum.
+    if (donmaYoksay()) return;
+    pencereDisinda = true; gizli = true;
+  };
   const odakGeldi = (): void => { gorunurluk(); };
   /** Dokunuş her zaman çözer: oyuncu ekrana bastıysa oyun donuk kalmamalı. */
   const dokunusla = (): void => { if (gizli) gorunurluk(); };
@@ -110,13 +169,14 @@ export function dongu({ adim, cizim, cozuldu }: DonguGeriCagirmalari): Dongu {
       if (calisiyor) return;
       calisiyor = true;
       pencereDisinda = odaksizMi();
-      gizli = document.hidden || pencereDisinda;
+      gizli = donmaYoksay() ? false : (document.hidden || pencereDisinda);
       son = performance.now();
       birikim = 0;
       document.addEventListener("visibilitychange", gorunurluk);
       window.addEventListener("blur", odakGitti);
       window.addEventListener("focus", odakGeldi);
       window.addEventListener("pointerdown", dokunusla, true);
+      workerKur();                       // DEV: gizli sekmede kare üreticisi
       requestAnimationFrame(kare);
     }
   };
