@@ -101,8 +101,10 @@ minGap = leveldeki en küçük gap (radyan)
 q = (en büyük açıklık − NEED_PASS) / (minGap − NEED_PASS)
 3 yıldız: q >= q3   "Temiz açılış"
 2 yıldız: q >= q2   "İyi açılış"
-1 yıldız: aksi      "Kıl payı"
+1 yıldız: aksi      "Açıldı"
 ```
+
+1 yıldızın adı eskiden "Kıl payı" idi. Oysa kazançların çoğu 1 yıldızla biter ve oyuncu çoğu zaman kıl payı geçmemiştir; ad bir başarıyı küçümsüyor, ayrıca kayıp mesajındaki "kıl payı" sözüyle çakışıyordu. Yıldız glifleri (★☆☆) ekran okuyucuya ayrıca sözle verilir ("3 üzerinden 1 yıldız"): glifler ya hiç okunmuyor ya "siyah yıldız, beyaz yıldız" diye okunuyordu.
 
 `q3` ve `q2` level tablosunun en üstünde gelir. **Bu belgeye sayı yazılmaz**: değerler tablo her üretildiğinde yeniden hesaplanır (bu yazının yazıldığı sırada 0,67 ve 0,42). Oyun bunları `levels.json`'dan okur, koda gömmez.
 
@@ -140,7 +142,8 @@ Dikey düzen, yukarıdan aşağıya:
 
 Oyun alanında çizim sırası:
 1. Arka planda levelin numarası, büyük ve çok soluk (patron levelinde sarı). Punto `S × 0,5`'tir, ama metnin yarı genişliği en dış halkayı aşarsa oranla küçültülür — dört hanede ("1000") rakam hem halkaları hem temizlenen kutuyu taşıyordu. Rakam çizildikten hemen sonra merkezde yumuşak kenarlı bir delik silinir: gövdesi tam topun altından geçiyordu (1, 4, 7 gibi merkezden geçen rakamlarda, yani Level 1'de).
-2. Açıklık kamaları, yalnızca en az bir halka kilitliyken. **Geçer kama sarı %35 dolu; geçmez kama doldurulmaz**, yalnızca kesik kırmızı konturla çevrilir. **Kayıpta kural değişir: daralmış kanal kırmızı DOLU çizilir** — oyuncunun neden kaybettiğini görmesi gereken tek an odur (aşağıda "Kaybın açıklanması"). Eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15) ve açık temada aralarındaki fark 1,03:1 idi — fiilen ayırt edilemiyorlardı. Yeni modelde ayrım hem parlaklığa hem doluluğa bağlıdır, yani renkten bağımsız iki kanal taşır (açık tema 1,28:1, koyu tema 2,43:1).
+2. Açıklık kamaları, yalnızca en az bir halka kilitliyken. **Geçer kama sarı %35 dolu; geçmez kama doldurulmaz**, yalnızca kesik kırmızı konturla çevrilir. **Kayıpta kural değişir: daralmış kanal kırmızı DOLU çizilir** — oyuncunun neden kaybettiğini görmesi gereken tek an odur (aşağıda "Kaybın açıklanması"). Eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15) ve açık temada aralarındaki fark 1,03:1 idi — fiilen ayırt edilemiyorlardı. Yeni modelde ayrım renkten bağımsız üç kanal taşır: dolgu var/yok, kontur düz/kesik ve kayıpta kırmızı dolgu.
+   **Geçer kamanın mürekkep konturu vardır** (düz, %70 opak, 1,5 px). Amber dolgu açık temada zeminden yalnız 1,28:1 ayrılıyor; WCAG 1.4.11 grafik nesneler için 3:1 ister ve dolgu opaklığını artırmak işe yaramaz (amber ile açık zeminin parlaklığı neredeyse aynı). Kontur zemine karşı açık temada 4,68:1, koyu temada 6,93:1; geçmez kamanın kesik kırmızı konturu 3,03:1 ve 4,72:1 — eşiğin hemen üstünde, test korur. **Kontur yalnız halkaların dışında çizilir**: dış yay ve iki uçta dış halkadan yaya kısa birer çentik. İlk sürümde kontur dolgu yolunun kendisiydi ve merkezden çıkan iki çizgi halkalarla aynı renkte bütün halkaları kesiyordu. Opaklıklar tek kaynaktır (`render.ts` `KAMA`); kontrast testi oradan okur, çizim testi o değerle gerçekten çizildiğini doğrular.
 3. Halkalar: kilitli olanlar tam opak; sıradaki (aktif) halka sarı ve kalın; ondan sonraki halka %75; diğerleri %40. Kilitlenme anında çizgi kısa süre kalınlaşır.
 4. İşaretler: baştan kilitli halkada küçük kare, yön değiştiren halkada kırmızı nokta (ikisi de en geniş çizili yayın ortasında).
    **Kare zemin renginde dolu ve mürekkeple çevrilidir.** Mürekkeple doldurulduğunda, baştan kilitli halka da mürekkep rengiyle ve tam opaklıkla çizildiği için kare halkanın üstünde görünmez oluyordu — 1000 bölümün 431inde durum buydu ve Level 7deki ipucu "kareli halka baştan kilitli" diyerek olmayan bir şeyi arattırıyordu. Kenarlık şart: dolgusu tek başına kalsaydı halkada küçük bir boşluk sanılabilirdi.
@@ -198,7 +201,7 @@ Süre çubuğunun oluğu iki temada da zeminden ayrılmalıdır (açık 1,42:1, 
 
 - **Kanal ekranda kalır.** Kamalar eskiden kayıpta tamamen gizleniyordu; yani "neden kaybettim" sorusuna cevap veren tek öğe, tam da o soru sorulduğu anda siliniyordu. Geriye kırmızı bir halka ve sarsıntı kalıyordu: "kaybettin" diyordu ama "şu kadarla" demiyordu. Artık daralmış kanal kırmızı dolu çizilir ve topun ona sığmadığı görünür.
 - **Mesaj okunacak kadar kalır.** Kayıp animasyonu 0,9 saniye sürer ve bitince level yeniden yüklenir; yükleme de ipucunu hemen eziyordu. Yani bu cümle ekranda 0,9 saniye duruyordu — okumak bundan uzun sürer. Sonuç mesajları (kayıp, kazanma, süre dolması) artık **korumalı** yazılır ve bir sonraki denemeye taşar; yeniden başlama gecikmez. Koruma yalnızca oyun canlıyken işler: duraklatan oyuncu okuma süresini yakmaz.
-- **Pay yazılır.** Kanalın geçiş eşiğinden ne kadar dar kaldığı, kaybın oluştuğu anda zaten hesaplanıyordu ama atılıyordu. Artık durumda saklanır ve ipucunda söylenir: 0,05°'nin altında "kıl payı", 10°'nin üstünde "yol erken daraldı", arada sayıyla ("1,4° dar kaldı"). **Süre dolduğunda ölçülecek bir pay yoktur; orada sayı uydurulmaz.**
+- **Pay yazılır.** Kanalın geçiş eşiğinden ne kadar dar kaldığı, kaybın oluştuğu anda zaten hesaplanıyordu ama atılıyordu. Artık durumda saklanır ve ipucunda söylenir: tek dilimlik (0,5°) kayıpta "kıl payı", 10°'nin üstünde "yol erken daraldı", arada sayıyla ("1,5° dar kaldı"). Eşik 0,6°'dir: kanal 0,5°'lik dilimlerle ölçüldüğü için pay hep dilimin katıdır ve eski 0,05° eşiği hiç tetiklenemiyordu (991 kaybın sıfırı bu mesajı aldı). **Süre dolduğunda ölçülecek bir pay yoktur; orada sayı uydurulmaz**, ama kaç halkanın kilitlenmeden kaldığı söylenir ("Süre doldu · 2 halka kaldı"): "Süre doldu" tek başına bir halka kala ile hiç kilitlemeden aynı cümleydi.
 
 **Duraklatma.** Oyuncunun ara vermesi gereken bir durum her zaman olur; eskiden tek yol ayarlar panelini açmaktı ve panel kapanınca level **baştan başlıyordu** — yani ara vermenin bedeli ilerlemeydi.
 
@@ -215,7 +218,7 @@ Süre çubuğunun oluğu iki temada da zeminden ayrılmalıdır (açık 1,42:1, 
 **Birikimin görünmesi.** Ayarlar paneli ilerleme özetini gösterir: kaç bölüm açıldığı ve toplanan yıldız ("312 bölüm açıldı · 714 / 936 yıldız"). Toplanan yıldız eskiden oyun boyunca hiçbir yerde görünmüyordu; yalnızca 1000. bölümü bitiren oyuncu toplamını öğreniyordu. 1000 bölümlük bir oyunda devam etme sebebinin kendisi birikimin görünmesidir.
 
 **İpuçları.** Alt çubuktaki metin şu önceliğe göre seçilir:
-1. Patron leveli, ilk deneme: `"<ad>: <açıklama>"`.
+1. Patron bölümü (daha önce bitirilmemişse): ilk denemede `"<ad>: <açıklama>"`, sonraki denemelerde `"Deneme N · <açıklama>"` — ad düşer, çünkü `"Deneme 12 · Çatal: Her halkada…"` dar ekranda üç satıra taşıyor ve alt çubuk büyüyüp halkaları zıplatıyordu. Aynı patron tasarımı **yeniden** geldiğinde (tasarımlar ~70 bölümde bir döner) yalnız adı yazılır: oyuncu kuralı ilk karşılaşmada öğrendi.
 2. **Öğretici ipucu (yalnızca level daha önce bitirilmemişse).** İkinci ve sonraki denemelerde önüne deneme sayısı eklenir: `"Deneme N · <ipucu>"`.
    *Neden bu sırada:* öğretici ipucu eskiden deneme sayacının altındaydı ve ilk kayıpta kayboluyordu. Oysa oyuncu kuralı tam da kaybettiği için öğrenmeye çalışır; Level 2'deki "Sarı kama ortak açıklık" cümlesi oyunun belkemiğidir ve tek bir kayıpla siliniyordu.
 3. İkinci ve sonraki denemeler (öğretici ipucu yoksa): `"Deneme N"`, varsa en iyi yıldızla birlikte.
@@ -241,12 +244,25 @@ Süre çubuğunun oluğu iki temada da zeminden ayrılmalıdır (açık 1,42:1, 
 | Ölçüt | Rehber eşiği | Dönence | Sonuç |
 |---|---|---|---|
 | Yanıp sönme sıklığı | saniyede 3'ten fazla | en kötü hâlde 1,1 | eşiğin çok altında |
-| Flaş şiddeti | %10 parlaklık sıçraması | %18 opaklık, 0,5 sn'de sönüyor | sınırda, sıklık düşük |
+| Flaş şiddeti | %10 parlaklık sıçraması | açık temada %17,7 (0,848 → 0,671), deneme başına bir kez, 0,5 sn'de söner | şiddet eşik üstü, sıklık saniyede birin altında: 2.3.1'i geçer; "hareketi azalt" kapatır |
 | Açık-koyu çizgi çifti | 5'ten fazla | 6 halkalı levelde 6 | **eşik üstü** |
 | Uzamsal frekans | 1–4 çevrim/derece riskli | 1,48 | **riskli bantta** |
 | Kontrast (Michelson) | 0,4 üstü riskli | halka/zemin 0,93–0,96 | **eşik üstü** |
-| Desenin görüş açısı | "geniş alan kaplayan" | 11°, oyun alanının %13,8'i | küçük, koruyucu |
+| Desenin kapladığı alan | ekranın %25'i (değişen desen), %40'ı (duran çizgiler) | 11,2°; 360×780 ekranın %25,5'i, oyun alanının %33'ü | duran çizgi sınıfında, sınırın altında |
 | Yön değiştirme sıklığı | kritik bant 15–25 Hz | 0,31–0,83 Hz | çok uzakta |
+
+**Desen alanı mürekkep alanı değildir.** Rehberler (ITU-R BT.1702, Ofcom) desenin kapladığı alanı sayar, çizgilerin boyadığı pikselleri değil. Bu belgenin ilk sürümü "%13,8" yazıyordu: o yalnız mürekkepti. Halka bandı ekranın %25,5'ini kaplar. Belirleyici olan desenin sınıfı: halkalar eş merkezlidir, dönerken çizgiler yerinde durur, yalnız boşluklar hareket eder. Bu "duran çizgi" sınıfıdır ve sınırı ekranın %40'ıdır.
+
+Cihaz aralığı (6 halka):
+
+| Cihaz / mesafe | Uzamsal frekans | Görüş açısı | Doluluk |
+|---|---|---|---|
+| 320 px telefon / 25 cm | 1,44 çevrim/° | — | %33 |
+| 7 cm telefon / 32 cm | 1,48 çevrim/° | 11,2° | %33 |
+| büyük telefon / 40 cm | 1,72 çevrim/° | — | %33 |
+| tablet / 40 cm | 0,92 çevrim/° | 17,7° | %22 |
+
+**Halka tavanı 6 bu değerlendirmenin ön koşuludur.** 7 ya da daha fazla halka onu geçersiz kılar: 8 halkada 2,07 çevrim/° (büyük telefonda 2,41), doluluk %47 (bkz. MATEMATİK §3.1).
 
 Desen üç ölçütü işaretliyor ama en belirleyicisini kaçırıyor: telefonda yalnızca 11° kaplıyor ve çizgiler ince (doluluk %33). Baş dönmesi riski ihmal edilebilir — dönen desenin kendi kendine dönme yanılsaması (vection) yaratması için genellikle 60°+ görüş alanı gerekir. En olası rahatsızlık kaynağı dönen halkalar değil, kayıptaki ekran sarsıntısıdır.
 
@@ -363,7 +379,7 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
    faz2(n)  = 0,03 × max(0, (n−200)/800)^0,9                         // n = 200'den sonra
    taban(n) = faz1(n) − faz2(n)                                       // %35 → %32, n = 1000
    pay(n)   = (taban(n) − 0,22) / (0,94 − 0,22)
-   dalga(n) = 0,08 × (0,3 + 0,7 × pay(n)) × sin(2π n / 24)            // ±8,0 → ±2,9 puan
+   dalga(n) = 0,08 × (0,3 + 0,7 × pay(n)) × sin(2π n / 24)            // ±8,0 → ±3,2 puan
    nefes(n) = hash{3,4} yürüyüşü, patronda n+1'e kaydırılır
    hedef(n) = taban(n) + (nefes ? 0,12 : dalga(n))                    // %22 ile %95 arasına sıkıştırılır
    ```
@@ -387,7 +403,7 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
    **Saate yenilen aday tercih edilmez.** Kanalı daraltarak bölüm sonsuza kadar zorlaştırılamıyor: bir noktadan sonra politikanın kabul edeceği an seyrekleşiyor ve bölüm zor değil **oynanamaz** oluyor. Sınırı kabul oranı ρ belirler (bkz. MATEMATİK §3.2) ve ρ hızdan bağımsızdır, yani hızı artırmak bu duvarı kaldırmaz. Denemelerin %30'undan fazlasını saate kaptıran bir aday, hedefe daha yakın olsa bile temiz bir adaya karşı kaybeder.
 
 10. **Patron bölümleri** (her 10 bölümde bir) elle tasarlanmıştır: Ayna, Merkez, Metronom, Çatal, Tavşan ile kaplumbağa, Büyük kasa. Altı tasarım sırayla tekrar eder. Tasarımları `tools/gen.ts` içindeki `BOSSES` nesnesindedir.
-    Hedefleri **hedef eğrinin %75'idir** (sabit puan farkı değil, oran), en az %22. Sebep: patronların halka sayıları ve hızları sabittir, ayarlayıcının elinde yalnızca boşluk genişliği vardır. Eğrinin dibinde bu yapılar sabit puanlı bir hedefi tutturamıyor, en fazla `%40'a inebiliyorlardı. Doğrulamada da patronlara daha geniş bant tanınır (±20 puan, normalde ±15).
+    Hedefleri **hedef eğrinin %75'idir** (sabit puan farkı değil, oran), en az %22. Sebep: patronların halka sayıları ve hızları sabittir, ayarlayıcının elinde yalnızca boşluk genişliği vardır. Eğrinin dibinde bu yapılar sabit puanlı bir hedefi tutturamıyor, en fazla `%40'a inebiliyorlardı. Doğrulamada da patronlara daha geniş bant tanınır (±25 puan, normalde ±20).
 
 Üretici sabit bir tohumla çalışır, her çalıştırmada birebir aynı tabloyu verir.
 
@@ -421,7 +437,9 @@ Kayıt okunamazsa oyun hata vermeden Level 1'den başlar. "Baştan başla" Level
 
 **Kayıt şeması** (`donence:v1`): `level` (son oynanan), `enUzak` (ulaşılan en uzak bölüm; bölüm seçiminde buraya kadarı açıktır ve **soğuk açılışın çıpası budur**), `tabloSurum` (rekorların ait olduğu tablo damgası), `bests` (level -> {yıldız, süre}).
 
-**Tablo damgası.** `data/levels.json` bir `v` alanı taşır: bölümlerin ve yıldız eşiklerinin özeti. Kayıt bölümleri numarayla sakladığı için tablo yeniden üretildiğinde "47. bölümde 2 yıldız" kaydı başka bir bulmacaya ait olur; bir kez yaşandı ve ölçüldü (966 bölümün tanımı değişti, 303 bölümde gösterilen rekor ulaşılamaz hâle geldi). Damga eşleşmezse **yalnız `bests` temizlenir**; `level` ve `enUzak` korunur. Damgadan önce yazılmış kayıtlarda alan yoktur ve o kayıtlar cezalandırılmaz: mevcut tabloyu benimserler.
+**Tablo damgası.** `data/levels.json` bir `v` alanı taşır: bölümlerin ve yıldız eşiklerinin özeti. Kayıt bölümleri numarayla sakladığı için tablo yeniden üretildiğinde "47. bölümde 2 yıldız" kaydı başka bir bulmacaya ait olur; bir kez yaşandı ve ölçüldü (966 bölümün tanımı değişti, 303 bölümde gösterilen rekor ulaşılamaz hâle geldi). Damga eşleşmezse **yalnız `bests` temizlenir**; `level` ve `enUzak` korunur. Damgadan önce yazılmış kayıtlarda alan yoktur ve o kayıtlar cezalandırılmaz: mevcut tabloyu benimserler. Rekorlar silindiğinde oyuncuya söylenir: "Bölümler güncellendi: ilerlemen yerinde, yıldız rekorları sıfırlandı". Mesaj sayfa açılırken yazıldığı için ekran okuyuculara ulaşmıyordu (canlı bölge henüz kaydolmamıştı); kısa bir süre sonra yeniden yazılır.
+
+**Aynı oyun iki sekmede.** Oyun sırasındaki her yazma (ilerleme, rekor) diskteki kaydı önce okur ve onunla birleştirir: `enUzak` ikisinin büyüğüdür, rekorlar bölüm bölüm iyisi seçilerek birleşir. Eskiden kayıt bellekten bütünüyle yazılıyordu ve son yazan kazanıyordu; daha kötüsü, yeni sürümü açan sekme kaydı yeni tabloya taşıdıktan sonra **eski sekme bir sonraki kazanışta eski damgayı geri yazıyor**, sonraki açılışta yeni tabloda kırılan rekorlar da siliniyordu. Artık diskteki damga bellekteki damgadan farklıysa bu sekme eski sayılır: yalnız ilerlemesi taşınır, rekorları yazılmaz ve sayfa ilk güvenli anda (bir bölüm bitince) yenilenir. "Baştan başla" ve yedekten yükleme birleştirmez: onlar ilerlemeyi bilerek küçültür.
 
 ## 10. Kabul ölçütleri
 
@@ -432,7 +450,7 @@ Bir sürüm ancak aşağıdakilerin hepsi sağlanınca tamam sayılır:
 - [x] Birim testleri: açı normalleştirme, maske uygulama, çembersel en büyük açıklık (başa sarma dahil), yıldız hesabı.
 - [x] Kayıp sonrası kazanma, süre dolması ve art arda hızlı dokunuş senaryolarında oyun takılmıyor.
 - [x] 360×640 ve 1440×900 ekranlarda halkalar ekrana sığıyor, düzen bozulmuyor.
-- [x] Orta seviye bir telefonda 60 fps. *(Ölçüldü: en yoğun kare telefon ölçüsünde 1,9 ms, 16,7 ms bütçesinin %11'i. Gerçek cihazda akıcı olduğu doğrulandı. Girdi artık kare hızından bağımsız olduğu için 60 fps oynanışı sınırlamaz; bkz. `docs/MATEMATIK.md` 10. bölüm.)* *(Masaüstünde ölçüldü: en yoğun kare 1920×1000'de 6,2 ms, telefon ölçüsünde 1,9 ms — 16,7 ms bütçesinin %37 ve %11'i. Gerçek cihazda doğrulanmayı bekliyor: `npm run dev -- --host`.)*
+- [x] Orta seviye bir telefonda 60 fps. *(Ölçüldü: en yoğun kare telefon ölçüsünde 1,9 ms, 16,7 ms bütçesinin %11'i. Gerçek cihazda akıcı olduğu doğrulandı. Girdi artık kare hızından bağımsız olduğu için 60 fps oynanışı sınırlamaz; bkz. `docs/MATEMATIK.md` 10. bölüm.)* *(Masaüstünde ölçüldü: en yoğun kare 1920×1000'de 6,2 ms, telefon ölçüsünde 1,9 ms — 16,7 ms bütçesinin %37 ve %11'i. Gerçek cihazda doğrulanmayı bekliyor: `npm run dev -- --host`.)* Tuvalin piksel yoğunluğu en fazla 2'dir: 3x ekranlı telefonlarda tuval 9 kat piksel taşıyordu, masaüstü ölçümü bunu göstermez. Kareden kareye değişmeyen işler (sayı biçimlendirici, bölüm numarasının ölçüsü, merkezdeki delik gradyanı, sayaç metni) bir kez kurulur.
 - [x] Açık ve koyu temada tüm öğeler okunabilir.
 
 ## 11. Yayın
@@ -442,7 +460,8 @@ Oyun, telefona "ana ekrana ekle" ile kurulabilen bir web uygulaması (PWA) olara
 - **Manifest:** `name` "Dönence", `display` `standalone`, `orientation` `portrait`, `start_url` ve `scope` göreli (`.`) — oyun bir alan adının kökünde de alt klasörde de çalışır. Açılış ekranı `#13232B`, simgenin zeminiyle aynı.
 - **Simgeler:** 192 ve 512 piksel, ayrıca Android'in kendi şekline kırptığı `maskable` 512 ve iOS için `apple-touch-icon`. `tools/make-icons.ts` bunları oyunun kendi geometrisinden (`src/core` oranları) üretir ve PNG'yi doğrudan kodlar; çizim kütüphanesi bağımlılığı yoktur. `public/` elle düzenlenmez.
 - **Çevrimdışı:** tüm derleme çıktısı servis çalışanıyla önbelleğe alınır. Fredoka yazı tipi Google Fonts'tan geldiği için ayrıca çalışma zamanı önbelleğine alınır, böylece çevrimdışıyken de doğru yazı tipi görünür.
-- **Güncelleme:** `autoUpdate`; yeni sürüm sessizce kurulur, oyuncuya sorulmaz.
+- **Güncelleme:** yeni sürüm sessizce indirilir ve **güvenli bir anda** uygulanır (bir bölüm bitince ya da duraklatmadan dönerken); oyuncuya sorulmaz, turu kesilmez. Tarayıcı servis çalışanını yalnız gezinmede denetler ve ana ekrana eklenmiş oyun arka plandan dönünce sayfa yeniden yüklenmez; bu yüzden oyun yeni sürümü saatte bir ve her öne gelişte kendisi sorar. Sormasaydı oyuncu yeni sürümü günlerce almayabilirdi — tablo değiştiğinde bu, eski tabloda rekor biriktirmek demek.
+- **Dağıtım:** Vercel, Node 24 (`.nvmrc`, `engines`) ve `npm ci` ile kurar; yalnız hızlı denetimi (`npm run check:hizli`: tip, testler, tablo damgası, prototip güncelliği) çalıştırır. 7 dakikalık Monte Carlo tablo doğrulaması GitHub Actions'ta her gönderimde çalışır (`.github/workflows/check.yml`); determinizm denetimi (`verify:full`) elle tetiklenir. `index.html`, `sw.js` ve manifest `no-cache` ile sunulur: eski bir servis çalışanının önbellekte kalması güncellemeyi geciktirirdi.
 - **Doğrulama:** `npm run build` sonrası `npm run preview`, ardından sunucu kapatılıp sayfa yeniden yüklenir. Oyun açılmalı ve hiçbir varlık ağdan gelmemelidir.
 
 Mağaza sürümü istenirse ileride Capacitor ile paketlenir; çekirdek kurallar (`src/core`) ortamdan bağımsız olduğu için bu mimariyi değiştirmez.

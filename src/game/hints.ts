@@ -23,6 +23,30 @@ export function ogreticiTablosu(levels: Level[], m: Metinler): Record<number, st
 
 export const yildizYazisi = (s: Stars): string => "★".repeat(s) + "☆".repeat(3 - s);
 
+/** Mesajın bir parçası: düz metin ya da yıldız gösterimi (`yildiz` doluysa). */
+export interface Parca { metin: string; yildiz?: number }
+
+/**
+ * Mesajı düz metin ve yıldız gösterimi parçalarına ayırır.
+ *
+ * Neden: ipucu satırı canlı bölge (`role=status`) ve "Açıldı ★☆☆ 3,2 sn" ekran
+ * okuyucuda ya hiç okunmuyor (NVDA'nın noktalama ayarına bağlı) ya da "siyah yıldız,
+ * beyaz yıldız" diye okunuyordu. Çağıran, yıldız parçasını görünür ama `aria-hidden`
+ * yazar ve yanına gizli bir "3 üzerinden 1 yıldız" koyar (bkz. main.ts `yaz`).
+ */
+export function yildizParcalari(metin: string): Parca[] {
+  const out: Parca[] = [];
+  let son = 0;
+  for (const e of metin.matchAll(/[★☆]{3}/g)) {
+    const i = e.index;
+    if (i > son) out.push({ metin: metin.slice(son, i) });
+    out.push({ metin: e[0], yildiz: [...e[0]].filter(c => c === "★").length });
+    son = i + e[0].length;
+  }
+  if (son < metin.length) out.push({ metin: metin.slice(son) });
+  return out;
+}
+
 /**
  * Kayıp mesajı: yol ne kadarla kapandı?
  *
@@ -80,23 +104,39 @@ export function kalanYazisi(q: number, q3: number, q2: number, m: Metinler): str
 /** Süre: ondalık ayırıcı dile göre değişir (Türkçe "8,0", İngilizce "8.0"). */
 export const sureYazisi = (t: number, m: Metinler): string => sayi(m, t, 1);
 
+/** Her patron tasarımının ilk göründüğü bölüm (tasarımlar ~70 bölümde bir tekrarlanır). */
+export function patronIlkGorunus(levels: Level[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const l of levels) if (l.boss && !(l.boss in out)) out[l.boss] = l.n;
+  return out;
+}
+
 export interface IpucuGirdi {
   level: Level;
   deneme: number;
   rekor: Best | undefined;
   ogretici: Record<number, string>;
   m: Metinler;
+  /** Verilmezse her patron ilk kez görülüyor sayılır. */
+  patronIlk?: Record<string, number>;
 }
 
-export function ipucu({ level, deneme, rekor, ogretici, m }: IpucuGirdi): string {
+export function ipucu({ level, deneme, rekor, ogretici, m, patronIlk }: IpucuGirdi): string {
   // Patron ipucu da öğretici ipucu gibi davranır: bölüm daha önce BİTİRİLMEMİŞSE
   // deneme sayacı onu ezmez. Eskiden yalnızca ilk denemede gösteriliyordu ve
   // "Ayna: Hepsi aynı anda hizalanıyor" cümlesi tam da oyuncunun ona ihtiyaç duyduğu
   // anda — ilk kayıptan sonra — siliniyordu. Aşağıdaki kuralın tersiydi.
+  //
+  // Uzunluk: "Deneme 12 · Çatal: Her halkada iki kapı var, …" dar ekranda üç satıra
+  // taşıyor, alt çubuk büyüyor ve halkalar zıplıyordu. İki kısaltma:
+  // - Denemelerde ad düşer (ilk denemede zaten okundu): "Deneme 12 · <ipucu>".
+  // - Tasarım DAHA ÖNCE GÖRÜLDÜYSE (aynı patron ~70 bölümde bir döner) yalnız ad
+  //   yazılır; oyuncu kuralı ilk karşılaşmada öğrendi, her seferinde okumak zorunda değil.
   if (level.boss && !rekor) {
     const p = m.patron[level.boss];
-    const metin = `${p.ad}: ${p.ipucu}`;
-    return deneme > 1 ? m.denemeVeIpucu(deneme, metin) : metin;
+    const ilk = !patronIlk || (patronIlk[level.boss] ?? level.n) >= level.n;
+    if (!ilk) return deneme > 1 ? m.denemeVeIpucu(deneme, p.ad) : p.ad;
+    return deneme > 1 ? m.denemeVeIpucu(deneme, p.ipucu) : `${p.ad}: ${p.ipucu}`;
   }
 
   // Öğretici ipucu deneme sayacını EZER, tersi değil.

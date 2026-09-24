@@ -3,7 +3,6 @@
 //   npm run verify        -> mevcut tabloyu denetler
 //   npm run verify:full   -> üstüne determinizmi de sınar
 import fs from "node:fs";
-import crypto from "node:crypto";
 import path from "node:path";
 import {
   TAU, DEG, NEED_PASS, SOLVER_MARGIN, REACT, GAP_MAX_DEG, LEVEL_COUNT, BOSS_ARALIGI, bossMu,
@@ -40,6 +39,7 @@ interface Boss { anahtar: PatronAnahtari; rings: () => RawRing[] }
 type Log = (...args: unknown[]) => void;
 
 import * as IST from "./gen/istatistik.ts";
+import { damga, serialize } from "./gen/tablo.ts";
 import type { Tepe } from "./gen/istatistik.ts";
 
 const OUT = path.join(import.meta.dirname, "..", "data", "levels.json");
@@ -74,7 +74,7 @@ function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): 
         const e = gauss() * sigma;
         // YUVARLAMA EN YAKINA. Eski `for (let k = |e|; k > 0; k -= dt)` döngüsü
         // `ceil(|e|/dt)` adım atıyordu: hatayı sıfırdan UZAĞA yuvarlayıp BÜYÜTÜYORDU.
-        // Ölçüldü: ortalama mutlak hata 47,90 → 52,14 ms, etkin sapma 60 → 65,3 ms.
+        // Ölçüldü: ortalama mutlak hata 47,90 → 52,14 ms, etkin sapma 60 → 63,4 ms.
         // Oyun dokunuşu zaman damgasının düştüğü adımda işler — o, en yakına yuvarlamadır.
         const adimSayisi = Math.round(e / dt);
         const sdt = adimSayisi >= 0 ? dt : -dt;
@@ -234,23 +234,22 @@ const karistir = (i: number): number => {
 const RITIM_OFSET = [0, 0, -1, 0, -2, 0, -1, 0];
 
 /**
- * Taban halka sayısı. 200'e kadar 6 (öğrenme fazı), sonra kademeli 8'e çıkar.
- * Geometri buna hazır: `RATIO.inner` sabit olduğu için NEED halka sayısından
- * BAĞIMSIZ; değişen tek şey halkalar arası aralık. 320 piksellik bir telefonda
- * 8 halkada aralık 12,3 piksel, çizgi kalınlığı 5,8 — hâlâ rahat okunur.
+ * Taban halka sayısı: her bölümde 6, gerekçesi aşağıda. Geometri daha fazlasını
+ * çizebilir (`RATIO.inner` sabit, NEED halka sayısından bağımsız) ama sınır geometri
+ * değil ışığa duyarlılık.
  */
 const tabanHalka = (_n: number): number => {
   // HALKA SAYISI 6'DA DURUR — ve bu bir kalibrasyon kararı değil GÜVENLİK kararıdır.
   //
   // `docs/MATEMATIK.md` §3.1 bunu zaten ölçüp reddetmiş: 6 halka 1,48 çevrim/derece ve
   // 6 açık-koyu çift üretiyor; ışığa duyarlılık rehberlerinin eşiği ">5 çift", riskli
-  // bant 1-4 çevrim/derece. 8 halka 2,07 çevrim/dereceye çıkıyor — daha kötü.
+  // bant 1-4 çevrim/derece. 8 halka aynı varsayımla 2,07 (büyük telefonda 2,41).
   // `SPEC.md` §7 6 halkayı zaten "eşik üstü / riskli bantta" işaretliyor ve riski
   // kabul edilebilir sayan gerekçesi açıkça "çizgiler ince (doluluk %33)" diyor.
   //
   // 8'e çıkarma bir kez denendi (zorluk eğrisini 200'den sonra indirebilmek için) ve
-  // ölçüldü: desen 2,36 çevrim/dereceye, doluluk %53'e çıkıyor. Yani gerekçenin iki
-  // dayanağından biri tamamen kayboluyor. Kazanılan zorluk, faz 2'de yalnız 3,4 puan.
+  // ölçüldü: doluluk %33'ten %47'ye çıkıyor, yani gerekçenin iki dayanağından biri
+  // kayboluyor. Kazanılan zorluk 801-1000 bandında yalnız 1,7 puandı (%37,1 → %35,4).
   //
   // Bedeli açık ve kabul edildi: zorluğun tek gerçek ekseni τ ve tabanı 25 ms insan
   // refleksi. 6 halkada 200'den sonra eğri büyük ölçüde düzleşir. Kalan iniş yalnız
@@ -393,10 +392,9 @@ interface ArketipAyari {
 }
 
 const ARKETIP_AYARI: Record<Arketip, ArketipAyari> = {
-  // halka: TABANA GÖRE ofset aralığı. Mutlak sayı ([3,4] gibi) yazılırsa arketip,
-  // halka sayısı 8'e çıkan geç bölümlerde eğriyle çelişir ve zorluk kolunu kilitler.
-  // `hassasiyet` her zaman tabandan 3-2 eksik (az halka, dar boşluk), `dayaniklilik`
-  // 1 eksik ile taban arası (çok halka, geniş boşluk) — kimlikleri oran olarak korunur.
+  // halka: MUTLAK aralık. Taban 6'da sabit olduğu için tabana göre ofset gerekmiyor;
+  // taban yeniden eğilimli olursa (bkz. tabanHalka) bu aralıklar ofsete çevrilmeli,
+  // yoksa arketip eğriyle çelişir ve zorluk kolunu kilitler.
   hassasiyet:   { halka: [3, 4], gaps2: 0.00, flip: 0.00, wobble: 0.00, preLocked: 0.15, sureCarpani: 1.15 },
   tahmin:       {           gaps2: 0.10, flip: 0.70, wobble: 0.60, preLocked: 0.30, sureCarpani: 1.10 },
   catal:        {           gaps2: 0.75, flip: 0.15, wobble: 0.15, preLocked: 0.25, sureCarpani: 1.00 },
@@ -451,7 +449,7 @@ function candidate(n: number, hizCarpani = 1, ekHalka = 0): RawRing[] {
   // oyuncunun hata bütçesini küçültür ama nadir bir hizalanma beklemesini istemez.
   //
   // Neden gerekli: geç bölümlerde hedef %22'ye inince tek kol halka sayısı kalıyordu ve
-  // 8 halkada politikanın kilit başına bütçesi `(kanal − eşik)/(kalan+1)` olduğu için
+  // 8 halkalı denemede (bkz. tabanHalka) politikanın kilit başına bütçesi `(kanal − eşik)/(kalan+1)` olduğu için
   // küçülüyor; oyuncu neredeyse bedava bir an bekliyor, o an nadiren geliyor ve süre
   // doluyor. Ölçüldü: 13 bölümde denemelerin dörtte birinden fazlası saate yeniliyordu,
   // 808. bölümde %74 — üstelik limitin çözücüye 17,3 saniye payı varken. Yani 8 halka
@@ -664,7 +662,7 @@ function playUsta(def: RingDef[], limit: number): PlayResult {
         const e = gauss() * USTA_SAPMA;
         // YUVARLAMA EN YAKINA. Eski `for (let k = |e|; k > 0; k -= dt)` döngüsü
         // `ceil(|e|/dt)` adım atıyordu: hatayı sıfırdan UZAĞA yuvarlayıp BÜYÜTÜYORDU.
-        // Ölçüldü: ortalama mutlak hata 47,90 → 52,14 ms, etkin sapma 60 → 65,3 ms.
+        // Ölçüldü: ortalama mutlak hata 47,90 → 52,14 ms, etkin sapma 60 → 63,4 ms.
         // Oyun dokunuşu zaman damgasının düştüğü adımda işler — o, en yakına yuvarlamadır.
         const adimSayisi = Math.round(e / dt);
         const sdt = adimSayisi >= 0 ? dt : -dt;
@@ -1291,27 +1289,6 @@ function generate(log: Log = () => {}): LevelTable {
   return out;
 }
 
-// data/levels.json biçimi: her level tek satır, okunabilir kalsın diye elle diziliyor.
-/**
- * Tablonun sürüm damgası: bölümlerin ve yıldız eşiklerinin özeti.
- *
- * Neden var: kayıt, bölümleri NUMARAYLA saklıyor (`bests: { "47": {...} }`). Tablo
- * yeniden üretildiğinde o numara başka bir bulmacaya ait oluyor. Bir kez yaşandı ve
- * ölçüldü: 1000 bölümün 966'sının tanımı, 761'inin süre sınırı değişti; 303 bölümde
- * kayıtlı rekor yeni sınırı aşıyordu, yani oyuncuya ulaşılamaz bir hedef gösteriliyordu.
- * Kayıtta bir `surum` alanı vardı ama hiç okunmuyordu — ölü alandı.
- *
- * Damga sayesinde oyun, elindeki kaydın hangi tabloya ait olduğunu bilir.
- */
-const damga = (o: LevelTable): string =>
-  crypto.createHash("sha256")
-    .update(o.q3 + "|" + o.q2 + "|" + o.levels.map(l => JSON.stringify(l)).join(""))
-    .digest("hex").slice(0, 12);
-
-const serialize = (o: LevelTable): string =>
-  '{"v":"' + damga(o) + '","q3":' + o.q3 + ',"q2":' + o.q2 + ',"levels":[\n' +
-  o.levels.map(l => JSON.stringify(l)).join(',\n') + '\n]}\n';
-
 // ===== Doğrulama =====
 // Eski --verify yalnızca "kazanma oranı %20'nin üstünde mi" diye bakıyordu; oysa üretim
 // hedefi %97'den %28'e inen bir eğri. Bir level hedefinin 25 puan altına düşse bile geçiyordu.
@@ -1372,11 +1349,13 @@ function verify(): number {
   // yanar, dağıtım çıkar ve her oyuncu BAŞKA BİR TABLOYA ait rekorları taşımaya devam
   // eder. Bir kez yaşandı: 966 bölümün tanımı değişti, 303 bölümde rekor ulaşılamaz oldu.
   //
-  // `npm run verify:full` bunu yakalardı ama hiçbir şey onu çalıştırmıyor: `npm run
-  // check` düz `verify` kullanıyor, Vercel de `check` çalıştırıyor. Bu üç satır aynı
-  // deliği 40 dakikalık yeniden üretim olmadan kapatıyor.
+  // `npm run verify:full` bunu yakalardı ama 40 dakikalık yeniden üretim ister. Aynı
+  // denetim bir saniyelik testte de var (tools/gen/tablo.test.ts): Vercel'in hızlı
+  // denetimi (`check:hizli`) Monte Carlo'yu çalıştırmadığı için oradan yakalanır.
+  // Hemen durur: damga tutmuyorsa aşağıdaki 7 dakikalık ölçüm başka bir tabloyu ölçer.
   if (data.v !== damga(data)) {
-    sorunlar.push("tablo damgası içerikle uyuşmuyor: dosya elle değişmiş ya da gen.ts ile yeniden üretilmemiş");
+    console.error("tablo damgası içerikle uyuşmuyor: dosya elle değişmiş ya da gen.ts ile yeniden üretilmemiş");
+    return 1;
   }
   const oranlar: number[] = [];
   /** Bandı aşan bölümler; tek tek marjinal olabilirler, sayıları ayrıca denetlenir. */
@@ -1434,11 +1413,11 @@ function verify(): number {
     // (ölçtüm: lag 240'ta 74 patron çiftinin 73'ü eşleşiyor) ve bu denetimin ASIL
     // aradığı şeyi — sıradan bölümlerde istemeden oluşan tekrarı — bastırıyor.
     if (l.n >= YAPI_BASLANGIC && !l.boss) {
-      // TASARLANAN TABANDAN SAPMA, ham sayı değil. Halka sayısı tasarım gereği 5'ten
-      // 8'e yükseliyor; permütasyon bu EĞİLİMİ de yok ettiği için komşu bölümlerin
-      // benzer halka sayısına sahip olmasını "tekrar" sayıyordu. Ölçüldü: ham seri
-      // tavanı aşıyor (0,284 > 0,268), tabandan sapma geçiyor (0,329 < 0,352).
-      // Doğru soru "tasarımın ötesinde bir tekrar var mı", ham seri onu ölçmüyor.
+      // TASARLANAN TABANDAN SAPMA, ham sayı değil. Taban şu an sabit (6) ve sapma ham
+      // sayının kaydırılmış hâli; ama taban eğilimli olduğunda (8 halkalı denemede
+      // 6'dan 8'e çıkıyordu) permütasyon bu EĞİLİMİ de yok eder ve komşu bölümlerin
+      // benzer halka sayısına sahip olmasını "tekrar" sayar. Ölçülmüştü: ham seri
+      // tavanı aşıyordu (0,284 > 0,268), tabandan sapma geçiyordu (0,329 < 0,352).
       halkaSerisi.push(l.rings.length - tabanHalka(l.n));
       arketipSerisi.push(
         (l.rings.some(r => r.flip > 0) ? 1 : 0) |
@@ -1696,5 +1675,8 @@ function verify(): number {
   return 0;
 }
 
-if (process.argv.includes("--verify")) process.exit(verify());
-fs.writeFileSync(OUT, serialize(generate(console.log)));
+// Yalnız doğrudan çalıştırılınca: içe aktarmak tabloyu yeniden üretip EZMEMELİ.
+if (import.meta.main) {
+  if (process.argv.includes("--verify")) process.exit(verify());
+  fs.writeFileSync(OUT, serialize(generate(console.log)));
+}

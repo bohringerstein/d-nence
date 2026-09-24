@@ -97,10 +97,59 @@ function yaz(k: Kayit): void {
   try { localStorage.setItem(KEY, JSON.stringify(k)); } catch { /* kayıt olmadan da oynanır */ }
 }
 
+/**
+ * Başka bir sekme kaydı bu sekmeden DAHA YENİ bir tabloya taşıdı mı?
+ *
+ * Bkz. `birlestirVeYaz`. Doğruysa bu sekmenin bellekteki tablosu ve rekorları eskidir;
+ * oyun ilk güvenli anda sayfayı yeniler (bkz. game/guncelleme.ts).
+ */
+let eskiSekme = false;
+export const kayitEskidiMi = (): boolean => eskiSekme;
+
+/**
+ * Oyun sırasında yapılan yazma: diskteki kaydı OKUR, bununla birleştirir, sonra yazar.
+ *
+ * Neden: kayıt tek bir nesne ve her yazma onu bütünüyle değiştiriyordu. Aynı oyun iki
+ * sekmede açıkken son yazan kazanıyordu — öbür sekmenin açtığı bölümler ve kırdığı
+ * rekorlar siliniyordu. Daha kötüsü, yeni sürüm bir sekmede açılıp kaydı yeni tabloya
+ * taşıdığında ESKİ sekme bir sonraki kazanışta eski damgayı geri yazıyordu; sonraki
+ * açılışta damga yine uyuşmuyor ve yeni sekmede kırılan rekorlar da siliniyordu.
+ *
+ * Kural:
+ * - İlerleme (`enUzak`) iki kaydın büyüğüdür. Tablodan bağımsızdır, hiç kaybolmaz.
+ * - Damgalar AYNIYSA rekorlar bölüm bölüm birleşir (`isBetter`).
+ * - Damgalar FARKLIYSA diskteki kazanır: bu sekme eski tabloyu oynuyor. Yalnız ilerleme
+ *   taşınır, bu sekmenin rekorları (eski tabloya ait) yazılmaz ve sekme eski sayılır.
+ *
+ * "Baştan başla" ve yedekten yükleme bu yolu KULLANMAZ: onlar ilerlemeyi bilerek
+ * küçültür, birleştirme bunu geri alırdı.
+ */
+function birlestirVeYaz(k: Kayit): void {
+  let disk: Kayit | null = null;
+  try {
+    const ham = localStorage.getItem(KEY);
+    if (ham) disk = ayikla(JSON.parse(ham));
+  } catch { /* okunamıyorsa birleştirilecek bir şey yok */ }
+  if (disk) {
+    k.enUzak = Math.max(k.enUzak, disk.enUzak);
+    if (disk.tabloSurum !== undefined && k.tabloSurum !== undefined && disk.tabloSurum !== k.tabloSurum) {
+      eskiSekme = true;
+      yaz({ ...disk, level: k.level, enUzak: k.enUzak });
+      return;
+    }
+    for (const [n, b] of Object.entries(disk.bests)) {
+      const i = Number(n);
+      if (isBetter(b, k.bests[i])) k.bests[i] = b;
+    }
+    if (k.tabloSurum === undefined) k.tabloSurum = disk.tabloSurum;
+  }
+  yaz(k);
+}
+
 export function levelKaydet(k: Kayit, level: number): void {
   k.level = level;
   if (level > k.enUzak) k.enUzak = level;
-  yaz(k);
+  birlestirVeYaz(k);
 }
 
 /**
@@ -210,7 +259,7 @@ export const acikMi = (k: Kayit, n: number): boolean => n >= 1 && n <= k.enUzak;
 export function rekorKaydet(k: Kayit, level: number, yeni: Best): boolean {
   if (!isBetter(yeni, k.bests[level])) return false;
   k.bests[level] = yeni;
-  yaz(k);
+  birlestirVeYaz(k);
   return true;
 }
 

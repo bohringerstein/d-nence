@@ -1,7 +1,7 @@
 // İpucu önceliği (şartname 7. bölüm).
 import test from "node:test";
 import assert from "node:assert";
-import { ipucu, ogreticiTablosu, yildizYazisi, sureYazisi, kayipYazisi, kalanYazisi } from "./hints.ts";
+import { ipucu, ogreticiTablosu, patronIlkGorunus, yildizYazisi, yildizParcalari, sureYazisi, kayipYazisi, kalanYazisi } from "./hints.ts";
 import type { Level, Best } from "../core/index.ts";
 import { TR } from "../dil/tr.ts";
 import { EN } from "../dil/en.ts";
@@ -130,8 +130,32 @@ test("pay mesajında ondalık ayırıcı virgül", () => {
 test("patron ipucu ikinci denemede de görünür", () => {
   const p = TR.patron.ayna;
   const m = ipucu({ level: level({ n: 10, boss: "ayna" as const }), deneme: 3, rekor: undefined, ogretici, m: TR });
-  assert.ok(m.includes(p.ad) && m.includes(p.ipucu), `patron metni kayboldu: "${m}"`);
+  assert.ok(m.includes(p.ipucu), `patron ipucu kayboldu: "${m}"`);
   assert.ok(m.includes("Deneme 3"), `deneme sayısı da görünmeli: "${m}"`);
+  // Ad denemelerde düşer: ilk denemede okundu, satır dar ekranda üçe taşıyordu.
+  assert.ok(!m.includes(p.ad + ":"), `denemede ad tekrarlanmamalı: "${m}"`);
+});
+
+test("aynı patron tasarımı yeniden gelince yalnız adı yazılır", () => {
+  const levels = [level({ n: 10, boss: "catal" as const }), level({ n: 80, boss: "catal" as const })];
+  const patronIlk = patronIlkGorunus(levels);
+  const ilk = ipucu({ level: levels[0], deneme: 1, rekor: undefined, ogretici, m: TR, patronIlk });
+  const tekrar = ipucu({ level: levels[1], deneme: 1, rekor: undefined, ogretici, m: TR, patronIlk });
+  assert.equal(ilk, `${TR.patron.catal.ad}: ${TR.patron.catal.ipucu}`);
+  assert.equal(tekrar, TR.patron.catal.ad);
+  assert.equal(ipucu({ level: levels[1], deneme: 4, rekor: undefined, ogretici, m: TR, patronIlk }),
+    `Deneme 4 · ${TR.patron.catal.ad}`);
+});
+
+test("en uzun patron ipucu denemelerde kısalır", () => {
+  // Frontend ölçüsü: ~6,3 px/karakter, 360 px ekranda ~280 px kullanılabilir alan;
+  // iki satır ≈ 88 karakter. Sınır sözcük kaydırması için pay bırakır.
+  for (const m of [TR, EN]) {
+    for (const k of Object.keys(m.patron) as Array<keyof typeof m.patron>) {
+      const metin = ipucu({ level: level({ n: 10, boss: k }), deneme: 12, rekor: undefined, ogretici, m });
+      assert.ok(metin.length <= 78, `${m.kod} ${k}: ${metin.length} karakter — "${metin}"`);
+    }
+  }
 });
 
 test("patron bölümü bitirilmişse ipucu yerini rekora bırakır", () => {
@@ -174,4 +198,28 @@ test("kalan eki hiçbir zaman %0 demiyor", () => {
 
 test("geçersiz q satırı kirletmez", () => {
   assert.equal(kalanYazisi(NaN, 0.67, 0.42, TR), "");
+});
+
+test("yıldız glifleri ekran okuyucu için ayrı parçaya ayrılır", () => {
+  assert.deepEqual(yildizParcalari("Açıldı ★☆☆ 3,2 sn"), [
+    { metin: "Açıldı " }, { metin: "★☆☆", yildiz: 1 }, { metin: " 3,2 sn" }
+  ]);
+  assert.deepEqual(yildizParcalari("★★★"), [{ metin: "★★★", yildiz: 3 }]);
+  assert.deepEqual(yildizParcalari("Deneme 3"), [{ metin: "Deneme 3" }]);
+  // Oyunun ürettiği her yıldız yazısı yakalanmalı.
+  for (const s of [1, 2, 3] as const) {
+    assert.equal(yildizParcalari("x " + yildizYazisi(s)).find(p => p.yildiz !== undefined)?.yildiz, s);
+  }
+});
+
+test("yıldızın sözlü karşılığı iki dilde de sayıyı taşır", () => {
+  assert.equal(TR.yildizSesli(1), "3 üzerinden 1 yıldız");
+  assert.equal(EN.yildizSesli(2), "2 of 3 stars");
+});
+
+test("süre dolunca kalan halka sayısı söylenir", () => {
+  assert.equal(TR.sureDoldu(2), "Süre doldu · 2 halka kaldı");
+  assert.equal(TR.sureDoldu(0), "Süre doldu");
+  assert.equal(EN.sureDoldu(1), "Out of time · 1 ring left");
+  assert.equal(EN.sureDoldu(3), "Out of time · 3 rings left");
 });

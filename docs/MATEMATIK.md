@@ -148,8 +148,8 @@ Diğer eksenler neden yardımcı olmuyor:
   **Bu karar bir kez unutuldu ve pahalıya öğrenildi.** Zorluk eğrisini 200'den sonra
   indirebilmek için halka sayısı 8'e çıkarıldı; bu paragraf gözden kaçmıştı. Beş
   uzmanlı incelemede uzmanlardan ikisi bağımsız olarak yakaladı. Ölçüm: 8 halkada desen
-  2,36 çevrim/derece, doluluk %53 — SPEC §7'nin riski kabul edilebilir sayan
-  gerekçesi ("çizgiler ince, doluluk %33") tamamen geçersizleşiyor. Kazanılan zorluk
+  2,07 çevrim/derece (büyük telefonda 2,41), doluluk %47 — SPEC §7'nin riski kabul edilebilir sayan
+  gerekçesi ("çizgiler ince, doluluk %33") büyük ölçüde zayıflıyor. Kazanılan zorluk
   ise yalnız **1,7 puandı** (801-1000 bandı %37,1 → %35,4). Geri alındı.
 - **Hız** artırmak işe yaramaz. `gap = NEED_PASS + tol·Σ|ω|` olduğundan hız artınca
   boşluk da orantılı büyür: τ değişmez, yalnızca her şey büyür ve 85° tavanına dayanır.

@@ -21,7 +21,7 @@ class SahteDepo {
 const depo = new SahteDepo();
 Object.defineProperty(globalThis, "localStorage", { value: depo, configurable: true });
 
-const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, acikMi, tabloSurumuUygula, disaAktar, iceAktar } =
+const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, acikMi, tabloSurumuUygula, disaAktar, iceAktar, kayitEskidiMi } =
   await import("./storage.ts");
 const { LEVEL_COUNT } = await import("../core/index.ts");
 
@@ -312,4 +312,39 @@ test("yedekteki bozuk rekorlar ayıklanıyor", () => {
   assert.equal((k.bests as Record<string, unknown>).s, undefined, "bests prototipi kirlenmemeli");
   assert.equal(Object.getPrototypeOf(k.bests), Object.prototype, "bests prototipi değişmemeli");
   assert.equal(({} as Record<string, unknown>).s, undefined, "Object.prototype kirlenmemeli");
+});
+
+test("iki sekme: yazma diskle birleşir, öbür sekmenin ilerlemesi ve rekoru kaybolmaz", () => {
+  yaz({ level: 10, enUzak: 10, tabloSurum: "aaa", bests: { 3: { s: 1, t: 5 } } });
+  const a = oku(), b = oku();
+  levelKaydet(a, 40);                        // A sekmesi 40'a ilerledi
+  rekorKaydet(a, 3, { s: 3, t: 4 });         // ve 3'te rekor kırdı
+  rekorKaydet(b, 7, { s: 2, t: 6 });         // B (belleğinde hâlâ 10) başka rekor kırdı
+  const son = oku();
+  assert.equal(son.enUzak, 40, "A'nın ilerlemesi B'nin yazmasıyla geri gitmemeli");
+  assert.deepEqual(son.bests[3], { s: 3, t: 4 }, "A'nın rekoru korunmalı");
+  assert.deepEqual(son.bests[7], { s: 2, t: 6 });
+});
+
+test("eski sekme yeni tablonun damgasını ve rekorlarını ezmez, yalnız ilerleme taşır", () => {
+  yaz({ level: 10, enUzak: 10, tabloSurum: "eski", bests: { 3: { s: 1, t: 5 } } });
+  const eski = oku(), yeni = oku();
+  tabloSurumuUygula(yeni, "yeni");           // yeni sürüm açıldı, rekorlar silindi
+  rekorKaydet(yeni, 5, { s: 3, t: 2 });
+  assert.equal(kayitEskidiMi(), false);
+  levelKaydet(eski, 12);                     // eski sekme bir bölüm daha bitirdi
+  rekorKaydet(eski, 11, { s: 3, t: 1 });
+  assert.equal(kayitEskidiMi(), true, "eski sekme yenilenmek üzere işaretlenmeli");
+  const son = oku();
+  assert.equal(son.tabloSurum, "yeni");
+  assert.deepEqual(son.bests, { 5: { s: 3, t: 2 } }, "eski tablonun rekoru yazılmamalı");
+  assert.equal(son.enUzak, 12, "ilerleme tablodan bağımsızdır, taşınmalı");
+});
+
+test("Baştan başla birleştirmeyle geri alınmaz", () => {
+  yaz({ level: 400, enUzak: 412, tabloSurum: "aaa", bests: {} });
+  const k = oku();
+  bastanBasla(k);
+  levelKaydet(k, 1);
+  assert.equal(oku().enUzak, 1);
 });

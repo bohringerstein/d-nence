@@ -1,7 +1,9 @@
 // Level tablosunun biçimi ve şema doğrulaması.
 // Oynanabilirlik denetimi ayrıdır: tools/gen.ts --verify.
-import { TAU, NEED_PASS, DEG } from "./geometry.ts";
+import { TAU, NEED_PASS, NEED_BINS, DEG } from "./geometry.ts";
+import { liveRings } from "./rings.ts";
 import type { RingDef } from "./rings.ts";
+import { newMask, applyMask, maskLargest } from "./opening.ts";
 
 /**
  * Patron bölümlerinin anahtarları.
@@ -65,6 +67,16 @@ export const BOSS_LEVELS: number[] =
   Array.from({ length: Math.floor(LEVEL_COUNT / BOSS_ARALIGI) }, (_, i) => (i + 1) * BOSS_ARALIGI);
 export const bossMu = (n: number): boolean => n % BOSS_ARALIGI === 0;
 
+/** Tablonun en üst düzeyinde izin verilen alanlar; bilinmeyen alan damgaya girmez, yani sessizce kaybolur. */
+const TABLO_ALANLARI = new Set(["v", "q3", "q2", "levels"]);
+const LEVEL_ALANLARI = new Set(["n", "boss", "limit", "rings"]);
+
+/**
+ * Hız üst sınırı, rad/sn. Tablodaki en hızlı halka 6,16; 12 bunun iki katı. Amaç ayar
+ * değil, bozuk veriyi (birim hatası, derece yazılmış hız) yakalamak.
+ */
+const HIZ_TAVANI = 12;
+
 const RING_FIELDS: Array<[keyof RingDef, string]> = [
   ["speed", "number"], ["gap", "number"], ["gaps", "number"], ["gapOffset", "number"],
   ["flip", "number"], ["wobble", "boolean"], ["preLocked", "boolean"], ["start", "number"]
@@ -90,8 +102,11 @@ export function validateTable(data: unknown): string[] {
   const err: string[] = [];
   if (!nesneMi(data)) return ["tablo bir JSON nesnesi değil"];
   if (data.v !== undefined && typeof data.v !== "string") err.push("sürüm damgası dize değil");
+  for (const k of Object.keys(data)) if (!TABLO_ALANLARI.has(k)) err.push("bilinmeyen tablo alanı " + JSON.stringify(k));
   if (!sayiMi(data.q3) || !sayiMi(data.q2)) err.push("q3/q2 sayı değil");
   else if (!(data.q3 > data.q2)) err.push("q3, q2 değerinden büyük olmalı");
+  // q bir oran: 0 ile 1 arasında. Dışında bir eşik ya herkese ya kimseye yıldız verir.
+  else if (!(data.q2 > 0 && data.q3 <= 1)) err.push("q3/q2 (0, 1] aralığının dışında");
   if (!Array.isArray(data.levels) || data.levels.length !== LEVEL_COUNT) {
     err.push(LEVEL_COUNT + " level olmalı");
     return err;
@@ -101,6 +116,7 @@ export function validateTable(data: unknown): string[] {
     if (!nesneMi(ham)) { err.push(ad + ": bir nesne değil"); return; }
     const l = ham as unknown as Level;
     if (l.n !== i + 1) err.push(ad + ": n alanı sırayla gitmiyor");
+    for (const k of Object.keys(ham)) if (!LEVEL_ALANLARI.has(k)) err.push(ad + ": bilinmeyen alan " + JSON.stringify(k));
     if (!sayiMi(l.limit) || l.limit <= 0) err.push(ad + ": limit geçersiz");
     // Patron anahtarı tanınmıyorsa oyun o bölümde adsız kalırdı; şemada yakala.
     if (l.boss !== null && !(PATRON_ANAHTARLARI as readonly string[]).includes(l.boss)) {
@@ -112,6 +128,15 @@ export function validateTable(data: unknown): string[] {
       return;
     }
     if (!l.rings.some(r => nesneMi(r) && !r.preLocked)) err.push(ad + ": tüm halkalar baştan kilitli");
+    // Baştan kilitli halkaların bıraktığı kanal OYUNUN kuralıyla (dilim maskesi) geçilebilir
+    // olmalı. Karşılaştırma dilim sayısıyla: derece karşılaştırması sınırdaki 8 bölümde
+    // kayan nokta gürültüsüyle "geçilemez" diyordu.
+    const kilitli = l.rings.filter(r => nesneMi(r) && r.preLocked === true && sayiMi(r.gap) && sayiMi(r.start));
+    if (kilitli.length) {
+      const m = newMask();
+      for (const r of liveRings(kilitli)) applyMask(m, r);
+      if (maskLargest(m).len < NEED_BINS) err.push(ad + ": baştan kilitli halkalar geçilemez bir kanal bırakıyor");
+    }
     const gorulen = new Set<string>();
     (l.rings as unknown[]).forEach((hamHalka, k) => {
       const nerede = ad + " halka " + k + ": ";
@@ -132,6 +157,12 @@ export function validateTable(data: unknown): string[] {
       if (r.gap < NEED_PASS / DEG || r.gap > GAP_MAX_DEG) err.push(nerede + "gap " + r.gap.toFixed(1) + " derece, sınırların dışında");
       if (r.start < 0 || r.start >= TAU) err.push(nerede + "start 0..2pi dışında");
       if (r.flip < 0) err.push(nerede + "flip negatif");
+      for (const k of Object.keys(kayit)) if (!RING_FIELDS.some(([a]) => a === k)) err.push(nerede + "bilinmeyen alan " + JSON.stringify(k));
+      if (r.speed === 0 || Math.abs(r.speed) > HIZ_TAVANI) err.push(nerede + "hız " + r.speed + " rad/sn, sınırların dışında");
+      // İki kapılı halkada ikinci boşluk birinciyle çakışmamalı; çakışırsa tek, geniş bir
+      // boşluk olur ve üreticinin ölçtüğü bulmaca bu olmaz.
+      if (r.gapOffset <= 0 || r.gapOffset >= 360) err.push(nerede + "gapOffset 0..360 dışında");
+      else if (r.gaps === 2 && (r.gapOffset < r.gap || 360 - r.gapOffset < r.gap)) err.push(nerede + "iki boşluk çakışıyor");
       // Birebir aynı iki halka ikinci kilidi bedava yapar (10. patronda böyle bir hata vardı).
       const anahtar = JSON.stringify(r);
       if (gorulen.has(anahtar)) err.push(nerede + "bir öncekiyle birebir aynı");

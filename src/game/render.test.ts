@@ -7,28 +7,39 @@ import assert from "node:assert";
 import { newMask, BINS, layout } from "../core/index.ts";
 import type { Level } from "../core/index.ts";
 import { createLevel } from "./state.ts";
-import { ciz } from "./render.ts";
+import { ciz, KAMA } from "./render.ts";
 import type { Tuval } from "./render.ts";
 
 interface Dolgu { renk: string; alfa: number }
-interface Kontur { renk: string; alfa: number; kesikli: boolean }
+interface Kontur {
+  renk: string; alfa: number; kesikli: boolean; kalinlik: number;
+  /** Yolun merkeze en yakın noktası (moveTo/lineTo/arc'tan). */
+  enYakin: number;
+}
 
 function sahteTuval(): { tuval: Tuval; dolgular: Dolgu[]; konturlar: Kontur[] } {
   const dolgular: Dolgu[] = [];
   const konturlar: Kontur[] = [];
   let kesikli = false;
+  let yol: number[] = [];
   const ctx = {
     fillStyle: "", strokeStyle: "", globalAlpha: 1, lineWidth: 1,
     lineCap: "butt" as CanvasLineCap, font: "", textAlign: "center" as CanvasTextAlign,
     textBaseline: "middle" as CanvasTextBaseline,
     globalCompositeOperation: "source-over" as GlobalCompositeOperation,
-    save() {}, restore() {}, translate() {}, beginPath() {}, closePath() {},
-    moveTo() {}, arc() {}, rect() {}, clearRect() {}, fillRect() {}, fillText() {},
+    save() {}, restore() {}, translate() {}, beginPath() { yol = []; }, closePath() {},
+    moveTo(x: number, y: number) { yol.push(Math.hypot(x, y)); },
+    lineTo(x: number, y: number) { yol.push(Math.hypot(x, y)); },
+    arc(_x: number, _y: number, r: number) { yol.push(r); },
+    rect() {}, clearRect() {}, fillRect() {}, fillText() {},
     measureText: (t: string) => ({ width: t.length * 20 }),
     createRadialGradient: () => ({ addColorStop() {} }),
     setLineDash(d: number[]) { kesikli = d.length > 0; },
     fill() { dolgular.push({ renk: String(ctx.fillStyle), alfa: ctx.globalAlpha }); },
-    stroke() { konturlar.push({ renk: String(ctx.strokeStyle), alfa: ctx.globalAlpha, kesikli }); }
+    stroke() {
+      konturlar.push({ renk: String(ctx.strokeStyle), alfa: ctx.globalAlpha, kesikli,
+        kalinlik: ctx.lineWidth, enYakin: Math.min(...yol) });
+    }
   };
   const tuval = {
     canvas: {} as HTMLCanvasElement,
@@ -148,4 +159,33 @@ test("baştan kilitli halka yokken zemin renkli dolgu da yok", () => {
   ciz(g.tuval, createLevel(level(), 1), RENK, SECENEK);
   assert.ok(!g.dolgular.some(d => d.renk === RENK.bg),
     "preLocked halka yokken zemin renginde dolgu olmamalı");
+});
+
+test("geçer kamanın konturu çiziliyor: mürekkep, düz, KAMA opaklığında (1.4.11 bunu taşır)", () => {
+  // Kontrast testi opaklığı KAMA'dan okuyor; bu test o değerle GERÇEKTEN çizildiğini
+  // doğruluyor. İkisi birlikte: `stroke()` silinse ya da renk değişse biri düşer.
+  const g = sahteTuval();
+  const s = createLevel(level(), 1);
+  kanalKur(s, 60);
+  ciz(g.tuval, s, RENK, SECENEK);
+  const k = g.konturlar.find(x => x.renk === RENK.ink && !x.kesikli && Math.abs(x.alfa - KAMA.kontur) < 1e-6);
+  assert.ok(k, "geçer kamada mürekkep renginde düz kontur olmalı");
+  assert.equal(k.kalinlik, KAMA.kalinlik);
+});
+
+test("kama konturu halkaların içine girmez (merkezden çıkan 'tel' yok)", () => {
+  const yer = layout(400, 700, 2);
+  for (const acik of [60, 20]) {
+    const g = sahteTuval();
+    const s = createLevel(level(), 1);
+    kanalKur(s, acik);
+    ciz(g.tuval, s, RENK, SECENEK);
+    const kama = g.konturlar.filter(x => (x.renk === RENK.ink && Math.abs(x.alfa - KAMA.kontur) < 1e-6) ||
+      (x.renk === RENK.fail && x.kesikli));
+    assert.ok(kama.length > 0, acik + " dilim: kama konturu bulunamadı");
+    for (const x of kama) {
+      assert.ok(x.enYakin >= yer.outer + yer.lineWidth / 2 - 1e-6,
+        `${acik} dilim: kontur merkeze ${x.enYakin.toFixed(1)} px kadar giriyor (dış halka ${yer.outer.toFixed(1)})`);
+    }
+  }
 });

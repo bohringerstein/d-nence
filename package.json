@@ -15,11 +15,12 @@
     "typecheck": "tsc --noEmit",
     "sync": "node tools/sync-prototype.ts",
     "check": "npm run typecheck && npm test && npm run verify && node tools/sync-prototype.ts --check",
+    "check:hizli": "npm run typecheck && npm test && node tools/sync-prototype.ts --check",
     "icons": "node tools/make-icons.ts",
     "play": "node tools/play.ts"
   },
   "engines": {
-    "node": ">=22.6"
+    "node": "24.x"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",

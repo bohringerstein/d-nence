@@ -87,7 +87,7 @@ export const EN: Metinler = {
   denemeVeRekor: (n, yildiz) => `Try ${n}, best ${yildiz}`,
   enIyin: (yildiz, sure) => `Best ${yildiz} ${sure} s`,
   ilkDokunus: "Tap to lock the next ring",
-  sureDoldu: "Out of time",
+  sureDoldu: (kalan) => kalan > 0 ? `Out of time · ${kalan} ring${kalan === 1 ? "" : "s"} left` : "Out of time",
 
   aciklikKapandi: "Path closed",
   kilPayiKayip: "Path closed · by a hair",
@@ -95,6 +95,7 @@ export const EN: Metinler = {
   darKaldi: derece => `Path closed · missed by ${derece}°`,
 
   yildizEtiketi: { 3: "Clean open", 2: "Good open", 1: "Opened" },
+  yildizSesli: (yildiz) => `${yildiz} of 3 stars`,
   sonucSatiri: (etiket, yildiz, sure) => `${etiket} ${yildiz} ${sure} s`,
   yildizaKalan: (yildiz, yuzde) => ` · ${yuzde}% short of ${yildiz} stars`,
   rekorEki: ", new best",
@@ -149,7 +150,7 @@ or a history of discomfort from patterns, you can turn on &ldquo;Soften the patt
 <b>Settings</b> and take breaks while you play.`
   },
 
-  rekorlarYenilendi: "Levels were rebuilt, records reset",
+  rekorlarYenilendi: "Levels updated: your progress is kept, star records were reset",
   yukleniyor: "Loading levels…",
   tabloIndirilemediBaslik: "Could not load the levels",
   tabloIndirilemediMetin: "Check your connection and try again. Once the game has opened, it works offline too.",

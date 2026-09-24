@@ -158,3 +158,42 @@ test("NaN geçerli bir sayı sayılmıyor", () => {
   u.levels[0].rings[0].speed = NaN;
   assert.ok(C.validateTable(u).some(x => x.includes("speed")), "NaN speed yakalanmalı");
 });
+
+test("validateTable aralık dışı eşik, hız ve boşluk konumunu yakalar", () => {
+  const kopya = (): LevelTable => JSON.parse(JSON.stringify(data)) as LevelTable;
+  const hatalar = (t: LevelTable): string => C.validateTable(t).join(" | ");
+
+  const q = kopya(); q.q3 = 1.4; q.q2 = 1.2;
+  assert.match(hatalar(q), /aralığının dışında/);
+
+  const hiz = kopya(); hiz.levels[5].rings[0].speed = 0;
+  assert.match(hatalar(hiz), /hız 0/);
+  const derece = kopya(); derece.levels[5].rings[0].speed = 90; // derece yazılmış hız
+  assert.match(hatalar(derece), /hız 90/);
+
+  const iki = kopya(); const r = iki.levels[20].rings[0];
+  r.gaps = 2; r.gap = 60; r.gapOffset = 40;
+  assert.match(hatalar(iki), /iki boşluk çakışıyor/);
+});
+
+test("validateTable bilinmeyen alanı reddeder (damgaya girmez, sessizce kaybolurdu)", () => {
+  const t = JSON.parse(JSON.stringify(data)) as LevelTable & Record<string, unknown>;
+  t.yeniAlan = 1;
+  (t.levels[3] as unknown as Record<string, unknown>).ipucu = "x";
+  (t.levels[3].rings[0] as unknown as Record<string, unknown>).renk = "kırmızı";
+  const h = C.validateTable(t).join(" | ");
+  assert.match(h, /bilinmeyen tablo alanı "yeniAlan"/);
+  assert.match(h, /level 4: bilinmeyen alan "ipucu"/);
+  assert.match(h, /halka 0: bilinmeyen alan "renk"/);
+});
+
+test("validateTable baştan kilitli halkaların kapattığı kanalı oyunun maskesiyle yakalar", () => {
+  const t = JSON.parse(JSON.stringify(data)) as LevelTable;
+  const l = t.levels.find(x => x.rings.some(r => r.preLocked) && !x.boss);
+  assert.ok(l, "tabloda baştan kilitli halkalı bölüm olmalı");
+  // İki kilitli halka, boşlukları tam karşı karşıya: ortak açıklık kalmaz.
+  const sablon = l.rings.find(r => r.preLocked)!;
+  l.rings.splice(0, 0, { ...sablon, start: (sablon.start + Math.PI) % C.TAU, speed: sablon.speed + 0.1 });
+  if (l.rings.length > 6) l.rings.splice(l.rings.findIndex(r => !r.preLocked && r !== sablon), 1);
+  assert.match(C.validateTable(t).join(" | "), /geçilemez bir kanal/);
+});

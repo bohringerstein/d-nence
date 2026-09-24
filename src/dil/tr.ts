@@ -9,14 +9,14 @@ export const TR: Metinler = {
   oyunAlani: "Oyun alanı. Dokunarak sıradaki halkayı kilitle.",
   duraklatDugmesi: "Duraklat",
   kalanSureSesli: saniye => `Kalan süre ${saniye} saniye`,
-  levelOneki: "Level",
+  levelOneki: "Bölüm",
   patronEki: ", patron",
   ayarlar: "Ayarlar",
   tamam: "Tamam",
   nasilOynanir: "Nasıl oynanır",
   bastanBasla: "Baştan başla",
-  bastanBaslaAciklama: "Level 1'e döner ve açtığın bölümler kilitlenir. Yıldızların kalır.",
-  bastanBaslaOnay: level => `Emin misin? Level ${level} kaybolur`,
+  bastanBaslaAciklama: "1. bölüme döner ve açtığın bölümler kilitlenir. Yıldızların kalır.",
+  bastanBaslaOnay: level => `Emin misin? ${level}. bölüme kadar açtıkların kilitlenir`,
   anladim: "Anladım",
 
   bolumSec: "Bölüm seç",
@@ -25,8 +25,8 @@ export const TR: Metinler = {
   oncekiSayfa: "Önceki yüz bölüm",
   sonrakiSayfa: "Sonraki yüz bölüm",
   bolumEtiketi: (n, yildiz) =>
-    yildiz > 0 ? `Level ${n}, ${yildiz} yıldız` : `Level ${n}, henüz bitirilmedi`,
-  bolumKilitli: n => `Level ${n}, kilitli`,
+    yildiz > 0 ? `Bölüm ${n}, ${yildiz} yıldız` : `Bölüm ${n}, henüz bitirilmedi`,
+  bolumKilitli: n => `Bölüm ${n}, kilitli`,
 
   ilerlemeYok: "Henüz bölüm açılmadı.",
   ilerleme: (bolum, yildiz, enCok) => `${bolum} bölüm açıldı · ${yildiz} / ${enCok} yıldız`,
@@ -54,8 +54,8 @@ export const TR: Metinler = {
 
   kasaAcildi: "Kasa açıldı",
   bitisMetni: (toplam, bolum, yildiz, enCok) =>
-    `${toplam} kasanın hepsini açtın. ${bolum} levelde toplam ${yildiz} yıldız topladın` +
-    (yildiz < enCok ? `; ${enCok} yıldızın tamamı için levelleri daha temiz açman gerek.` : ". Hepsi temiz."),
+    `${toplam} kasanın hepsini açtın. ${bolum} bölümde toplam ${yildiz} yıldız topladın` +
+    (yildiz < enCok ? `; ${enCok} yıldızın tamamı için bölümleri daha temiz açman gerek.` : ". Hepsi temiz."),
   bastanOyna: "Baştan oyna",
 
   ogretici: {
@@ -75,7 +75,7 @@ export const TR: Metinler = {
   denemeVeRekor: (n, yildiz) => `Deneme ${n}, en iyin ${yildiz}`,
   enIyin: (yildiz, sure) => `En iyin ${yildiz} ${sure} sn`,
   ilkDokunus: "Dokun, sıradaki halkayı kilitle",
-  sureDoldu: "Süre doldu",
+  sureDoldu: (kalan) => kalan > 0 ? `Süre doldu · ${kalan} halka kaldı` : "Süre doldu",
 
   aciklikKapandi: "Açıklık kapandı",
   kilPayiKayip: "Açıklık kapandı · kıl payı",
@@ -83,6 +83,7 @@ export const TR: Metinler = {
   darKaldi: derece => `Açıklık kapandı · ${derece}° dar kaldı`,
 
   yildizEtiketi: { 3: "Temiz açılış", 2: "İyi açılış", 1: "Açıldı" },
+  yildizSesli: (yildiz) => `3 üzerinden ${yildiz} yıldız`,
   sonucSatiri: (etiket, yildiz, sure) => `${etiket} ${yildiz} ${sure} sn`,
   yildizaKalan: (yildiz, yuzde) => ` · ${yildiz} yıldıza %${yuzde} kaldı`,
   rekorEki: ", rekor",
@@ -137,11 +138,11 @@ rahatsız olma geçmişin varsa, <b>Ayarlar</b>'dan &ldquo;Deseni yumuşat&rdquo
 ve ara vererek oynayabilirsin.`
   },
 
-  rekorlarYenilendi: "Bölümler yenilendi, rekorlar sıfırlandı",
-  yukleniyor: "Leveller indiriliyor…",
-  tabloIndirilemediBaslik: "Leveller indirilemedi",
+  rekorlarYenilendi: "Bölümler güncellendi: ilerlemen yerinde, yıldız rekorları sıfırlandı",
+  yukleniyor: "Bölümler indiriliyor…",
+  tabloIndirilemediBaslik: "Bölümler indirilemedi",
   tabloIndirilemediMetin: "Bağlantını kontrol edip tekrar dene. Oyun bir kez açıldıktan sonra çevrimdışı da çalışır.",
   tekrarDene: "Tekrar dene",
-  tabloHatasiBaslik: "Level tablosu okunamadı",
+  tabloHatasiBaslik: "Bölüm tablosu okunamadı",
   tabloHatasiMetin: "Geliştirici için: <code>npm run verify</code> çalıştırın."
 };

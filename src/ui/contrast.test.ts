@@ -8,6 +8,7 @@ import assert from "node:assert";
 import { kuralGovdesi } from "./cssOku.ts";
 import fs from "node:fs";
 import path from "node:path";
+import { KAMA } from "../game/render.ts";
 
 const css = fs.readFileSync(path.join(import.meta.dirname, "..", "styles.css"), "utf8");
 
@@ -111,9 +112,9 @@ test("halkalar arka plandan ayırt edilebiliyor (en soluk halka dahil)", () => {
   assert.deepEqual(sorun, [], sorun.join("; "));
 });
 
-/** render.ts'teki geçer kama dolgu ve kontur opaklıkları. Geçmez kama doldurulmaz. */
-const KAMA_OPAKLIK = 0.35;
-const KAMA_KONTUR_OPAKLIK = 0.7;
+// Kama opaklıkları render.ts'ten okunur (tek kaynak); çizildikleri game/render.test.ts'te sınanır.
+const KAMA_OPAKLIK = KAMA.dolgu;
+const KAMA_KONTUR_OPAKLIK = KAMA.kontur;
 
 test("geçer kama zeminden WCAG 1.4.11 eşiğiyle ayrılıyor", () => {
   // Eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15). Açık temada zemine göre
@@ -132,6 +133,17 @@ test("geçer kama zeminden WCAG 1.4.11 eşiğiyle ayrılıyor", () => {
     const kontur = harmanla(t.ink, t.bg, KAMA_KONTUR_OPAKLIK);
     const o = kontrast(kontur, t.bg);
     if (o < 3.0) sorun.push(`${ad} tema: kama konturu / zemin = ${o.toFixed(2)}:1 (WCAG 1.4.11, en az 3,0 gerek)`);
+  }
+  assert.deepEqual(sorun, [], sorun.join("; "));
+});
+
+test("geçmez kamanın kesik konturu zeminden WCAG 1.4.11 eşiğiyle ayrılıyor", () => {
+  // Açık temada 3,03:1 — eşiğin hemen üstünde ve hiçbir test korumuyordu. Kırmızı biraz
+  // açılsa ya da opaklık düşse renk körü oyuncu için tek işaret kaybolurdu.
+  const sorun: string[] = [];
+  for (const [ad, t] of temalar) {
+    const o = kontrast(harmanla(t.fail, t.bg, KAMA.gecmezKontur), t.bg);
+    if (o < 3.0) sorun.push(`${ad} tema: geçmez kama konturu / zemin = ${o.toFixed(2)}:1 (en az 3,0 gerek)`);
   }
   assert.deepEqual(sorun, [], sorun.join("; "));
 });

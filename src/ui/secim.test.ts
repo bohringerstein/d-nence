@@ -44,10 +44,10 @@ test("her düğmenin erişilebilir adı bölüm numarasını ve yıldızı söyl
   // Izgarada görünen sayı ve yıldız glifleri aria-hidden; ekran okuyucu için tek
   // bilgi kaynağı aria-label. Eksik kalırsa ekran "düğme, düğme, düğme" olur.
   const h = ciz();
-  assert.ok(h.includes('aria-label="Level 1, 3 yıldız"'));
-  assert.ok(h.includes('aria-label="Level 2, 1 yıldız"'));
-  assert.ok(h.includes('aria-label="Level 4, henüz bitirilmedi"'));
-  assert.ok(h.includes('aria-label="Level 6, kilitli"'));
+  assert.ok(h.includes('aria-label="Bölüm 1, 3 yıldız"'));
+  assert.ok(h.includes('aria-label="Bölüm 2, 1 yıldız"'));
+  assert.ok(h.includes('aria-label="Bölüm 4, henüz bitirilmedi"'));
+  assert.ok(h.includes('aria-label="Bölüm 6, kilitli"'));
   const en = ciz({ m: EN });
   assert.ok(en.includes('aria-label="Level 1, 3 stars"'));
   assert.ok(en.includes('aria-label="Level 2, 1 star"'), "İngilizcede tek yıldız tekil olmalı");

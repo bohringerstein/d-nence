@@ -119,7 +119,7 @@ test("nasıl oynanır duraklatmayı anlatıyor", () => {
 // kaybettim" sorusuna cevap veren tek cümle — ekranda 0,9 saniye duruyordu. O cümleyi
 // okumak bundan uzun sürer.
 test("kayıp, kazanma ve süre dolması mesajları korumalı yazılıyor", () => {
-  for (const cagri of ["yazKoru(kayipYazisi(", "yazKoru(M.sonucSatiri(", "yazKoru(M.sureDoldu)"]) {
+  for (const cagri of ["yazKoru(kayipYazisi(", "yazKoru(M.sonucSatiri(", "yazKoru(M.sureDoldu("]) {
     assert.ok(main.includes(cagri), `sonuç mesajı korumasız yazılıyor: ${cagri}`);
   }
   // Level yüklemesi mesajı EZMEMELİ, ertelemeli.

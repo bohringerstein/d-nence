@@ -1,0 +1,36 @@
+# Tam denetim: tip + testler + Monte Carlo tablo doğrulaması (~7 dk) + prototip güncelliği.
+# Vercel yalnız hızlı denetimi (check:hizli) çalıştırır; tablo damgası orada da sınanır.
+name: check
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      tam:
+        description: "Determinizm denetimi de çalışsın (verify:full, ~40 dk)"
+        type: boolean
+        default: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+  determinizm:
+    if: github.event_name == 'workflow_dispatch' && inputs.tam
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:full

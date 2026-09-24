@@ -14,7 +14,7 @@ import { dongu, ADIM } from "./game/loop.ts";
 import { girdiBagla } from "./game/input.ts";
 import { tuvalKur, ciz } from "./game/render.ts";
 import { renkleriOku, renklerHazir, hareketAzalt, tercihleriIzle } from "./game/theme.ts";
-import { ogreticiTablosu, ipucu, yildizYazisi, sureYazisi, kayipYazisi, kalanYazisi } from "./game/hints.ts";
+import { ogreticiTablosu, patronIlkGorunus, ipucu, yildizYazisi, yildizParcalari, sureYazisi, kayipYazisi, kalanYazisi } from "./game/hints.ts";
 import { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, tabloSurumuUygula, disaAktar, iceAktar, kaydiDegistir,
   devamNoktasiYaz, devamNoktasiOku } from "./game/storage.ts";
 import { izgaraHtml, sayfaSayisi, sayfasi, aralik } from "./ui/secim.ts";
@@ -122,6 +122,7 @@ const kayit = oku();
 // Damgadan önceki kayıtlar cezalandırılmaz: alan yoksa mevcut tablo benimsenir.
 const silinenRekor = tabloSurumuUygula(kayit, tablo.v);
 const ogretici = ogreticiTablosu(tablo.levels, M);
+const patronIlk = patronIlkGorunus(tablo.levels);
 let renk = renkleriOku();
 // Sistem tercihi VEYA oyuncunun kendi seçimi; ikisinden biri yeterli.
 let azalt = hareketAzalt() || ayarlar.hareketAzalt;
@@ -217,7 +218,7 @@ function levelYukle(n: number, denemeyiKoru = false): void {
   // 1,4 rem içinde 320 piksellik telefonda üst çubuğu taşırıyordu.
   ui.lvl.textContent = String(n);
   ui.lvlToplam.textContent = ` / ${LEVEL_COUNT}${level.boss ? M.patronEki : ""}`;
-  yazVeyaErtele(ipucu({ level, deneme, rekor: kayit.bests[n], ogretici, m: M }));
+  yazVeyaErtele(ipucu({ level, deneme, rekor: kayit.bests[n], ogretici, m: M, patronIlk }));
   levelKaydet(kayit, n);
   saatiGuncelle();
 }
@@ -231,7 +232,21 @@ function levelYukle(n: number, denemeyiKoru = false): void {
  * duruyordu. O cümleyi okumak bundan uzun sürer. Mesaj artık bir sonraki denemeye
  * taşar; yeniden başlama gecikmez, yalnızca açıklama okunacak kadar kalır.
  */
-const yaz = (metin: string): void => { ui.hint.textContent = metin; };
+function yaz(metin: string): void {
+  const parcalar = yildizParcalari(metin);
+  if (parcalar.every(p => p.yildiz === undefined)) { ui.hint.textContent = metin; return; }
+  // Yıldız glifleri görünür ama sessiz; yanında ekran okuyucu için sözlü karşılığı.
+  ui.hint.replaceChildren(...parcalar.flatMap((p): Node[] => {
+    if (p.yildiz === undefined) return [document.createTextNode(p.metin)];
+    const gorunen = document.createElement("span");
+    gorunen.setAttribute("aria-hidden", "true");
+    gorunen.textContent = p.metin;
+    const sesli = document.createElement("span");
+    sesli.className = "gizli";
+    sesli.textContent = M.yildizSesli(p.yildiz);
+    return [gorunen, sesli];
+  }));
+}
 
 /** Sonuç mesajının ekranda kalacağı süre (kayıp animasyonu dahil). */
 const SONUC_SURESI = 2.4;
@@ -262,10 +277,13 @@ function ipucuKilidiSifirla(): void { ipucuKilidi = 0; bekleyenIpucu = null; }
 
 /** Sesli sayaçta en son yazılan tam saniye; her karede DOM'a yazmamak için. */
 let sonSesliSaniye = -1;
+/** Görünen sayaçta en son yazılan metin: onda bir saniyede bir değişir, her kare değil. */
+let sonSaatYazisi = "";
 
 function saatiGuncelle(): void {
   const kalan = kalanSure(durum);
-  ui.clockSayi.textContent = sureYazisi(kalan, M);
+  const yazi = sureYazisi(kalan, M);
+  if (yazi !== sonSaatYazisi) { sonSaatYazisi = yazi; ui.clockSayi.textContent = yazi; }
   // Sesli sayaç saniyede bir tazelenir ve tam saniye söyler. role="timer" kendiliğinden
   // okunmaz (aria-live varsayılanı "off"): oyuncu rotordan/tarama kipinden istediğinde
   // okur. Ondalıkla ve her karede yazmanın tek etkisi boşa DOM trafiği olurdu.
@@ -323,7 +341,7 @@ const oyun = dongu({
     if (oyunDonuk()) { girdi.temizle(); return false; }
     dokunusIsle(gercekZaman);
     const s = step(durum, dt);
-    if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); cal(ayarlar, "kayip"); yazKoru(M.sureDoldu); return true; }
+    if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); cal(ayarlar, "kayip"); yazKoru(M.sureDoldu(durum.rings.filter(r => !r.locked).length)); return true; }
     if (s.tip === "bitti") {
       if (durum.asama === "crash") levelYukle(durum.level.n, true);
       else {
@@ -835,7 +853,20 @@ ui.ayarKapat.addEventListener("click", () => {
 // Rekorlar silindiyse oyuncu bunu sessizce öğrenmemeli. levelYukle'den ÖNCE:
 // sonradan yazılırsa `yazKoru` bekleyen ipucunu da siler ve oyuncu o bölümün
 // öğretici ipucunu hiç görmez.
-if (silinenRekor > 0) yazKoru(M.rekorlarYenilendi);
+//
+// Aynı metin kısa bir süre sonra canlı bölgeye YENİDEN yazılır: sayfa yüklenirken,
+// kabuğun kurulduğu görevde yapılan ilk yazma ekran okuyuculara genelde ulaşmaz
+// (bölge henüz erişilebilirlik ağacına kaydolmamıştır). Boşaltıp yeniden yazmak
+// değişikliği duyurulur kılar; ipucu kilidi o sırada hâlâ açık olduğu için arada
+// başka bir mesaj yazılmış olamaz.
+if (silinenRekor > 0) {
+  yazKoru(M.rekorlarYenilendi);
+  setTimeout(() => {
+    if (ui.hint.textContent !== M.rekorlarYenilendi) return;
+    ui.hint.textContent = "";
+    requestAnimationFrame(() => yaz(M.rekorlarYenilendi));
+  }, 700);
+}
 levelYukle(devamNoktasiOku() ?? acilisBolumu(kayit));
 tuval.boyutla();
 oyun.basla();

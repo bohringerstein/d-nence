@@ -113,7 +113,11 @@ export interface Metinler {
   denemeVeRekor: (n: number, yildiz: string) => string;
   enIyin: (yildiz: string, sure: string) => string;
   ilkDokunus: string;
-  sureDoldu: string;
+  /**
+   * Süre dolunca. Kalan halka sayısıyla: "Süre doldu" tek başına oyuncuya ne kadar
+   * yaklaştığını söylemiyordu; bir halka kala ile hiç kilitlemeden aynı cümleydi.
+   */
+  sureDoldu: (kalanHalka: number) => string;
 
   // ---- Kayıp ----
   aciklikKapandi: string;
@@ -123,6 +127,8 @@ export interface Metinler {
 
   // ---- Kazanma ----
   yildizEtiketi: Record<Stars, string>;
+  /** ★☆☆ gliflerinin ekran okuyucu karşılığı. Glifler okunmaz ya da "siyah yıldız" diye okunur. */
+  yildizSesli: (yildiz: number) => string;
   sonucSatiri: (etiket: string, yildiz: string, sure: string) => string;
   /**
    * Kazanma satırının eki: bir üst yıldıza kalan mesafe ("· 3 yıldıza %9 kaldı").

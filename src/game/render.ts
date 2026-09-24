@@ -8,6 +8,24 @@ import type { Renkler } from "./theme.ts";
 /** Kamalar halkalarin disina S x bu kadar tasar. */
 export const KAMA_TASMA = 0.05;
 
+/**
+ * Kama opaklıkları. TEK KAYNAK: kontrast testi (ui/contrast.test.ts) bunları buradan
+ * okur. Eskiden testte elle kopyalanmışlardı; biri burada değişse test eski değeri
+ * ölçüp yeşil yanmaya devam ederdi.
+ */
+export const KAMA = {
+  /** Geçer kama dolgusu (top rengi). Tek başına 3:1'e ulaşamaz, bkz. kontur. */
+  dolgu: 0.35,
+  /** Geçer kama konturu (mürekkep rengi, düz). WCAG 1.4.11'i bu taşır. */
+  kontur: 0.7,
+  /** Geçmez kama konturu (kırmızı, kesik). */
+  gecmezKontur: 0.9,
+  /** Kayıpta geçmez kamanın dolgusu. */
+  kayipDolgu: 0.3,
+  /** Kontur kalınlığı, CSS pikseli. */
+  kalinlik: 1.5
+} as const;
+
 export interface Tuval {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
@@ -35,7 +53,10 @@ export function tuvalKur(canvas: HTMLCanvasElement, degisti: () => void): Tuval 
   let onbellek: Layout | null = null;
 
   const boyutla = (): void => {
-    const dpr = window.devicePixelRatio || 1;
+    // Üst sınır 2: 3x ekranlı telefonlarda tuval 9 kat piksel taşıyordu (2x'te 4 kat).
+    // İnce çizgili, düz renkli bir çizimde 2x ile 3x arasındaki fark gözle seçilmez,
+    // doldurma maliyeti ise 2,25 kat artar.
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     const r = canvas.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) return;
     W = r.width; H = r.height;
@@ -99,6 +120,18 @@ export interface CizimSecenekleri {
   halkaOpakligi: number;
 }
 
+/** Kareden kareye değişmeyen çizim nesneleri, bağlam başına. */
+interface CizimOnbellegi {
+  yaziAnahtari: string; font: string;
+  delikYari: number; delik: CanvasGradient | null;
+}
+const onbellekler = new WeakMap<CanvasRenderingContext2D, CizimOnbellegi>();
+function onbellekAl(ctx: CanvasRenderingContext2D): CizimOnbellegi {
+  let o = onbellekler.get(ctx);
+  if (!o) { o = { yaziAnahtari: "", font: "", delikYari: -1, delik: null }; onbellekler.set(ctx, o); }
+  return o;
+}
+
 export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halkaOpakligi }: CizimSecenekleri): void {
   const { ctx, W, H } = t;
   if (W === 0 || H === 0) return;
@@ -136,14 +169,22 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
   //     merkezden geçen rakamlarda, yani herkesin gördüğü Level 1'de). Rakam çizildikten
   //     sonra merkezde yumuşak kenarlı bir delik silinir; halkalar henüz çizilmediği için
   //     silme yalnızca rakama dokunur.
+  // Yazı tipi dizesi ve ölçüm bölüm ve yerleşim başına bir kez: her karede metni ölçmek
+  // ve dize kurmak boşa işti. Önbellek bağlama bağlı (WeakMap): yazı tipi yüklenince
+  // ölçü değişebilir, o da tuvali yeniden boyutlandırmaz; bu yüzden anahtar ölçüyü
+  // değil, ölçünün girdilerini taşır ve yükleme sonrası ilk karede tazelenir.
+  const ob = onbellekAl(ctx);
   const metin = String(s.level.n);
-  let punto = g.S * 0.5;
-  ctx.font = `600 ${punto}px Fredoka, "Trebuchet MS", sans-serif`;
-  const yariGenislik = ctx.measureText(metin).width / 2;
-  if (yariGenislik > g.outer) {
-    punto *= g.outer / yariGenislik;
+  const yaziAnahtari = metin + "|" + g.S + "|" + g.outer + "|" + (typeof document !== "undefined" ? document.fonts?.status ?? "" : "");
+  if (ob.yaziAnahtari !== yaziAnahtari) {
+    let punto = g.S * 0.5;
     ctx.font = `600 ${punto}px Fredoka, "Trebuchet MS", sans-serif`;
+    const yariGenislik = ctx.measureText(metin).width / 2;
+    if (yariGenislik > g.outer) punto *= g.outer / yariGenislik;
+    ob.yaziAnahtari = yaziAnahtari;
+    ob.font = `600 ${punto}px Fredoka, "Trebuchet MS", sans-serif`;
   }
+  ctx.font = ob.font;
   ctx.globalAlpha = s.level.boss ? 0.14 : 0.07;
   ctx.fillStyle = s.level.boss ? renk.ball : renk.ink;
   ctx.textAlign = "center";
@@ -152,9 +193,15 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
   ctx.globalAlpha = 1;
 
   const delikDis = g.ballR * 4;
-  const delik = ctx.createRadialGradient(0, 0, g.ballR * 1.6, 0, 0, delikDis);
-  delik.addColorStop(0, "rgba(0,0,0,1)");
-  delik.addColorStop(1, "rgba(0,0,0,0)");
+  // Gradyan merkeze (0,0) göre tanımlı; çevirme çizim anında uygulandığı için aynı
+  // nesne her karede kullanılabilir. Yalnız top yarıçapı değişince yeniden kurulur.
+  if (ob.delikYari !== g.ballR || !ob.delik) {
+    const d = ctx.createRadialGradient(0, 0, g.ballR * 1.6, 0, 0, delikDis);
+    d.addColorStop(0, "rgba(0,0,0,1)");
+    d.addColorStop(1, "rgba(0,0,0,0)");
+    ob.delik = d; ob.delikYari = g.ballR;
+  }
+  const delik = ob.delik;
   ctx.globalCompositeOperation = "destination-out";
   ctx.fillStyle = delik;
   ctx.beginPath();
@@ -169,6 +216,8 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
   // daralmış kanal kırmızı DOLU çiziliyor; topun ona sığmadığı görünüyor.
   if (s.anyLocked) {
     const dis = g.outer + g.S * KAMA_TASMA;
+    /** Çentiklerin başladığı yer: dış halkanın çizgisinin hemen dışı. */
+    const icKenar = g.outer + g.lineWidth / 2;
     // Geçer ve geçmez kama eskiden ikisi de dolduruluyordu (sarı %22, kırmızı %15).
     // Açık temada ikisinin zemine göre kontrastı 1,17 ve 1,20 çıkıyordu; aralarındaki
     // fark 1,03:1, yani fiilen ayırt edilemiyorlardı ve ayrım tamamen renk tonuna
@@ -176,13 +225,27 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
     // kesik konturlu. Aradaki fark 1,03 -> 1,28 ve renkten bağımsız ikinci bir kanal.
     for (const bolge of aciklikBolgeleri(s)) {
       const genis = canPass(bolge.w);
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(0, 0, dis, bolge.from, bolge.to);
-      ctx.closePath();
+      // Dolgu merkezden çıkan dilim; KONTUR ise yalnız halkaların DIŞINDA kalır: dış yay
+      // ve iki uçta dış halkadan yaya kısa birer çentik. Eskiden kontur dolgu yolunun
+      // kendisiydi, yani merkezden çıkan iki radyal çizgi halkalarla aynı mürekkep
+      // renginde bütün halkaları kesiyordu — boşluk uçlarının üstüne binen "teller".
+      // Şeklin sınırı yine belirli (1.4.11), ama halka bölgesinde çizgi yok.
+      const dilim = (): void => {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, dis, bolge.from, bolge.to);
+        ctx.closePath();
+      };
+      const kenar = (): void => {
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(bolge.from) * icKenar, Math.sin(bolge.from) * icKenar);
+        ctx.arc(0, 0, dis, bolge.from, bolge.to);
+        ctx.lineTo(Math.cos(bolge.to) * icKenar, Math.sin(bolge.to) * icKenar);
+      };
       if (genis) {
+        dilim();
         ctx.fillStyle = renk.ball;
-        ctx.globalAlpha = 0.35;
+        ctx.globalAlpha = KAMA.dolgu;
         ctx.fill();
         // KONTUR ŞART (WCAG 1.4.11). Amber dolgu tek başına açık temada zeminden
         // yalnızca 1,28:1 ayrılıyor — ölçüt 3:1. Oyunun kendi öğretici metni bu nesneyi
@@ -190,26 +253,29 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
         //
         // Dolgu opaklığını artırmak İŞE YARAMIYOR: amber ile açık zeminin parlaklığı
         // neredeyse aynı, 0,35 → 0,70 yapmak oranı yalnız 1,62'ye taşıyor. Çözüm
-        // mürekkep konturu olmak zorunda. Alfa 0,7 → açık temada 5,88:1, koyu 6,93:1.
+        // mürekkep konturu: alfa 0,7 → zemine karşı açık temada 4,68:1, koyu 6,93:1.
         //
         // Kontur DÜZ çizgi: kesik kontur geçmez kamanın işareti olarak kalsın, ikisi
         // arasındaki ikinci kanal (dolgu var/yok) ve üçüncü kanal (düz/kesik) bozulmasın.
+        kenar();
         ctx.strokeStyle = renk.ink;
-        ctx.globalAlpha = 0.7;
-        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = KAMA.kontur;
+        ctx.lineWidth = KAMA.kalinlik;
         ctx.setLineDash([]);
         ctx.stroke();
       } else {
         // Kayıpta dolgu geri gelir: "işte sığmadığın yer" tek bakışta okunmalı.
         if (s.asama === "crash") {
+          dilim();
           ctx.fillStyle = renk.fail;
-          ctx.globalAlpha = 0.3;
+          ctx.globalAlpha = KAMA.kayipDolgu;
           ctx.fill();
         }
-        // Renk körlüğü için ikinci işaret: kesik kontur.
-        ctx.globalAlpha = 0.9;
+        // Renk körlüğü için ikinci işaret: kesik kontur. Geçer kamayla aynı yol.
+        kenar();
+        ctx.globalAlpha = KAMA.gecmezKontur;
         ctx.strokeStyle = renk.fail;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = KAMA.kalinlik;
         ctx.setLineDash([4, 4]);
         ctx.stroke();
         ctx.setLineDash([]);
