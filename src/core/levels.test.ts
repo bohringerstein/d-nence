@@ -197,3 +197,15 @@ test("validateTable baştan kilitli halkaların kapattığı kanalı oyunun mask
   if (l.rings.length > 6) l.rings.splice(l.rings.findIndex(r => !r.preLocked && r !== sablon), 1);
   assert.match(C.validateTable(t).join(" | "), /geçilemez bir kanal/);
 });
+
+test("bolumOzeti tanım ya da eşik değişince değişir, aynı girdide aynıdır", () => {
+  const l = data.levels[41];
+  const o = C.bolumOzeti(l, data.q3, data.q2);
+  assert.match(o, /^[0-9a-f]{8}$/);
+  assert.equal(C.bolumOzeti(JSON.parse(JSON.stringify(l)), data.q3, data.q2), o);
+  const d = JSON.parse(JSON.stringify(l)) as typeof l; d.limit += 0.1;
+  assert.notEqual(C.bolumOzeti(d, data.q3, data.q2), o);
+  assert.notEqual(C.bolumOzeti(l, data.q3 + 0.01, data.q2), o);
+  const hepsi = new Set(data.levels.map(x => C.bolumOzeti(x, data.q3, data.q2)));
+  assert.equal(hepsi.size, data.levels.length, "1000 bölümde çakışma olmamalı");
+});

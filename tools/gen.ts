@@ -5,10 +5,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  TAU, DEG, NEED_PASS, SOLVER_MARGIN, REACT, GAP_MAX_DEG, LEVEL_COUNT, BOSS_ARALIGI, bossMu,
+  TAU, DEG, NEED_PASS, REACT, GAP_MAX_DEG, LEVEL_COUNT, BOSS_ARALIGI, bossMu,
   canPass, stepRings, liveRings, validateTable, solve, ADIM, wrap,
   OPEN_ALL, lockOpen, peekOpen, largestOpen, initialOpen, starRatio,
-  newMask, applyMask, maskLargest
+  newMask, applyMask, maskLargest, BIN, NEED_BINS
 } from "../src/core/index.ts";
 import type { RingDef, LevelTable, Open, PatronAnahtari } from "../src/core/index.ts";
 
@@ -47,8 +47,24 @@ let seed = 12345; const R = () => { seed = (seed * 16807) % 2147483647; return s
 let es = 1; const ER = () => { es = (es * 16807) % 2147483647; return es / 2147483647; };
 const gauss = () => Math.sqrt(-2 * Math.log(ER() + 1e-9)) * Math.cos(TAU * ER());
 const rnd4 = (x: number): number => Math.round(x * 1e4) / 1e4;
-// Çözücünün kendine bıraktığı pay: geçiş eşiğinin biraz üstünü hedefler ki insan oyuncuya yer kalsın.
-const needS = NEED_PASS + SOLVER_MARGIN;
+/**
+ * İnsan modelinin basma eşiği: kanalın geçiş eşiğinin ÇEYREK DERECE üstü.
+ *
+ * Eskiden `NEED_PASS + SOLVER_MARGIN` (1°) idi ve bir ÖLÜ BÖLGE yaratıyordu: kanal
+ * 18,0° ile 19,0° arasına düştüğünde `allow` negatif oluyor ve model bir daha HİÇ
+ * basmıyordu. Oysa bölüm hâlâ geçilebilir ve hizalı bir kilit açıklık kaybettirmez;
+ * gerçek oyuncu orada basar. Ölçüldü: saate yenilen denemelerin %90'ından fazlasında
+ * `allow < 0` idi — model an vardı ama reddetti. "Kabul oranı duvarı" diye belgelenen
+ * şeyin ~%80'i buydu. Düzeltmeyle aynı tabloda kazanma %39,6 → %39,6 (değişmedi), süre
+ * kaybı %6,7 → %2,5: kayıp türü düzeldi, zorluk aynı kaldı.
+ *
+ * Model bu yüzden süper insan olmuyor: dokunuş hatası (σ = 60 ms) aynı; değişen yalnız
+ * karar kuralı. Çözücü (solver.ts) kendi 1°'lik payını korur — o, bölümün
+ * çözülebilirliğini kanıtlar, insanı taklit etmez.
+ */
+const BASMA_ESIGI = NEED_PASS + 0.25 * DEG;
+/** Hizalama bütçesinin tabanı: tek dilim. Kanal eşiğe yakınken bütçe sıfıra inmesin. */
+const EN_AZ_BUTCE = BIN;
 
 // İnsan benzeri oyuncu: dokunuşu ±sigma sn sapar
 function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): PlayResult {
@@ -64,9 +80,9 @@ function play(def: RingDef[], limit: number, { tol = 0.7, sigma = 0.06 } = {}): 
       if (t >= last + REACT) {
         if (open === OPEN_ALL) want = true;
         else {
-          const cur = largestOpen(open).w, allow = (cur - needS) / (rem + 1) * tol;
+          const cur = largestOpen(open).w, allow = Math.max(EN_AZ_BUTCE, (cur - BASMA_ESIGI) / (rem + 1) * tol);
           const p = peekOpen(open, r);
-          if (p.w >= needS && cur - p.w <= allow) want = true;
+          if (p.w >= BASMA_ESIGI && cur - p.w <= allow) want = true;
         }
       }
       if (want) {
@@ -135,8 +151,18 @@ function sizeGaps(rings: RawRing[], tolSec: number): void {
  * başına 1 sigma isabet tutturmak zorundadır, 30 ms iken 0,5 sigma.
  *
  * 25 ms'nin altı adil değildir: orada bölüm beceriyle değil şansla geçilir.
+ *
+ * FAZ 2'DE TABAN İNER: 200. bölümde 25 ms, 1000. bölümde 22 ms (proje sahibinin kararı,
+ * SPEC §8). Sebep: zorluğun 200'den sonra HİSSEDİLİR biçimde artmaya devam etmesinin
+ * fizik içindeki tek yolu bu. Ölçüldü (201-1000, geç yapılar τ tabanına sıkıştırılarak):
+ * 25 ms'de kazanma %34,5, 22 ms'de ~%29; 20 ms'de %24,8 ve süre kaybı hâlâ %4,2 — yani
+ * 22 ms'de de sonuç beceriye bağlı, şansa dönmüyor. İnsanın 60 ms'lik sapmasına göre
+ * 22 ms kilit başına 0,37 sigma demek; 1000 bölüm oynamış bir oyuncudan istenebilir.
  */
-const TAU_TABAN = 0.025;
+const TAU_ILK = 0.025;
+const TAU_SON = 0.022;
+const tauTaban = (n: number): number =>
+  TAU_ILK - (TAU_ILK - TAU_SON) * Math.min(1, Math.max(0, (n - TABAN_BOLUM) / (LEVEL_COUNT - TABAN_BOLUM)));
 
 /**
  * Kanalı daraltan kilitlerin hız toplamı — `sizeGaps` ve `tauHesapla` AYNI değeri
@@ -201,6 +227,21 @@ function tauHesapla(def: RingDef[]): number {
  */
 const EN_AZ_PAY = 6 * DEG;
 const gerekenPay = (kalan: number): number => EN_AZ_PAY * (1 + (kalan - 1) * 0.5);
+/**
+ * Baştan kilitli halkaların bıraktığı pay OYUNUN kuralıyla (dilim maskesi), DİLİM
+ * SAYISIYLA. Analitik model maskeden ±0,5° sapabiliyor; derece karşılaştırması sınırdaki
+ * 8 bölümde kayan nokta gürültüsüyle karar veriyordu. Baştan kilitli halka yoksa null.
+ */
+function baslangicPayi(def: readonly RingDef[]): { yeter: boolean; payDerece: number; gerekDerece: number; kalan: number } | null {
+  const canli = liveRings(def);
+  if (!canli.some(r => r.locked)) return null;
+  const m = newMask();
+  for (const r of canli) if (r.locked) applyMask(m, r);
+  const kalan = canli.filter(r => !r.locked).length;
+  const payDilim = maskLargest(m).len - NEED_BINS;
+  const gerekDilim = Math.ceil(gerekenPay(kalan) / BIN - 1e-9);
+  return { yeter: payDilim >= gerekDilim, payDerece: payDilim * BIN / DEG, gerekDerece: gerekDilim * BIN / DEG, kalan };
+}
 /**
  * Tek yönlü karıştırıcı (xorshift-multiply). Nefes yürüyüşü ve halka sayısı ritmi
  * bundan beslenir; ikisi de "periyodik değil ama deterministik" olmak zorunda.
@@ -302,7 +343,7 @@ const ringCount = (n: number): number => {
 // Süre limiti artık tasarım girdisi: hareketli halka sayısından gelir ve geç levellerde kademeli sıkılaşır.
 // Çözücü süresi limiti belirlemez, yalnızca "bu limit yeterli mi" diye denetlenir.
 const limitFor = (n: number, moving: number): number =>
-  +((4 + 2 * moving) * (1 - 0.22 * Math.min(1, (n - 1) / (TABAN_BOLUM - 1)))).toFixed(1);
+  +((4 + 2 * moving) * (1 - 0.22 * Math.min(1, (n - 1) / (TABAN_BOLUM - 1))) * (1 - SURE_SIKISMA * gecOyunPayi(n))).toFixed(1);
 
 /** Tasarim limiti: arketip carpani dahil. Uretim ve dogrulama AYNI fonksiyonu kullanir. */
 const tasarimLimiti = (n: number, moving: number): number =>
@@ -420,7 +461,7 @@ const ARKETIP_AYARI: Record<Arketip, ArketipAyari> = {
  * Kanal tabanlandığında τ = (kanal − NEED_PASS) / Σ'|ω| olur ve o zaman hız bir kol
  * haline gelir. Bu yüzden arama, bant dışında kaldığı GEÇ turlarda hızı kademeli artırır.
  *
- * `ekHalka` ise ÜÇÜNCÜ kol ve en son çaredir. Tolerans kolu `TAU_TABAN`'a (25 ms insan
+ * `ekHalka` ise ÜÇÜNCÜ kol ve en son çaredir. Tolerans kolu `tauTaban`'a (25→22 ms insan
  * sınırı) dayandığında bölüm daha zor OLAMAZ; kalan tek yol daraltan kilit sayısını
  * artırmaktır. Ölçtüm: 332. bölümde 4 halka, τ = 25,5 ms — taban birebir bağlıyordu ve
  * hedef %28 iken ulaşılan %50'de kalıyordu. Beşinci halka o kilidi açar.
@@ -430,9 +471,15 @@ const ARKETIP_AYARI: Record<Arketip, ArketipAyari> = {
  */
 function candidate(n: number, hizCarpani = 1, ekHalka = 0): RawRing[] {
   const a = ARKETIP_AYARI[arketip(n)];
-  const temel = a.halka
+  const gecOyun = gecOyunPayi(n);
+  let temel = a.halka
     ? a.halka[0] + Math.floor(R() * (a.halka[1] - a.halka[0] + 1))
     : ringCount(n);
+  // Yapısal kol 1: faz 2'de daha çok 6 halkalı bölüm (bkz. YAPI_ALTI). `hassasiyet`
+  // hariç: kimliği az halka, dar boşluk. `dayaniklilik` zaten çok halkalı, ona uyar.
+  if (arketip(n) !== "hassasiyet" && temel < 6 && R() < YAPI_ALTI * gecOyun) temel++;
+  // Yapısal kol 2: aynı bölümde daha çok mekanik. Sıfır olan olasılık sıfır kalır.
+  const mk2 = (p: number): number => Math.min(0.9, p * (1 + MEKANIK_ARTIS * gecOyun));
   // `ekHalka`: zorluğun ÜÇÜNCÜ kolu, yalnız ilk ikisi tükendiğinde. Bkz. aday döngüsü.
   const count = Math.max(2, Math.min(6, temel + ekHalka));
   const base = Math.min(0.8 + n * 0.03, 2.2) * hizCarpani;
@@ -440,9 +487,9 @@ function candidate(n: number, hizCarpani = 1, ekHalka = 0): RawRing[] {
   for (let i = 0; i < count; i++) {
     const dir = n < 3 ? 1 : (R() < 0.5 ? -1 : 1);
     rings.push({ speed: dir * base * (0.7 + R() * 0.6), gap: 0, gapScale: 0.82 + R() * 0.36,
-      gaps: n >= 11 && R() < a.gaps2 ? 2 : 1, gapOffset: 130 + R() * 50,
-      flip: n >= 12 && R() < a.flip ? 1.4 + R() * 1.8 : 0,
-      wobble: n >= 18 && R() < a.wobble, preLocked: false, start: R() * TAU });
+      gaps: n >= 11 && R() < mk2(a.gaps2) ? 2 : 1, gapOffset: 130 + R() * 50,
+      flip: n >= 12 && R() < mk2(a.flip) ? 1.4 + R() * 1.8 : 0,
+      wobble: n >= 18 && R() < mk2(a.wobble), preLocked: false, start: R() * TAU });
   }
   gorunurFlip(rings);
   // Baştan kilitli halka, BEKLEME GEREKTİRMEYEN zorluk kolu: kanalı en baştan daraltır,
@@ -454,7 +501,6 @@ function candidate(n: number, hizCarpani = 1, ekHalka = 0): RawRing[] {
   // doluyor. Ölçüldü: 13 bölümde denemelerin dörtte birinden fazlası saate yeniliyordu,
   // 808. bölümde %74 — üstelik limitin çözücüye 17,3 saniye payı varken. Yani 8 halka
   // zorluğu hassasiyetten SABRA çeviriyordu; γ tavanının önlemek için var olduğu şey.
-  const gecOyun = Math.min(1, Math.max(0, (n - TABAN_BOLUM) / (LEVEL_COUNT - TABAN_BOLUM)));
   if (n >= 6 && R() < a.preLocked + 0.25 * gecOyun) {
     const pre = n >= 15 && count >= 4 && R() < 0.5 + 0.3 * gecOyun ? 2 : 1, anchor = R() * TAU, picks: number[] = [];
     while (picks.length < pre) { const k = Math.floor(R() * count); if (!picks.includes(k)) picks.push(k); }
@@ -585,15 +631,10 @@ const BOSSES: Record<number, Boss | undefined> = {
 function finalize(rings: RawRing[], n: number): Finalized | null {
   const def = rings.map(r => ({ speed: rnd4(r.speed), gap: rnd4(r.gap), gaps: r.gaps, gapOffset: rnd4(r.gapOffset), flip: rnd4(r.flip), wobble: r.wobble, preLocked: r.preLocked, start: rnd4(wrap(r.start)) }));
   // Baştan kilitli halkalar kanalı fazla daralttıysa aday elenir (bkz. EN_AZ_PAY).
-  const canli = liveRings(def);
-  const baslangic = initialOpen(canli);
-  if (baslangic !== OPEN_ALL) {
-    const kalan = canli.filter(r => !r.locked).length;
-    const pay = largestOpen(baslangic).w - NEED_PASS;
-    if (pay < gerekenPay(kalan)) return null;
-  }
+  const bp = baslangicPayi(def);
+  if (bp && !bp.yeter) return null;
   // İnsan sınırının altındaki bölümler elenir: orada başarı beceriye değil şansa bağlıdır.
-  if (tauHesapla(def) < TAU_TABAN) return null;
+  if (tauHesapla(def) < tauTaban(n) - 1e-9) return null;
   const cozum = solve(def); if (!cozum) return null;
   // Flip görünürlüğünün GERÇEK denetimi. `gorunurFlip` doğrusal bir tahminle
   // (`tahminiKilitAni`) çalışır; burada çözücünün ölçülmüş kilit anlarına bakılır.
@@ -627,7 +668,9 @@ function finalize(rings: RawRing[], n: number): Finalized | null {
   // adil bir süre verilemez demektir: aday elenir, limit zorlanmaz.
   const tavan = gamaTavani(def);
   if (guvenli > tavan) return null;
-  const limit = +Math.min(Math.max(want, guvenli), tavan).toFixed(1);
+  // AŞAĞI yuvarlanır: `toFixed(1)` en yakına yuvarlıyor ve limit tavanı 0,05 sn'ye kadar
+  // aşabiliyordu (γ 1,31 > 1,3); doğrulama bu yüzden 0,05'lik bir tolerans taşıyordu.
+  const limit = Math.floor(Math.min(Math.max(want, guvenli), tavan) * 10 + 1e-9) / 10;
   return { def, best, limit, want, roomy: best <= want * 0.65 };
 }
 /**
@@ -799,6 +842,25 @@ function evaluate(L: { def: RingDef[]; limit: number }, bolum: number,
  *   nefes  — hash'le seçilen {3,4} aralıklarıyla +12 puan, dalgayı ezerek (bkz. nefesMi).
  */
 const TABAN_BOLUM = 200;
+/** Faz 2'de ne kadar ilerlendi: 200'de 0, 1000'de 1. Yapısal zorluk kolları bununla ölçeklenir. */
+const gecOyunPayi = (n: number): number =>
+  Math.min(1, Math.max(0, (n - TABAN_BOLUM) / (LEVEL_COUNT - TABAN_BOLUM)));
+/**
+ * HİSSEDİLEN zorluk yapıdan gelir, kazanma oranından değil. Eski tabloda 200'den sonra
+ * kazanma oranı 2 puan inerken oyuncunun GÖRDÜĞÜ yapı hiç değişmiyordu: bantlarda
+ * ortalama halka 5,03 / 4,97 / 5,08 / 5,09, boşluk 40,4° → 40,0°. Uzman kurulu (UX ve
+ * matematik) bunu "kâğıtta artış, oyuncu için düz" diye ölçtü.
+ *
+ * Üç kol, üçü de faz 2 boyunca doğrusal açılır ve kazanma oranını BOZMAZ: ayarlayıcı
+ * yapı ağırlaştıkça boşluğu genişletir, hedefi tutturmaya devam eder. Oyuncu ise daha
+ * çok halka sayar, aynı bölümde daha çok mekanik görür ve daha kısa bir saat görür.
+ */
+/** Faz 2 sonunda 6'dan az halkalı adaya bir halka ekleme olasılığı (`hassasiyet` hariç). */
+const YAPI_ALTI = 0.8;
+/** Mekanik (iki kapı, yön değiştirme, hızlanma) olasılıklarının faz 2 sonundaki çarpanı: 1 + bu. */
+const MEKANIK_ARTIS = 1.0;
+/** Tasarım süresinin faz 2 sonunda kısalma oranı. */
+const SURE_SIKISMA = 0.10;
 const DALGA_GENLIK = 0.08;
 const DALGA_PERIYOT = 24;
 /**
@@ -836,7 +898,7 @@ const EN_ZOR = 0.35;          // faz 1'in dibi (n = 200)
  * baskı altında kalır ama ulaşamayacağı bir sayının peşinden koşmaz. %30 denemedi
  * çünkü orada ayarlayıcı %35'te durup eğriyi sonda yeniden düzleştirirdi.
  */
-const SON_ZOR = 0.32;
+const SON_ZOR = 0.29;
 const FAZ2_US = 0.9;
 /**
  * Hedefin mutlak tabanı. Eğrinin dibi %22 ama dalga ±8 puan oynatıyor; klamp 0,15'te
@@ -846,6 +908,8 @@ const FAZ2_US = 0.9;
  * kasıtlı — eğri tabana yaklaştıkça oynaklık azalmalı.
  */
 const TABAN_KLAMP = 0.22;
+/** τ tabanı 22 ms iken geç yapıların ulaşabildiği en düşük kazanma oranının güvenli üstü. */
+const ULASILABILIR_DIP = 0.27;
 
 const egriTaban = (n: number): number => {
   const faz1 = 0.94 - (0.94 - EN_ZOR) * Math.pow(Math.min(1, (n - 1) / (TABAN_BOLUM - 1)), 0.45);
@@ -866,7 +930,10 @@ const egriTaban = (n: number): number => {
  */
 const egriDalga = (n: number): number => {
   const pay = (egriTaban(n) - TABAN_KLAMP) / (0.94 - TABAN_KLAMP);
-  const genlik = DALGA_GENLIK * (0.3 + 0.7 * Math.max(0, Math.min(1, pay)));
+  // Genlik ayrıca ULAŞILABİLİR paya bağlanır: dip, τ tabanında ulaşılabilen ~%27'nin
+  // altına inmesin. İnerse dipler tutturulamaz ve kalıntıya 24 periyotlu iz basılır.
+  const genlik = Math.min(DALGA_GENLIK * (0.3 + 0.7 * Math.max(0, Math.min(1, pay))),
+    Math.max(0, egriTaban(n) - ULASILABILIR_DIP));
   return genlik * Math.sin(2 * Math.PI * n / DALGA_PERIYOT);
 };
 /**
@@ -929,8 +996,17 @@ const ZOR_PAY = 0.07;
 const eslesmeTepesi = (d: readonly number[]): Tepe => IST.eslesmeTepesi(d, YAPI_LAG_ALT, LAG_UST);
 const ozilintiTepesi = (d: readonly number[]): Tepe =>
   IST.tepeNoktasi(IST.ozilintiler(d, RITIM_TARAMA_ALT, LAG_UST), RITIM_TARAMA_ALT);
-const permutasyonTavani = <T,>(seri: readonly T[], olc: (d: T[]) => number, tohum: number): number =>
-  IST.permutasyonTavani(seri, olc, tohum, PERM_TUR, PERM_DILIM);
+const permutasyonTavani = <T,>(seri: readonly T[], olc: (d: T[]) => number, tohum: number, blok = 0): number =>
+  IST.permutasyonTavani(seri, olc, tohum, PERM_TUR, PERM_DILIM, blok);
+/**
+ * Yapı serilerinde boş hipotez BLOK İÇİ karıştırmadır (bkz. IST.blokKaristir).
+ *
+ * Halka sayısı ve mekanik yoğunluğu faz 2'de bilerek artıyor (bkz. YAPI_ALTI,
+ * MEKANIK_ARTIS). Tam karıştırma bu eğilimi yok eder ve yavaş değişen dağılımın
+ * doğal sonucunu "tekrar" sayar. 100 bölüm eğilimin ölçeğinden (800) çok küçük;
+ * blok içindeki ve bloklar arası her hizalama yine rastgelelenir.
+ */
+const YAPI_BLOK = 100;
 const { enUzunSeri, yerelRng, ozilintiler } = IST;
 
 /** Bir bölümde denemelerin en çok bu kadarı saate yenilebilir (bkz. doğrulama). */
@@ -1396,11 +1472,14 @@ function verify(): number {
     }
     // Tasarım limiti kuraldır ama bekleme bütçesi tavanı onu kesebilir (bkz. GAMA_TAVAN):
     // hızlı halkalı bir bölümde tasarım süresi oyuncuya ikinci turu bekletirdi.
-    const altSinir = Math.min(tasarimLimiti(l.n, moving), gamaTavani(l.rings));
-    if (l.limit < altSinir - 0.05) sorunlar.push(`${ad}: limit tasarım değerinin altında`);
+    // Limit 0,1 sn'lik ızgaraya AŞAĞI yuvarlanır (bkz. finalize), yani alt sınır da
+    // aynı ızgaranın aşağı yuvarlanmışıdır. Eskiden `toFixed` en yakına yuvarlıyordu ve
+    // tolerans 0,05 idi; aşağı yuvarlamada fark 0,1'e kadar çıkar ve bu bir hata değildir.
+    const altSinir = Math.floor(Math.min(tasarimLimiti(l.n, moving), gamaTavani(l.rings)) * 10 + 1e-9) / 10;
+    if (l.limit < altSinir - 1e-9) sorunlar.push(`${ad}: limit tasarım değerinin altında (${l.limit} < ${altSinir})`);
     const g = gamaHesapla(l.rings, l.limit);
     gamalar.push(g);
-    if (g > GAMA_TAVAN + 0.05) gevsekler.push(`${ad}: γ ${g.toFixed(2)}`);
+    if (g > GAMA_TAVAN + 1e-9) gevsekler.push(`${ad}: γ ${g.toFixed(3)}`);
     sureKayiplari.push(ev.sureKaybi);
     if (ev.sureKaybi > SURE_KAYBI_VERIFY) sureliler.push(`${ad}: denemelerin %${Math.round(ev.sureKaybi * 100)}'i süre dolmasıyla bitiyor`);
     oranlar.push(ev.win);
@@ -1529,7 +1608,7 @@ function verify(): number {
     ["arketip", arketipSerisi, 202]
   ] as Array<[string, number[], number]>) {
     const t = eslesmeTepesi(seri);
-    const tavan = permutasyonTavani(seri, d => eslesmeTepesi(d).deger, tohum);
+    const tavan = permutasyonTavani(seri, d => eslesmeTepesi(d).deger, tohum, YAPI_BLOK);
     ritimSatir.push(`${ad} lag ${t.lag} = ${t.deger.toFixed(3)} (tavan ${tavan.toFixed(3)})`);
     if (t.deger > tavan) {
       sorunlar.push(`${ad} serisi ${t.lag} bölümde bir kendini tekrar ediyor: ` +
@@ -1640,13 +1719,9 @@ function verify(): number {
 
   // Baştan kilitli halkalar kalan halkalara yeterli pay bırakıyor mu? (bkz. EN_AZ_PAY)
   for (const l of data.levels) {
-    const canli = liveRings(l.rings);
-    const b = initialOpen(canli);
-    if (b === OPEN_ALL) continue;
-    const kalan = canli.filter(r => !r.locked).length;
-    const p = largestOpen(b).w - NEED_PASS;
-    if (p < gerekenPay(kalan)) {
-      sorunlar.push(`${l.n}: baştan kilitli halkalardan sonra ${(p / DEG).toFixed(1)}° pay kalıyor, ${(gerekenPay(kalan) / DEG).toFixed(1)}° gerek (${kalan} halka)`);
+    const bp = baslangicPayi(l.rings);
+    if (bp && !bp.yeter) {
+      sorunlar.push(`${l.n}: baştan kilitli halkalardan sonra ${bp.payDerece.toFixed(1)}° pay kalıyor, ${bp.gerekDerece.toFixed(1)}° gerek (${bp.kalan} halka)`);
     }
   }
 
@@ -1674,6 +1749,9 @@ function verify(): number {
     `(patronlarda ±${Math.round(BAND_BOSS * 100)})`);
   return 0;
 }
+
+// Ölçüm betikleri için (scratch). Üretim bunları kullanmaz.
+export { candidate, arketip, egri, tauTaban, tauHesapla };
 
 // Yalnız doğrudan çalıştırılınca: içe aktarmak tabloyu yeniden üretip EZMEMELİ.
 if (import.meta.main) {

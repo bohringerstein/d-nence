@@ -26,7 +26,7 @@ Object.defineProperty(globalThis, "Element", { value: class {}, configurable: tr
 let simdi = 1e9;
 Object.defineProperty(globalThis, "performance", { value: { now: () => simdi }, configurable: true });
 
-const { girdiBagla } = await import("./input.ts");
+const { girdiBagla, girdiEsigi } = await import("./input.ts");
 const girdi = girdiBagla(sahteEleman as unknown as HTMLCanvasElement);
 
 const dokun = (t: number, button = 0): void => {
@@ -88,7 +88,8 @@ test("GİRDİ KARE HIZINDAN BAĞIMSIZ", () => {
   const a = calistir(60), b = calistir(120), c = calistir(30), d = calistir(90);
   for (const [ad, v] of [["60", a], ["120", b], ["30", c], ["90", d]] as const) {
     assert.ok(v > 0, `${ad} fps: dokunuş hiç işlenmedi`);
-    // Fizik adımı 8,33 ms; dokunuş en fazla bir adım GECIKEBILIR, asla erken olamaz.
+    // Kuyruğun kendi sözleşmesi: verilen eşikten önce dokunuş çıkmaz. Oyun eşiği yarım
+    // adım geri çeker (girdiEsigi); o, aşağıdaki "EN YAKIN" testinde sınanır.
     assert.ok(v >= dokunusAni, `${ad} fps: dokunuş gerçek anından önce işlendi (${v.toFixed(1)} < ${dokunusAni})`);
     assert.ok(v - dokunusAni <= ADIM + 1e-6,
       `${ad} fps: dokunuş ${(v - dokunusAni).toFixed(1)} ms geç işlendi, en fazla ${ADIM.toFixed(1)} olmalı`);
@@ -206,4 +207,38 @@ test("yalnızca asıl düğme halka kilitler", () => {
   assert.equal(girdi.al(1000), 0, "sağ ve orta tık kilit üretmemeli");
   dokun(300, 0);
   assert.equal(girdi.al(1000), 1, "asıl düğme çalışmaya devam etmeli");
+});
+
+test("dokunuş EN YAKIN adım sınırına düşer: ortalama hata ~0, en fazla yarım adım", () => {
+  // Oyunun döngüsü: `adim(ADIM, adimSonu)` içinde dokunuşlar `girdiEsigi(adimSonu)`
+  // eşiğiyle alınır ve adımın BAŞINDAKİ duruma uygulanır. Hata = durum anı − dokunuş anı.
+  // Üreticinin insan modeli en yakına yuvarladığı için oyun da öyle yapmalı; eskiden
+  // hep erkene yuvarlıyordu (ortalama −4,17 ms, oyun modelden ~3 puan zor).
+  const ADIM = 1000 / 120;
+  const hatalar: number[] = [];
+  let x = 12345;
+  const rast = (): number => { x = (x * 16807) % 2147483647; return x / 2147483647; };
+  for (const fps of [60, 90, 120, 144]) {
+    for (let k = 0; k < 200; k++) {
+      girdi.temizle();
+      const dokunusAni = 300 + rast() * 400;
+      dokun(dokunusAni);
+      const kareSuresi = 1000 / fps;
+      let birikim = rast() * ADIM, bulundu = false;
+      for (let f = 1; f <= 200 && !bulundu; f++) {
+        const now = f * kareSuresi;
+        birikim += kareSuresi;
+        let adimSonu = now - birikim;
+        while (birikim >= ADIM) {
+          birikim -= ADIM;
+          adimSonu += ADIM;
+          if (girdi.al(girdiEsigi(adimSonu)) > 0) { hatalar.push(adimSonu - ADIM - dokunusAni); bulundu = true; break; }
+        }
+      }
+      assert.ok(bulundu, `${fps} fps: dokunuş işlenmedi`);
+    }
+  }
+  const ort = hatalar.reduce((a, b) => a + b, 0) / hatalar.length;
+  assert.ok(Math.abs(ort) < 0.5, `ortalama hata ${ort.toFixed(2)} ms, ~0 olmalı`);
+  assert.ok(hatalar.every(h => Math.abs(h) <= ADIM / 2 + 1e-6), "hata yarım adımı aşmamalı");
 });

@@ -68,7 +68,7 @@ kilitli değilse:
 
 **Sabit zaman adımı (zorunlu).** Referans sürüm değişken `dt` kullanır; yeni sürüm fizik güncellemesini sabit `1/120 sn` adımla yapmalıdır (biriktirici döngü, "fixed timestep accumulator"). Level süreleri bu adımla hesaplanmıştır ve yön değiştiren halkalar adım büyüklüğüne duyarlıdır. Çizim ekran yenileme hızında kalabilir.
 
-**Girdi zamanlaması — kare hızından bağımsız olmalıdır.** Dokunuşlar **kendi zaman damgalarıyla** (`PointerEvent.timeStamp`) kuyruğa alınır ve fizik saati o ana ulaştığında işlenir; sapma en fazla bir fizik adımıdır (8,3 ms) ve ekran hızıyla değişmez.
+**Girdi zamanlaması — kare hızından bağımsız olmalıdır.** Dokunuşlar **kendi zaman damgalarıyla** (`PointerEvent.timeStamp`) kuyruğa alınır ve fizik saati o ana ulaştığında işlenir. Dokunuş **en yakın** fizik adımı sınırına düşer: sapma en fazla yarım adımdır (±4,17 ms), ortalaması sıfırdır ve ekran hızıyla değişmez. İlk sürümde dokunuş hep adımın başına, yani erkene yuvarlanıyordu (ortalama −4,17 ms); üretici en yakına yuvarladığı için oyun tablodan ~3 puan zordu. Kural `input.ts` `girdiEsigi` içinde tek yerde.
 
 *Neden:* tarayıcı dokunuş olayını anında üretir ama oyun onu ancak bir sonraki animasyon karesinde okuyabilir. Damga kullanılmazsa dokunuş o karenin başına yuvarlanır ve 60 fps'te ±8,3 ms sapar — en zor bölümlerde oyuncunun TÜM hata payının (25 ms) üçte biri. Üstelik bu sapma ekran hızına bağlıdır: 120 Hz telefonda oyun 60 Hz telefondan kolay olurdu. Bu, oyuncunun kendi hatası değil motorun eklediği hatadır.
 
@@ -308,12 +308,12 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
 
    **Aramanın üç kolu.** Ayarlayıcı hedefe takip payı (5 puan) içinde kalamadığında,
    yalnızca **kolay yönde**, sırayla:
-   - **Tolerans** — birincil kol, boşluğu daraltır. τ tabanına (25 ms) kadar iner.
+   - **Tolerans** — birincil kol, boşluğu daraltır. τ tabanına kadar iner: 200. bölüme kadar 25 ms, sonra 1000. bölümde 22 ms'ye doğrusal.
    - **Hız** — 0,15 adımlarla 1,8 katına kadar. Normalde nötrdür (`sizeGaps` boşluğu
      hızla orantılı büyütür, τ değişmez), ama baştan kilitli halkalarda `gerekenPay`
      başlangıç kanalına taban koyunca tolerans kolu ölür ve o zaman hız bir kol olur.
-     **Bu kol ρ duvarını kaldırmaz** (ρ hızdan bağımsızdır, bkz. MATEMATİK §3.2),
-     yalnız γ'yı rahatlatır.
+     Kabul oranı ρ hızdan bağımsız olduğu için (bkz. MATEMATİK §3.2) bu kol ρ'yu
+     değiştirmez, yalnız γ'yı rahatlatır.
    - **Halka sayısı** — iki tur üst üste tutturulamazsa +1, **6 tavanına kadar**.
      Aday saate yeniliyorsa ters yönde çalışır ve halka azaltır: fazla halka kilit
      başına bütçeyi küçültüp oyuncuyu nadir bir hizalanma beklemeye zorlar.
@@ -376,17 +376,23 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
 
    ```
    faz1(n)  = 0,94 − 0,59 × min(1, (n−1)/199)^0,45                    // %94 → %35, n = 200
-   faz2(n)  = 0,03 × max(0, (n−200)/800)^0,9                         // n = 200'den sonra
-   taban(n) = faz1(n) − faz2(n)                                       // %35 → %32, n = 1000
+   faz2(n)  = 0,06 × max(0, (n−200)/800)^0,9                         // n = 200'den sonra
+   taban(n) = faz1(n) − faz2(n)                                       // %35 → %29, n = 1000
    pay(n)   = (taban(n) − 0,22) / (0,94 − 0,22)
-   dalga(n) = 0,08 × (0,3 + 0,7 × pay(n)) × sin(2π n / 24)            // ±8,0 → ±3,2 puan
+   genlik(n)= min(0,08 × (0,3 + 0,7 × pay(n)), taban(n) − 0,27)       // ±8,0 → ±2,0 puan
+   dalga(n) = genlik(n) × sin(2π n / 24)
    nefes(n) = hash{3,4} yürüyüşü, patronda n+1'e kaydırılır
    hedef(n) = taban(n) + (nefes ? 0,12 : dalga(n))                    // %22 ile %95 arasına sıkıştırılır
    ```
 
    **Üs 0,45 (faz 1)**: iniş başta diktir. Oyuncu 11. bölümde %80'in, 39'da %60'ın altına düşer.
 
-   **Faz 2 neden var ve neden bu kadar sığ.** Eğri eskiden 200'de tabana oturup 800 bölüm düz kalıyordu; bir tarayıcı koşusu 201-400 / 401-600 / 601-800 / 801-1000 bantlarının hedeflerini %39,3 / %39,9 / %39,8 / %39,3 ölçtü. Faz 2 zorluğu yükseltmeye devam ettirir, ama **fiziğin izin verdiği kadar**: zorluğun tek gerçek ekseni τ ve tabanı 25 ms insan refleksi (bkz. MATEMATİK §3). Hedef bir kez %22'ye, sonra %28'e çekildi ve ikisinde de **ulaşılamadı** — teslim edilen %35'te durdu, açık bant bant büyüdü. %32 ölçülen ulaşılabilir tabandır; eğri artık bir havuç değil bir ölçü.
+   **Faz 2 neden var ve neden bu kadar sığ.** Eğri eskiden 200'de tabana oturup 800 bölüm düz kalıyordu; bir tarayıcı koşusu 201-400 / 401-600 / 601-800 / 801-1000 bantlarının hedeflerini %39,3 / %39,9 / %39,8 / %39,3 ölçtü. Faz 2 zorluğu yükseltmeye devam ettirir, ama **fiziğin izin verdiği kadar**: kazanma oranını belirleyen eksen τ ve tabanı insan refleksi (bkz. MATEMATİK §3). τ tabanı 25 ms'de sabitken ulaşılabilir dip ~%34'tü ve faz 2 yalnız 3 puan iniyordu — istatistik olarak gerçek, oyuncu için hissedilmez. **Karar (proje sahibi): τ tabanı faz 2'de 25 ms'den 22 ms'ye iner.** 22 ms, 60 ms'lik insan sapmasının 0,37 katı; ölçüldü, 20 ms'de bile süre kaybı %4,2 ve sonuç beceriye bağlı kalıyor. Böylece dip %29'a iner. Dalga genliği ulaşılabilir paya bağlanır: dipleri ~%27'nin altına inmez.
+
+   **Hissedilen zorluk yapıdan gelir.** Kazanma oranı oyuncunun gördüğü şey değildir; gördüğü, halka sayısı, mekanikler ve saattir. Eski tabloda 200'den sonra bunların hiçbiri değişmiyordu (bant ortalaması 5,0 → 5,1 halka, boşluk 40° → 40°). Faz 2 boyunca üç yapı kolu doğrusal açılır ve ayarlayıcı boşluğu genişleterek kazanma oranını hedefte tutar:
+   - **Daha çok 6 halkalı bölüm:** 6'dan az halkalı adaya, 1000'e doğru %80 olasılıkla bir halka eklenir (`hassasiyet` arketipi hariç, kimliği az halkadır).
+   - **Aynı bölümde daha çok mekanik:** iki kapı, yön değiştirme ve hızlanma olasılıkları 1000'e doğru iki katına çıkar (en fazla %90; sıfır olan sıfır kalır).
+   - **Daha kısa saat:** tasarım süresi 1000'e doğru %10 kısalır.
 
    **Dalga genliği payla söner.** Sabit ±8 puan eğrinin dibinde hedefi üreticinin ulaşabileceğinin altına indiriyordu; o bölümler hem tutturulamıyor hem de oyuncuyu beklemeye zorluyordu. Dalganın işi ritim vermek; tabanda ritim verecek yer kalmaz. Genlik %30'da durur, sıfıra inmez.
 
@@ -395,12 +401,13 @@ Tablo `tools/gen.ts` ile üretilir. Üretim adımları:
    **Katı monotonluk yoktur.** Eğri dalgalı olduğu için tek tek bölümler birbirinden kolay olabilir.
 
    **Model oyunun kuralıyla ölçer.** Üreticinin insan benzeri oyuncusu (`play()`) iki noktada oyundan ayrışıyordu ve ikisi de aynı yöne itiyordu — tablo hedefinden **4,5 + 0,7 puan kolay** çıkıyordu:
-   - Dokunuş hatası `ceil(|e|/dt)` adımla, yani **sıfırdan uzağa** yuvarlanıyordu; etkin sapma 60 → 63,4 ms. Oyun dokunuşu zaman damgasının düştüğü adımda işler, bu **en yakına** yuvarlamadır. Model artık `Math.round(e/dt)` kullanır.
+   - Dokunuş hatası `ceil(|e|/dt)` adımla, yani **sıfırdan uzağa** yuvarlanıyordu; etkin sapma 60 → 63,4 ms. Model artık `Math.round(e/dt)` kullanır ve oyun da dokunuşu en yakın adım sınırına düşürür (bkz. 3. bölüm, girdi zamanlaması).
+   - **Ölü bölge.** Model basmak için kanalın geçiş eşiğinin 1° üstünü arıyordu; kanal 18° ile 19° arasına düşünce bir daha hiç basmıyor ve saate yeniliyordu — oysa bölüm hâlâ geçilebilirdi. Saate yenilen denemelerin ~%80'i buradan geliyordu. Eşik artık 0,25°, hizalama bütçesinin tabanı tek dilim (0,5°). Aynı tabloda kazanma oranı değişmedi, süre kaybı %6,7 → %2,5.
    - Geçiş testi analitik genişlikle yapılıyordu, oyun 0,5°'lik **maskeyle** karar verir. Model artık maskeyi kullanır.
 
    **Aramanın takip payı 5 puan** (TAKIP_PAYI). Eskiden erken çıkış doğrulama bandından türetiliyordu (13,4 puan); eğri indikçe ayarlayıcı hedefe o kadar uzakta duruyordu ve üzerinde hiç baskı kalmıyordu. Bant bir *doğrulama* toleransı, *takip* toleransı değil.
 
-   **Saate yenilen aday tercih edilmez.** Kanalı daraltarak bölüm sonsuza kadar zorlaştırılamıyor: bir noktadan sonra politikanın kabul edeceği an seyrekleşiyor ve bölüm zor değil **oynanamaz** oluyor. Sınırı kabul oranı ρ belirler (bkz. MATEMATİK §3.2) ve ρ hızdan bağımsızdır, yani hızı artırmak bu duvarı kaldırmaz. Denemelerin %30'undan fazlasını saate kaptıran bir aday, hedefe daha yakın olsa bile temiz bir adaya karşı kaybeder.
+   **Saate yenilen aday tercih edilmez.** Denemelerin %30'undan fazlasını saate kaptıran bir aday, hedefe daha yakın olsa bile temiz bir adaya karşı kaybeder: o bölüm zor değil, beklemeye zorlayıcıdır. Bu kuralın yakaladığı adayların çoğu aslında modelin ölü bölgesinden geliyordu (yukarıda); düzeltmeden sonra kural nadiren devreye girer.
 
 10. **Patron bölümleri** (her 10 bölümde bir) elle tasarlanmıştır: Ayna, Merkez, Metronom, Çatal, Tavşan ile kaplumbağa, Büyük kasa. Altı tasarım sırayla tekrar eder. Tasarımları `tools/gen.ts` içindeki `BOSSES` nesnesindedir.
     Hedefleri **hedef eğrinin %75'idir** (sabit puan farkı değil, oran), en az %22. Sebep: patronların halka sayıları ve hızları sabittir, ayarlayıcının elinde yalnızca boşluk genişliği vardır. Eğrinin dibinde bu yapılar sabit puanlı bir hedefi tutturamıyor, en fazla `%40'a inebiliyorlardı. Doğrulamada da patronlara daha geniş bant tanınır (±25 puan, normalde ±20).
@@ -437,7 +444,9 @@ Kayıt okunamazsa oyun hata vermeden Level 1'den başlar. "Baştan başla" Level
 
 **Kayıt şeması** (`donence:v1`): `level` (son oynanan), `enUzak` (ulaşılan en uzak bölüm; bölüm seçiminde buraya kadarı açıktır ve **soğuk açılışın çıpası budur**), `tabloSurum` (rekorların ait olduğu tablo damgası), `bests` (level -> {yıldız, süre}).
 
-**Tablo damgası.** `data/levels.json` bir `v` alanı taşır: bölümlerin ve yıldız eşiklerinin özeti. Kayıt bölümleri numarayla sakladığı için tablo yeniden üretildiğinde "47. bölümde 2 yıldız" kaydı başka bir bulmacaya ait olur; bir kez yaşandı ve ölçüldü (966 bölümün tanımı değişti, 303 bölümde gösterilen rekor ulaşılamaz hâle geldi). Damga eşleşmezse **yalnız `bests` temizlenir**; `level` ve `enUzak` korunur. Damgadan önce yazılmış kayıtlarda alan yoktur ve o kayıtlar cezalandırılmaz: mevcut tabloyu benimserler. Rekorlar silindiğinde oyuncuya söylenir: "Bölümler güncellendi: ilerlemen yerinde, yıldız rekorları sıfırlandı". Mesaj sayfa açılırken yazıldığı için ekran okuyuculara ulaşmıyordu (canlı bölge henüz kaydolmamıştı); kısa bir süre sonra yeniden yazılır.
+**Tablo damgası.** `data/levels.json` bir `v` alanı taşır: bölümlerin ve yıldız eşiklerinin özeti. Kayıt bölümleri numarayla sakladığı için tablo yeniden üretildiğinde "47. bölümde 2 yıldız" kaydı başka bir bulmacaya ait olur; bir kez yaşandı ve ölçüldü (966 bölümün tanımı değişti, 303 bölümde gösterilen rekor ulaşılamaz hâle geldi). Damga eşleşmezse **yalnız `bests` temizlenir**; `level` ve `enUzak` korunur. Damgadan önce yazılmış kayıtlarda alan yoktur ve o kayıtlar cezalandırılmaz: mevcut tabloyu benimserler.
+
+**Bölüm özeti.** Damga bütün tabloya aittir; tek bir bölüm düzeltildiğinde bile bütün rekorları siliyordu. Her rekor artık kırıldığı bölümün özetini taşır (`h`: bölüm tanımı + yıldız eşikleri, 8 onaltılık hane, `core/levels.ts` `bolumOzeti`). Tablo değişince her rekor kendi bölümünün bugünkü özetiyle karşılaştırılır: eşitse kalır, değilse yalnız o rekor silinir. Eşikler özete girer, çünkü eşik değişince "2 yıldız"ın anlamı değişir ve o zaman bütün rekorlar gider. Özetten önceki rekorlar eski kuralla işlenir (damga eşleşiyorsa benimsenir ve özeti yazılır). **Bu, tabloyu yeniden üretmeyi ucuzlatmaz:** üretici tohumlu bir arama olduğu için tek bir kuralın değişmesi bile bölümlerin hemen hepsini değiştirir. Yalnız elle yapılan küçük düzeltmeleri ucuzlatır. Rekorlar silindiğinde oyuncuya söylenir: "Bölümler güncellendi: ilerlemen yerinde, yıldız rekorları sıfırlandı". Mesaj sayfa açılırken yazıldığı için ekran okuyuculara ulaşmıyordu (canlı bölge henüz kaydolmamıştı); kısa bir süre sonra yeniden yazılır.
 
 **Aynı oyun iki sekmede.** Oyun sırasındaki her yazma (ilerleme, rekor) diskteki kaydı önce okur ve onunla birleştirir: `enUzak` ikisinin büyüğüdür, rekorlar bölüm bölüm iyisi seçilerek birleşir. Eskiden kayıt bellekten bütünüyle yazılıyordu ve son yazan kazanıyordu; daha kötüsü, yeni sürümü açan sekme kaydı yeni tabloya taşıdıktan sonra **eski sekme bir sonraki kazanışta eski damgayı geri yazıyor**, sonraki açılışta yeni tabloda kırılan rekorlar da siliniyordu. Artık diskteki damga bellekteki damgadan farklıysa bu sekme eski sayılır: yalnız ilerlemesi taşınır, rekorları yazılmaz ve sayfa ilk güvenli anda (bir bölüm bitince) yenilenir. "Baştan başla" ve yedekten yükleme birleştirmez: onlar ilerlemeyi bilerek küçültür.
 

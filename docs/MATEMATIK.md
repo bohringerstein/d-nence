@@ -157,44 +157,68 @@ Diğer eksenler neden yardımcı olmuyor:
 
 ---
 
-### 3.2 İkinci duvar: kabul oranı ρ
+### 3.2 Kabul oranı ρ — ve bir duvar sanılan ölü bölge
 
-τ'nun tabanı (25 ms) bir duvar, ama tek duvar değil. Kanalı daraltarak bölüm sonsuza
-kadar zorlaştırılamıyor: bir noktadan sonra bölüm **zor değil oynanamaz** oluyor.
-Sebep γ (bekleme bütçesi) değil — ölçüldü, saate yenilen bölümlerin γ'sı ortalamanın
-*üstünde* (1,09 / 0,96). Vakit var; kabul edilebilir an yok.
+Bu bölümün ilk sürümü, 200. bölümden sonra zorluğu durduranın ikinci bir "duvar"
+olduğunu, kabul oranının (ρ) seyrekleştiğini söylüyordu. **Bu yorum büyük ölçüde
+yanlıştı.** Duvar sanılanın ~%80'i insan modelinin kendi kuralındaki bir ölü bölgeydi.
+Aşağıda önce ρ'nun doğru tanımı, sonra ölü bölge.
 
-**Türetme.** Kanal genişliği `W`, halkanın boşluk yarım genişliği `h`, kalan halka
-`rem`, açgözlülük `tol`. Politika `p.w ≥ needS` **ve** `kayıp ≤ tol·(W − needS)/(rem+1)`
-isterse basar; `tol ≤ 1` için ikinci koşul bağlar. Kabul açısal yarım genişliği:
-
-```
-Δθ = (h − W/2) + tol · (W − needS) / (rem + 1)
-```
-
-Fırsat periyoduna (`2π / (g·|ω|)`) bölünce **kabul oranı**:
+**Kabul oranı.** Kanal genişliği `W`, halkanın boşluk yarım genişliği `h`, kalan halka
+`rem`, açgözlülük `tol`, basma eşiği `E`. Politika şu iki koşul birlikte sağlanınca basar:
+`p.w ≥ E` ve `kayıp ≤ tol·(W − E)/(rem+1)`. Kabul açısal yarım genişliği:
 
 ```
-ρ = g · Δθ / π          (g = kapı sayısı)
+Δθ = (h − W/2) + tol · (W − E) / (rem + 1)                 (W > E iken)
+ρ  = g · Δθ / π                                            (g = kapı sayısı)
+Δθ = 0,  ρ = 0                                             (W ≤ E iken)
 ```
 
-**ρ hızdan bağımsızdır.** Bu yüzden "hızı artır" kolu bu duvarı kaldırmaz; yalnızca
-γ'yı rahatlatır. Tüm tablo ρ_min'e göre kovalandığında (1000 bölüm × 1000 deneme):
+ρ fırsat periyoduna oranlandığı için **hızdan bağımsızdır**: hızı artırmak ρ'yu değiştirmez,
+yalnız γ'yı rahatlatır. İlk sürümün "tol ≤ 1 için ikinci koşul bağlar" cümlesi eksikti:
+`W < E` olduğunda birinci koşul bağlar ve ρ sıfırdır — bölüm geçilebilir olsa bile.
 
-| ρ_min | bölüm | süre kaybı | kazanma | γ |
-|---|---|---|---|---|
-| < %1 | 54 | **%12,3** | %32,9 | 1,03 |
-| %1–2 | 269 | %7,4 | %38,1 | 0,94 |
-| %3–5 | 287 | %6,4 | %43,4 | 0,95 |
-| > %8 | 9 | **%3,6** | %59,7 | 1,13 |
+**Ölü bölge.** Eski modelde `E = NEED_PASS + 1°` idi. Kanal 18,0° ile 19,0° arasına
+düştüğünde model bir daha HİÇ basmıyordu. Oysa bölüm geçilebilir ve hizalı bir kilit
+açıklık kaybettirmez; gerçek oyuncu orada basar. Ölçüldü (201-1000, 500 deneme):
 
-γ bütün aralıkta düz; süre kaybını ρ belirliyor (`r(sk, log ρ) = −0,36`, `r(sk, γ) = +0,10`).
-Pratikte **ρ_min ≈ %1–2** altında bölüm hassasiyet sınavı olmaktan çıkar. Bu yüzden
-üretici denemelerin %30'undan fazlasını saate kaptıran adayı tercih etmez (bkz. `SPEC.md` 8. bölüm, "Saate yenilen aday tercih edilmez").
+- Saate yenilen denemelerin **%90'ından fazlasında** `allow < 0` idi. Takılınan halkada
+  2-6 fırsat periyodu beklenmişti ve kabul penceresi ~18 adım genişliğindeydi — an vardı,
+  model reddetti.
+- Eşik `NEED_PASS + 0,25°`, bütçe tabanı tek dilim (0,5°) yapıldığında aynı tabloda:
+  kazanma **%39,6 → %39,6** (değişmedi), süre kaybı **%6,7 → %2,5**; süre kaybı %10'u
+  aşan bölüm oranı %13,8 → %0.
 
-Sert duvar da var ama bağlamıyor: `minGap < needS` olursa halka hiç basılamaz; bu,
-`τ < SOLVER_MARGIN / Σ'|ω|` demek, tipik `Σ'|ω| ≈ 6 rad/sn` için **2,9 ms** — 25 ms
-tabanının dokuz katı altında.
+Yani düzeltme zorluğu değiştirmedi, **kayıp türünü** düzeltti. Model süper insan olmadı:
+dokunuş hatası (σ = 60 ms) aynı, değişen yalnız karar kuralı.
+
+**Asıl duvar τ.** Geç yapılar τ tabanına sıkıştırıldığında eski kural %34,2, yeni kural
+%34,5 veriyor: ulaşılabilir dip ρ'dan değil τ'dan geliyor. Tabanı indirmenin fizik içindeki
+tek yolu τ tabanını gevşetmek:
+
+| τ tabanı | kazanma | süre kaybı | süre kaybı >%10 olan bölüm |
+|---|---|---|---|
+| 25 ms | %34,5 | %2,5 | %0 |
+| 22 ms | ~%29 | — | — |
+| 20 ms | %24,8 | %4,2 | %1,3 |
+
+20 ms'de bile sonuç beceriye bağlı, şansa dönmüyor. **Karar: τ tabanı 200. bölümde
+25 ms, 1000. bölümde 22 ms** (SPEC §8).
+
+**İlk sürümün sayıları da düzeltildi.** Bağımsız ölçümde (iki tohum) `r(süre kaybı, log ρ)`
+**−0,49 / −0,50**'dir (ilk sürüm −0,36 yazıyordu); `r(süre kaybı, γ)` +0,09. İlk sürümdeki
+ρ kova tablosu %2-3 ve %5-8 kovalarını atlıyordu (381 bölüm) ve ρ_min'in hangi yörüngede
+ölçüldüğünü tanımlamıyordu; bu yüzden kaldırıldı. Yön doğruydu, etki ve yorum değil.
+
+**Sert duvar** bağlamıyor: `minGap < E` olursa halka hiç basılamaz; bu `τ < 0,25° / Σ'|ω|`
+demek, tipik `Σ'|ω| ≈ 6 rad/sn` için ~0,7 ms — 22 ms tabanının çok altında.
+
+**Kalan belirsizlik: zamanlama kayması.** Model sabit kaymalara çok duyarlı: ölçülen
+**~0,65 puan/ms** (−8 ms → −5,4 puan, +33 ms → +14 puan), çünkü politika kabul penceresinin
+ön kenarında basıyor. Oyun artık dokunuşu en yakın adıma yuvarlıyor (ortalama 0; eskiden
+−4,17 ms, yani ~3 puan zor). Ama telefonun dokunmatik ve ekran gecikmesi (tahmini 10-50 ms)
+modelde yok. Kazanma oranlarının **mutlak** değeri bu yüzden ±10 puan belirsizdir; eğrinin
+**şekli** sağlamdır. Gerçek cihazda ölçülmeden tabloya dokunulmamalı.
 
 ---
 
@@ -220,12 +244,21 @@ oranı hedefte kalırken **zorluğun kaynağı** değişir.
 ## 5. Zorluk eğrisi
 
 ```
-taban(n) = 0,94 − 0,59 · min(1, (n−1)/199)^0,45     // %94 → %35, 200. bölümde tabanda
-dalga(n) = 0,08 · sin(2π n / 24)                     // ±8 puan, 24 bölümlük salınım
+faz1(n)  = 0,94 − 0,59 · min(1, (n−1)/199)^0,45     // %94 → %35, 200. bölümde
+faz2(n)  = 0,06 · max(0, (n−200)/800)^0,9            // 200'den sonra
+taban(n) = faz1(n) − faz2(n)                         // %35 → %29, 1000. bölümde
+pay(n)   = (taban(n) − 0,22) / (0,94 − 0,22)
+genlik(n)= min(0,08 · (0,3 + 0,7·pay(n)), taban(n) − 0,27)
+dalga(n) = genlik(n) · sin(2π n / 24)                // ±8 → ±2 puan, 24 bölümlük salınım
 nefes(n) = hash ile seçilen {3,4} aralıklarla yürüyen küme; patrona
            denk gelen nefes n+1'e KAYDIRILIR (iptal edilmez)
-hedef(n) = clamp(nefes(n) ? taban + 0,12 : taban + dalga, 0,25 , 0,95)
+hedef(n) = clamp(nefes(n) ? taban + 0,12 : taban + dalga, 0,22 , 0,95)
 ```
+
+- **Faz 2** (200-1000) yavaş ama kesintisiz iner. Dibi τ tabanından gelir (bkz. §3.2):
+  τ 25 ms'de sabitken dip ~%34'tü ve faz 2 yalnız 3 puan iniyordu; τ 22 ms'ye inince %29.
+- **Genlik ulaşılabilir paya bağlı**: dalga dipleri ~%27'nin altına inmez. İnseydi dipler
+  tutturulamaz ve kalıntıya 24 periyotlu iz basılırdı.
 
 - **Üs 0,45**: iniş başta diktir. Oyuncu 11. bölümde %80'in, 39'da %60'ın altına düşer.
 - **Dalga**: 200. bölümden sonra eğri düz kalsaydı kalan 800 bölüm tek bir duvar olurdu.
@@ -540,8 +573,20 @@ bulunan her periyot istemsizdir. Permütasyon boş hipotezi de ancak bu seri iç
 geçerlidir — süzgeçten geçmiş bir seri sıra değişimine duyarsız değildir.
 
 Tavan şu soruyla bulunur: *"aynı seri rastgele sıralansaydı bu istatistik en fazla ne
-kadar yükselirdi?"* Seri **600 kez** karıştırılır, her karıştırmada istatistiğin
+kadar yükselirdi?"* Seri **4000 kez** karıştırılır, her karıştırmada istatistiğin
 gecikmeler üstündeki **maksimumu** alınır, tavan bu dağılımın **%99,67'lik** dilimidir.
+
+**Yapı serilerinde karıştırma blok içidir** (100 bölümlük ardışık parçalar kendi içinde
+karıştırılır, parçalar yerinde kalır). Sebep: faz 2'de 6 halkalı bölümlerin ve çok
+mekanikli bölümlerin payı **bilerek** artıyor (SPEC §8, "Hissedilen zorluk yapıdan
+gelir"). Tam karıştırma bu eğilimi de yok eder ve yavaş değişen bir dağılımın doğal
+sonucunu — komşu bölümlerin birbirine benzemesini — tekrar sayar. Kaba hesap: 6 halka
+payı %46'dan %65'e çıkınca her gecikmedeki eşleşme oranı ~0,005 şişer; halka serisinin
+tavana payı 0,009'du. Blok içi karıştırma eğilimi blok çözünürlüğünde korur, ama blok
+içindeki ve bloklar arası her hizalamayı rastgeleler: aranan şey, belirli bir gecikmede
+kendini tekrar eden desen, yine yok edilir. `istatistik.test.ts` iki yönü de sınar:
+eğilimli periyotsuz seride alarm yok, aynı seriye gömülü 37 periyotlu desen yakalanıyor.
+Zorluk kalıntısı tam karıştırılır: eğilimi zaten doğrusal olarak çıkarılmıştır.
 
 İki ayrı çoklu karşılaştırma düzeltmesi var ve ikisi de gerekli:
 
@@ -550,8 +595,8 @@ gecikmeler üstündeki **maksimumu** alınır, tavan bu dağılımın **%99,67'l
 - **Seriler arasında:** üç seri birden sınanıyor. Düz %99 kullanmak aile bazında
   yanlış alarmı ~%3'e çıkarırdı, yani yapısı bozulmamış bir tablo 33 çalıştırmanın
   birinde ritimden kalırdı. Bonferroni düzeltmesi (`1 − 0,01/3` = %99,67) aile
-  bazında yanlış alarmı %1'de tutar. Tur sayısı 600'e çıkarıldı, çünkü 200 turda
-  %99,67'lik dilim son birkaç gözleme dayanırdı.
+  bazında yanlış alarmı %1'de tutar. Tur sayısı önce 600'e, sonra 4000'e çıkarıldı,
+  çünkü az turda %99,67'lik dilim son birkaç gözleme dayanır.
 
 **Bu denetim işe yaradı.** İlk çalıştırmada halka sayısı serisinde lag 240'ta %53,2
 eşleşme buldu (tavan %37,0). Teşhis iki kaynak gösterdi ve **ikisi de düzeltildi**:
@@ -606,34 +651,46 @@ oranda ama bağımsız dağılmış zor bölümlerle en uzun kesintisiz serinin 
 
 ## 9. Ölçülen son durum (1000 bölüm)
 
-Damga `78eda215621c`. Bütün sayılar **üretimden bağımsız bir tohumla** ölçülmüştür
+Damga `f3f87774069f`. Bütün sayılar **üretimden bağımsız bir tohumla** ölçülmüştür
 (bkz. §8.1) ve `npm run verify` çıktısından alınmıştır.
 
 | | |
 |---|---|
-| Hassasiyet τ | en düşük **25,0 ms**, medyan 27,1 ms, en yüksek 214 ms |
-| 25 ms altında bölüm | **0** — ama %70'i 30 ms altında, yani kütle tabana yaslı |
-| Halka dağılımı | 2:4, 3:113, 4:176, 5:250, 6:457 — **en fazla 6** (bkz. §3.1) |
-| Mekanik | iki kapılı 496, flip 467, hızlanan 521, baştan kilitli 497 bölüm |
-| Yıldız eşikleri | q3 = 0,69, q2 = 0,40 |
-| Yıldız dağılımı (usta) | %26 / %35 / %40 |
-| Süre sınırı | 4,3–23,9 sn, ortalama 11,1 sn |
-| γ | ortalama 0,98, en yüksek 1,31 (tavan 1,3 + 0,05 tolerans) |
+| Hassasiyet τ | en düşük **22,1 ms**, medyan 25,7 ms, en yüksek 308 ms; 801-1000'de medyan 23,9 ms |
+| τ tabanı | 200'e kadar 25 ms, 1000'de 22 ms (doğrusal) — altında bölüm **0** |
+| Halka dağılımı | 2:4, 3:100, 4:178, 5:210, 6:508 — **en fazla 6** (bkz. §3.1) |
+| Mekanik | iki kapılı 561, flip 548, hızlanan 587, baştan kilitli 491 bölüm |
+| Yıldız eşikleri | q3 = 0,69, q2 = 0,40 (dokunulmadı) |
+| Yıldız dağılımı (usta) | %25 / %35 / %40 |
+| Süre sınırı | 4,3–22,5 sn, ortalama 10,6 sn; 0,1 sn'ye aşağı yuvarlanır |
+| γ | ortalama 0,93, en yüksek 1,30 — tavan **toleranssız** tutuyor |
 | Bant dışı bölüm | **0** / 1000 |
-| Patron tasarımı başına sapma | +1 … +3 puan (tavan ±6) |
+| Patron tasarımı başına sapma | +0 … +3 puan (tavan ±6) |
 | Saate yenilmenin baskın olduğu bölüm | **0** / 1000 |
-| Ritim | halka 0,387/0,396 — arketip 0,211/0,238 — zorluk 0,110/0,148 |
-| Damga denetimi | içerikle karşılaştırılıyor (elle düzenleme yakalanıyor) |
+| Ritim | halka 0,413/0,429 — arketip 0,284/0,305 — zorluk 0,123/0,155 (yapı serileri blok içi boş hipotezle, §8.4) |
 | Doğrulama | **0 sorun** |
 
-**Teslim edilen eğri** (bant ortalaması):
+**Teslim edilen eğri ve yapı** (patronsuz bant ortalaması; parantezde önceki tablo `78eda215621c`):
 
-| 1–50 | 51–100 | 101–200 | 201–400 | 401–600 | 601–800 | 801–1000 |
-|---|---|---|---|---|---|---|
-| %74,7 | %58,5 | %45,9 | %39,0 | %38,3 | %37,9 | **%37,1** |
+| Bant | Kazanma | Ort. halka | 6 halkalı | ≥2 mekanik | Süre (sn) |
+|---|---|---|---|---|---|
+| 1–50 | %73,9 | 4,80 | %40 | %53 | 12,1 |
+| 51–100 | %58,4 | 5,07 | %44 | %76 | 12,3 |
+| 101–200 | %45,3 | 4,93 | %46 | %62 | 11,1 |
+| 201–400 | %38,7 (39,0) | 5,08 (5,03) | %51 (%49) | %64 (%61) | 10,8 (10,6) |
+| 401–600 | %37,8 (38,3) | 5,08 (4,97) | %49 (%44) | %67 (%57) | 10,2 (10,3) |
+| 601–800 | %36,0 (37,9) | 5,21 (5,08) | %58 (%48) | %72 (%61) | 9,9 (10,2) |
+| 801–1000 | **%34,4** (37,1) | **5,27** (5,09) | **%62** (%49) | **%72** (%56) | **9,6** (10,4) |
 
-İlk tablo 201-400 / 401-600 / 601-800 / 801-1000'de %39 / %40 / %40 / %39 veriyordu —
-yani ortada *kolaylaşıyordu*. Şimdi tek yönlü iniyor; ama §3'ün öngördüğü gibi yavaş.
+200'den sonra kazanma oranı **4,3 puan** iner (önceki tablo 1,9). Hedef eğri aynı bantlarda
+4,4 puan iniyor; teslim onu izliyor. Aradaki sabit fark (+6 puan, nefes bölümleri dahil
+ortalamada ~+2,5) ayarlayıcının bilinen kaymasıdır (§8.2b). Oyuncunun **gördüğü** değişim
+yapıdadır: son 200 bölümde her 10 bölümün 6'sı 6 halkalı, 7'sinde iki ya da daha çok
+mekanik var ve saat bir saniye kısa.
+
+**Mutlak değer uyarısı** (§3.2): model sabit zamanlama kaymasına ~0,65 puan/ms duyarlı ve
+telefonun dokunmatik gecikmesi modelde yok. Yukarıdaki oranların şekli sağlam, mutlak
+değeri gerçek cihazda ölçülmeden ±10 puan belirsiz.
 
 ---
 

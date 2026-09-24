@@ -1,6 +1,6 @@
 // Dönence: uygulamanın giriş noktası. Parçaları birbirine bağlar, kural içermez.
 import "./styles.css";
-import { LEVEL_COUNT, validateTable, DEG } from "./core/index.ts";
+import { LEVEL_COUNT, validateTable, DEG, bolumOzeti } from "./core/index.ts";
 import type { LevelTable, Best } from "./core/index.ts";
 // Level tablosu JS paketine GÖMÜLMEZ, ayrı bir dosya olarak indirilir.
 // 1000 bölümde tablo 643 KB; bu kadar veriyi JavaScript nesne sabiti olarak
@@ -11,7 +11,7 @@ import tabloUrl from "../data/levels.json?url";
 import { createLevel, tap, step, decay, kalanSure } from "./game/state.ts";
 import type { LevelState } from "./game/state.ts";
 import { dongu, ADIM } from "./game/loop.ts";
-import { girdiBagla } from "./game/input.ts";
+import { girdiBagla, girdiEsigi } from "./game/input.ts";
 import { tuvalKur, ciz } from "./game/render.ts";
 import { renkleriOku, renklerHazir, hareketAzalt, tercihleriIzle } from "./game/theme.ts";
 import { ogreticiTablosu, patronIlkGorunus, ipucu, yildizYazisi, yildizParcalari, sureYazisi, kayipYazisi, kalanYazisi } from "./game/hints.ts";
@@ -120,7 +120,10 @@ const ui = kabukKur(hedef, M, nasilHtml(M));
 const kayit = oku();
 // Tablo yeniden üretildiyse eski rekorlar başka bölümlere aittir (bkz. storage.ts).
 // Damgadan önceki kayıtlar cezalandırılmaz: alan yoksa mevcut tablo benimsenir.
-const silinenRekor = tabloSurumuUygula(kayit, tablo.v);
+/** Bölüm özetleri (bkz. core/levels.ts bolumOzeti): rekorlar bölüm başına doğrulanır. */
+const ozetler = tablo.levels.map(l => bolumOzeti(l, tablo.q3, tablo.q2));
+const ozet = (n: number): string | undefined => ozetler[n - 1];
+const silinenRekor = tabloSurumuUygula(kayit, tablo.v, ozet);
 const ogretici = ogreticiTablosu(tablo.levels, M);
 const patronIlk = patronIlkGorunus(tablo.levels);
 let renk = renkleriOku();
@@ -322,7 +325,7 @@ function dokunusIsle(gercekZaman: number): void {
       return;
     }
     if (sonuc.tip === "acildi") {
-      const yeni: Best = { s: sonuc.yildiz, t: +sonuc.sure.toFixed(2) };
+      const yeni: Best = { s: sonuc.yildiz, t: +sonuc.sure.toFixed(2), h: ozet(durum.level.n) };
       const oncekiVardi = kayit.bests[durum.level.n] !== undefined;
       titret(ayarlar, "acildi"); cal(ayarlar, "acildi");
       const rekor = rekorKaydet(kayit, durum.level.n, yeni);
@@ -339,7 +342,7 @@ function dokunusIsle(gercekZaman: number): void {
 const oyun = dongu({
   adim(dt, gercekZaman) {
     if (oyunDonuk()) { girdi.temizle(); return false; }
-    dokunusIsle(gercekZaman);
+    dokunusIsle(girdiEsigi(gercekZaman));
     const s = step(durum, dt);
     if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); cal(ayarlar, "kayip"); yazKoru(M.sureDoldu(durum.rings.filter(r => !r.locked).length)); return true; }
     if (s.tip === "bitti") {
@@ -814,7 +817,7 @@ ui.yedekYukle.addEventListener("click", () => {
   yedekOnayiSifirla();
   kaydiDegistir(kayit, yeni);
   // Yedek başka bir tablodan gelmiş olabilir; aynı kural işler.
-  tabloSurumuUygula(kayit, tablo.v);
+  tabloSurumuUygula(kayit, tablo.v, ozet);
   ui.yedekNot.textContent = M.yedekYuklendi(bitirilenLevel(kayit));
   ipucuKilidiSifirla();
   levelYukle(acilisBolumu(kayit));

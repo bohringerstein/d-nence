@@ -172,6 +172,26 @@ export function validateTable(data: unknown): string[] {
   return err;
 }
 
+/**
+ * Bir bölümün özeti: tanımı ve yıldız eşikleri. 8 onaltılık hane (FNV-1a, 32 bit).
+ *
+ * Neden: tablo damgası (`v`) bütün tabloya ait; tek bir bölüm düzeltildiğinde bile
+ * BÜTÜN rekorlar siliniyordu. Rekor artık kırıldığı bölümün özetini taşır; tablo
+ * değişince yalnız tanımı değişen bölümlerin rekoru gider. Eşikler özete girer, çünkü
+ * eşik değişince aynı bölümde "2 yıldız"ın anlamı değişir.
+ *
+ * Kriptografik değil: amaç değişikliği fark etmek, saldırıya dayanmak değil.
+ */
+export function bolumOzeti(l: Level, q3: number, q2: number): string {
+  const metin = q3 + "|" + q2 + "|" + JSON.stringify(l);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < metin.length; i++) {
+    h ^= metin.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
 /** Bir özelliğin patron olmayan ilk göründüğü level. Öğretici ipuçları bundan hesaplanır. */
 export function firstSeen(levels: Level[]): Record<string, number> {
   const out: Record<string, number> = {};

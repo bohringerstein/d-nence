@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert";
 import {
-  yerelRng, seriKaristir, ozilintiler, tepeNoktasi, eslesmeTepesi, enUzunSeri, permutasyonTavani
+  yerelRng, seriKaristir, blokKaristir, ozilintiler, tepeNoktasi, eslesmeTepesi, enUzunSeri, permutasyonTavani
 } from "./istatistik.ts";
 
 test("yerelRng aynı tohumda aynı diziyi verir ve [0,1) aralığında kalır", () => {
@@ -107,4 +107,25 @@ test("permutasyonTavani deterministik", () => {
   const olc = (d: number[]): number => eslesmeTepesi(d, 2, 60).deger;
   assert.equal(permutasyonTavani(seri, olc, 77, 100, 0.99),
                permutasyonTavani(seri, olc, 77, 100, 0.99), "aynı tohum aynı tavanı vermeli");
+});
+
+test("blokKaristir parçaların içeriğini korur, yalnız sırayı değiştirir", () => {
+  const seri = Array.from({ length: 250 }, (_, i) => i);
+  const k = blokKaristir(seri, yerelRng(7), 100);
+  for (const [a, b] of [[0, 100], [100, 200], [200, 250]]) {
+    assert.deepEqual([...k.slice(a, b)].sort((x, y) => x - y), seri.slice(a, b));
+  }
+  assert.notDeepEqual(k, seri);
+});
+
+test("blok içi boş hipotez eğilimli seride yanlış alarm vermez, gerçek periyodu yine yakalar", () => {
+  // Eğilimli ama periyotsuz seri: 6'ların payı %40'tan %80'e çıkıyor.
+  const r = yerelRng(11);
+  const egilimli = Array.from({ length: 800 }, (_, i) => (r() < 0.4 + 0.4 * i / 800 ? 6 : 5));
+  const olc = (d: number[]): number => eslesmeTepesi(d, 20, 300).deger;
+  const olcum = olc(egilimli);
+  assert.ok(olcum <= permutasyonTavani(egilimli, olc, 5, 400, 0.99, 100), "eğilim tekrar sayılmamalı");
+  // Aynı seriye 37 periyotlu bir desen gömülürse yakalanmalı.
+  const periyodik = egilimli.map((_, i) => (i % 37 < 18 ? 6 : 5));
+  assert.ok(olc(periyodik) > permutasyonTavani(periyodik, olc, 5, 400, 0.99, 100), "periyot yakalanmalı");
 });

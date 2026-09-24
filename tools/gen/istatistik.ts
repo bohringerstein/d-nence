@@ -16,6 +16,28 @@ export function yerelRng(tohum: number): () => number {
 }
 
 /** Fisher-Yates. Girdi dizisini DEĞİŞTİRMEZ; çokküme korunur. */
+/**
+ * Seriyi ardışık `blok` uzunluğundaki parçaların İÇİNDE karıştırır; parçalar yerinde kalır.
+ *
+ * Neden: dizi bilerek EĞİLİMLİ olduğunda (ör. geç oyunda 6 halkalı bölümlerin payı
+ * artıyor) tam karıştırma bu eğilimi de yok eder. O zaman komşu bölümlerin benzer
+ * olması — yavaş değişen bir dağılımın doğal sonucu — "tekrar" sayılır ve boş hipotez
+ * haksız yere düşük kalır. Blok içi karıştırma eğilimi blok çözünürlüğünde korur ama
+ * blok içindeki ve bloklar arası her HİZALAMAYI rastgeleler; aranan şey (belirli bir
+ * gecikmede kendini tekrar eden desen) yine yok edilir.
+ */
+export function blokKaristir<T>(a: readonly T[], r: () => number, blok: number): T[] {
+  const b = [...a];
+  for (let bas = 0; bas < b.length; bas += blok) {
+    const son = Math.min(b.length, bas + blok);
+    for (let i = son - 1; i > bas; i--) {
+      const j = bas + Math.floor(r() * (i - bas + 1));
+      [b[i], b[j]] = [b[j], b[i]];
+    }
+  }
+  return b;
+}
+
 export function seriKaristir<T>(a: readonly T[], r: () => number): T[] {
   const b = [...a];
   for (let i = b.length - 1; i > 0; i--) {
@@ -102,11 +124,11 @@ export function enUzunSeri(d: readonly boolean[]): number {
  * Seriler arası düzeltme çağıranın işi (bkz. PERM_DILIM, Bonferroni).
  */
 export function permutasyonTavani<T>(
-  seri: readonly T[], olc: (d: T[]) => number, tohum: number, tur: number, dilim: number
+  seri: readonly T[], olc: (d: T[]) => number, tohum: number, tur: number, dilim: number, blok = 0
 ): number {
   const r = yerelRng(tohum);
   const v: number[] = [];
-  for (let k = 0; k < tur; k++) v.push(olc(seriKaristir(seri, r)));
+  for (let k = 0; k < tur; k++) v.push(olc(blok > 0 ? blokKaristir(seri, r, blok) : seriKaristir(seri, r)));
   v.sort((a, b) => a - b);
   return v[Math.min(v.length - 1, Math.floor(tur * dilim))];
 }

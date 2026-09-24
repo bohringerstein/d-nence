@@ -348,3 +348,35 @@ test("Baştan başla birleştirmeyle geri alınmaz", () => {
   levelKaydet(k, 1);
   assert.equal(oku().enUzak, 1);
 });
+
+test("bölüm başına özet: yalnız tanımı değişen bölümün rekoru silinir", () => {
+  const ozetA: Record<number, string> = { 1: "aaaa0001", 2: "aaaa0002", 3: "aaaa0003" };
+  yaz({ level: 3, enUzak: 3, tabloSurum: "t1", bests: {
+    1: { s: 3, t: 4, h: "aaaa0001" }, 2: { s: 2, t: 5, h: "aaaa0002" }, 3: { s: 1, t: 6, h: "aaaa0003" } } });
+  const k = oku();
+  // Yeni tablo: yalnız 2. bölüm değişti.
+  const ozetB: Record<number, string> = { ...ozetA, 2: "bbbb0002" };
+  const silinen = tabloSurumuUygula(k, "t2", n => ozetB[n]);
+  assert.equal(silinen, 1);
+  assert.deepEqual(Object.keys(k.bests).sort(), ["1", "3"]);
+  assert.equal(oku().tabloSurum, "t2");
+});
+
+test("özetten önceki rekor: aynı tablodaysa benimsenir ve özet yazılır, başka tablodaysa silinir", () => {
+  yaz({ level: 2, enUzak: 2, tabloSurum: "t1", bests: { 1: { s: 3, t: 4 }, 2: { s: 2, t: 5 } } });
+  const k = oku();
+  assert.equal(tabloSurumuUygula(k, "t1", n => "ozet" + n), 0);
+  assert.equal(oku().bests[1].h, "ozet1", "benimsenen rekor özetini almalı");
+
+  yaz({ level: 2, enUzak: 2, tabloSurum: "eski", bests: { 1: { s: 3, t: 4 } } });
+  const e = oku();
+  assert.equal(tabloSurumuUygula(e, "t1", n => "ozet" + n), 1, "başka tablonun özetsiz rekoru silinmeli");
+  assert.equal(oku().enUzak, 2, "ilerleme korunmalı");
+});
+
+test("damgadan önceki kayıt özetle de cezalandırılmaz", () => {
+  yaz({ level: 2, enUzak: 2, bests: { 1: { s: 3, t: 4 } } });
+  const k = oku();
+  assert.equal(tabloSurumuUygula(k, "t1", n => "ozet" + n), 0);
+  assert.equal(oku().bests[1].h, "ozet1");
+});

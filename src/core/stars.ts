@@ -23,7 +23,14 @@ export const starCount = (q: number, q3: number, q2: number): Stars =>
   q >= q3 ? 3 : q >= q2 ? 2 : 1;
 
 /** Rekor karşılaştırması: daha çok yıldız her zaman daha iyi, eşit yıldızda kısa süre kazanır. */
-export interface Best { s: Stars; t: number }
+export interface Best {
+  s: Stars; t: number;
+  /**
+   * Rekorun kırıldığı bölümün özeti (bkz. levels.ts `bolumOzeti`). Tablo değişince yalnız
+   * TANIMI değişen bölümlerin rekorları silinir. Yoksa rekor özetten önceki dönemden gelir.
+   */
+  h?: string;
+}
 
 export const isBetter = (yeni: Best, eski: Best | undefined): boolean =>
   !eski || yeni.s > eski.s || (yeni.s === eski.s && yeni.t < eski.t);

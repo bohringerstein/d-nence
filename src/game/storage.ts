@@ -61,6 +61,7 @@ function ayikla(ham: unknown): Kayit {
       if (!gecerliYildiz(b.s)) continue;
       if (typeof b.t !== "number" || !Number.isFinite(b.t) || b.t < 0) continue;
       k.bests[n] = { s: b.s, t: b.t };
+      if (typeof b.h === "string" && b.h.length <= 16) k.bests[n].h = b.h;
     }
   }
   // Bu alan sonradan eklendi ve eski kayıtlarda YOK. O durumda türetilir: oynanmış en
@@ -243,12 +244,31 @@ export function kaydiDegistir(k: Kayit, yeni: Kayit): void {
  * Yani oyuncu yıldızlarını kaybeder ama 412 bölümlük ilerlemesini kaybetmez — yanlış
  * bir rekoru taşımakla bütün ilerlemeyi silmek arasında seçim yapmak gerekmiyor.
  */
-export function tabloSurumuUygula(k: Kayit, surum: string | undefined): number {
-  if (!surum || k.tabloSurum === surum) return 0;
-  const silinen = k.tabloSurum === undefined ? 0 : Object.keys(k.bests).length;
-  if (k.tabloSurum !== undefined) k.bests = {};
-  k.tabloSurum = surum;
-  yaz(k);
+export function tabloSurumuUygula(
+  k: Kayit, surum: string | undefined, ozet?: (n: number) => string | undefined
+): number {
+  if (!ozet) {
+    if (!surum || k.tabloSurum === surum) return 0;
+    const silinen = k.tabloSurum === undefined ? 0 : Object.keys(k.bests).length;
+    if (k.tabloSurum !== undefined) k.bests = {};
+    k.tabloSurum = surum;
+    yaz(k);
+    return silinen;
+  }
+  // BÖLÜM BAŞINA KURAL. Rekor özet taşıyorsa bölümün bugünkü özetiyle karşılaştırılır:
+  // eşitse kalır, değilse o bölüm değişmiştir ve yalnız o rekor silinir. Özet
+  // taşımıyorsa (özetten önceki kayıt) eski kural işler: damga eşleşiyorsa ya da hiç
+  // yoksa rekor benimsenir ve özeti yazılır; damga farklıysa silinir.
+  let silinen = 0, degisti = false;
+  const benimse = k.tabloSurum === undefined || k.tabloSurum === surum;
+  for (const [anahtar, b] of Object.entries(k.bests)) {
+    const n = Number(anahtar), h = ozet(n);
+    if (h !== undefined && b.h === h) continue;
+    if (h !== undefined && b.h === undefined && benimse) { b.h = h; degisti = true; continue; }
+    delete k.bests[n]; silinen++; degisti = true;
+  }
+  if (surum && k.tabloSurum !== surum) { k.tabloSurum = surum; degisti = true; }
+  if (degisti) yaz(k);
   return silinen;
 }
 

@@ -8,6 +8,19 @@
 // Bu, oyuncunun kendi hatası değil motorun eklediği hatadır ve ekran hızına göre değişir.
 // Damgayla oyun, girdi açısından kare hızından bağımsız olur.
 
+import { ADIM } from "../core/index.ts";
+
+/**
+ * Fizik adımının SONU verildiğinde, bu adımdan önce işlenecek dokunuşların eşiği.
+ *
+ * Dokunuş, adımın BAŞINDAKİ duruma uygulanır (kilit, `step`ten önce işlenir). Eşik adımın
+ * sonu olsaydı dokunuş hep geriye, yani ERKENE yuvarlanırdı: ölçüldü, ortalama −4,17 ms,
+ * aralık [−8,33, 0]. Üreticinin insan modeli ise en yakına yuvarlıyor; oyun bu yüzden
+ * modelden ~3 puan zordu (her ms ~0,65 puan). Eşik adımın ORTASI olunca dokunuş en yakın
+ * adım sınırına düşer: ortalama 0, aralık ±4,17 ms — üreticiyle aynı kural.
+ */
+export const girdiEsigi = (adimSonu: number): number => adimSonu - ADIM * 1000 / 2;
+
 export interface Girdi {
   /**
    * Fizik saati `gercekZaman`'a (performance.now() ölçeğinde, ms) ulaştığında
