@@ -1,5 +1,20 @@
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { execSync } from "node:child_process";
+
+/**
+ * Derlemenin kimliği: commit'in kısa özeti. Ayarların altında görünür; "bende hangi
+ * sürüm açık" sorusunun cevabı. Yayın öncesi incelemede canlı sitenin "eski" sanılması
+ * tam olarak bu yüzden oldu: servis çalışanı eski sürümü açıyordu ve ekranda bunu
+ * söyleyen hiçbir şey yoktu. Vercel commit'i ortam değişkeniyle verir; yerelde git'e
+ * sorulur; ikisi de yoksa "yerel".
+ */
+function surum(): string {
+  const vercel = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (vercel) return vercel.slice(0, 7);
+  try { return execSync("git rev-parse --short=7 HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); }
+  catch { return "yerel"; }
+}
 
 // Dönence, telefonda "ana ekrana ekle" ile kurulabilen bir web uygulaması olarak yayınlanır.
 // Mağaza sürümü istenirse ileride Capacitor ile paketlenir; bu yüzden oyun kodu DOM'a
@@ -7,6 +22,7 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   // Göreli taban: oyun bir alan adının kökünde de, alt klasörde de aynı şekilde çalışır.
   base: "./",
+  define: { __SURUM__: JSON.stringify(surum()) },
   build: {
     target: "es2022",
     outDir: "dist",

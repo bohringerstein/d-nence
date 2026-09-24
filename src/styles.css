@@ -548,6 +548,7 @@ canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 /* Ayarlardaki gizlilik bağlantısı: sessiz bir metin bağlantısı, düğme değil. Seyrek
    açılır ama her iki mağaza da uygulamanın içinde bulunmasını şart koşuyor. */
 .gizlilikSatir { margin: 1rem 0 0; font-size: 0.85rem; }
+.surumSatir { margin: 0.35rem 0 0; font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .gizlilikSatir a { color: var(--muted); }
 .gizlilikSatir a:hover, .gizlilikSatir a:focus-visible { color: var(--ink); }
 

@@ -104,6 +104,8 @@ export interface Metinler {
   erisilebilirlik: string;
   /** Açık kaynak lisansları bağlantısı (public/lisanslar.html, üretilir). */
   lisanslar: string;
+  /** Ayarların altındaki sürüm satırı: derleme ve tablo damgası. */
+  surum: (derleme: string, tablo: string) => string;
 
   // ---- Duraklatma ----
   duraklatildi: string;

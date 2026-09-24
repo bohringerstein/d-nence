@@ -53,6 +53,7 @@ export const TR: Metinler = {
   gizlilik: "Gizlilik politikası",
   erisilebilirlik: "Erişilebilirlik",
   lisanslar: "Lisanslar",
+  surum: (derleme, tablo) => `Sürüm ${derleme} · bölümler ${String(tablo).slice(0, 7)}`,
 
   duraklatildi: "Duraklatıldı",
   duraklatAciklama: kalan => `${kalan} saniyen kaldı. Halkalar tam durduğun yerde bekliyor.`,

@@ -47,6 +47,7 @@ export interface Kabuk {
   sesSatir: HTMLElement;
   dilKutu: HTMLSelectElement;
   temaKutu: HTMLSelectElement;
+  surumSatir: HTMLElement;
   uyari: HTMLElement;
   /** Ayarlar panelindeki ilerleme özeti (bölüm + yıldız). */
   ozet: HTMLElement;
@@ -198,6 +199,7 @@ export const html = (m: Metinler): string => `
       <p class="gizlilikSatir"><a href="./gizlilik.html">${m.gizlilik}</a> ·
         <a href="./erisilebilirlik.html">${m.erisilebilirlik}</a> ·
         <a href="./lisanslar.html">${m.lisanslar}</a></p>
+      <p class="surumSatir" id="surumSatir"></p>
       <div class="kutuAlt"><button id="ayarKapat" type="button">${m.tamam}</button></div>
     </div>
   </div>
@@ -326,6 +328,7 @@ export function kabukKur(hedef: HTMLElement, m: Metinler, nasilIcerik: string): 
     sesSatir: bul(hedef, "sesSatir"),
     dilKutu: bul<HTMLSelectElement>(hedef, "dilKutu"),
     temaKutu: bul<HTMLSelectElement>(hedef, "temaKutu"),
+    surumSatir: bul(hedef, "surumSatir"),
     uyari: bul(hedef, "uyari"),
     ozet: bul(hedef, "ozet"),
     yedek: bul(hedef, "yedek"),

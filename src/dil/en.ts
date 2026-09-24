@@ -64,6 +64,7 @@ export const EN: Metinler = {
   gizlilik: "Privacy policy",
   erisilebilirlik: "Accessibility",
   lisanslar: "Licences",
+  surum: (derleme, tablo) => `Version ${derleme} · levels ${String(tablo).slice(0, 7)}`,
 
   duraklatildi: "Paused",
   duraklatAciklama: kalan => `${kalan} seconds left. The rings are waiting exactly where you stopped them.`,

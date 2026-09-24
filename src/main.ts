@@ -610,6 +610,8 @@ function ayarPaneliAc(): void {
   ui.sesSatir.hidden = !sesVarMi();
   ui.dilKutu.value = dilKodu;
   ui.temaKutu.value = ayarlar.tema;
+  // Sürüm ve tablo damgası: hangi derlemenin ve hangi bölüm tablosunun açık olduğu.
+  ui.surumSatir.textContent = M.surum(__SURUM__, tablo.v ?? "—");
   // Cihaz titreşimi desteklemiyorsa (iOS Safari) seçeneği hiç gösterme.
   ui.titresimSatir.hidden = !titresimVarMi();
   ui.secim.hidden = true;
