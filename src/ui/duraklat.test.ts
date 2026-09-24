@@ -185,10 +185,14 @@ test("yeni sürüm yalnızca GÜVENLİ anlarda uygulanıyor", () => {
   const kazanma = main.slice(main.indexOf('if (sonraki.tip === "bitis")'));
   assert.ok(kazanma.slice(0, 700).includes("guncellemeyiIste(sonraki.n)"),
     "bölüm sınırında güncelleme istenmeli");
-  // Duraklatmadan dönerken: oyuncu zaten durmuş.
-  const devam = main.slice(main.indexOf("function duraklatmaKapat("));
-  assert.ok(devam.slice(0, 400).includes("guncellemeyiIste("),
-    "duraklatmadan dönerken güncelleme istenmeli");
+  // Kayıptan sonra: bölüm zaten baştan başlıyor.
+  const kayip = main.slice(main.indexOf('if (durum.asama === "crash") {'));
+  assert.ok(kayip.slice(0, 300).includes("guncellemeyiIste(durum.level.n)"),
+    "kayıp sonrası yeniden başlamada güncelleme istenmeli");
+  // Duraklatmadan dönerken DEĞİL: yenileme bölümü baştan başlatır, duraklatmanın sözünü bozar.
+  const devam = main.slice(main.indexOf("function duraklatmaKapat("), main.indexOf("ui.clock.addEventListener"));
+  assert.ok(!devam.includes("guncellemeyiIste("),
+    "duraklatmadan dönerken güncelleme uygulanmamalı");
   // Sonuca BAKILMAMALI: yenileme gelmezse oyun takılıp kalırdı.
   assert.ok(!/if \(guncellemeyiIste\(/.test(main),
     "güncelleme isteğinin sonucuna göre dallanılmamalı");
@@ -210,4 +214,14 @@ test("güncelleme uygulanmadan önce ilerleme yazılıyor", () => {
   const storage = fs.readFileSync(path.join(kok, "src", "game", "storage.ts"), "utf8");
   assert.ok(/sessionStorage\.setItem\(DEVAM_KEY/.test(storage),
     "devam noktası oturum depolamasında olmalı");
+});
+
+test("dil değişimiyle yenilemeden önce devam noktası yazılıyor", () => {
+  // Yenileme soğuk açılış gibidir ve çıpası `enUzak`tır; işaret yazılmazsa bölüm
+  // seçiminden 5'e dönmüş 412'lik oyuncu dil değiştirince 412'ye atılır.
+  const i = main.indexOf('ui.dilKutu.addEventListener("change"');
+  assert.ok(i >= 0, "dil değişim dinleyicisi bulunamadı");
+  const govde = main.slice(i, main.indexOf("});", i));
+  const yaz = govde.indexOf("devamNoktasiYaz("), yenile = govde.indexOf("location.reload()");
+  assert.ok(yaz >= 0 && yenile > yaz, "devamNoktasiYaz, location.reload'dan önce çağrılmalı");
 });

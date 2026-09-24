@@ -33,6 +33,16 @@ export interface Kayit {
   tabloSurum?: string;
   /** Level numarası -> en iyi sonuç. */
   bests: Record<number, Best>;
+  /**
+   * Kaydın NESLİ: ilerlemeyi bilerek geri alan her eylemde ("Baştan başla", yedekten
+   * yükleme) artar. Yoksa 0 sayılır.
+   *
+   * Neden: oyun sırasındaki yazmalar diskle birleşir ve `enUzak` iki kaydın büyüğüdür
+   * (bkz. birlestirVeYaz). Bu, iki sekmenin birbirinin ilerlemesini silmesini önler ama
+   * BİLEREK geri almayı da geri alıyordu: A sekmesinde "Baştan başla", B sekmesinde bir
+   * bölüm kazanmak → diskte enUzak yine 413. Nesil, "bu küçülme bilinçli" demenin yolu.
+   */
+  nesil?: number;
 }
 
 const bos = (): Kayit => ({ level: 1, enUzak: 1, bests: {} });
@@ -49,6 +59,7 @@ function ayikla(ham: unknown): Kayit {
     k.level = o.level;
   }
   if (typeof o.tabloSurum === "string" && o.tabloSurum.length <= 64) k.tabloSurum = o.tabloSurum;
+  if (typeof o.nesil === "number" && Number.isInteger(o.nesil) && o.nesil >= 0) k.nesil = o.nesil;
   const enUzakVar = typeof o.enUzak === "number" && Number.isInteger(o.enUzak) &&
     o.enUzak >= 1 && o.enUzak <= LEVEL_COUNT;
   if (enUzakVar) k.enUzak = o.enUzak as number;
@@ -125,18 +136,35 @@ export const kayitEskidiMi = (): boolean => eskiSekme;
  * "Baştan başla" ve yedekten yükleme bu yolu KULLANMAZ: onlar ilerlemeyi bilerek
  * küçültür, birleştirme bunu geri alırdı.
  */
-function birlestirVeYaz(k: Kayit): void {
-  let disk: Kayit | null = null;
+function diskOku(): Kayit | null {
   try {
     const ham = localStorage.getItem(KEY);
-    if (ham) disk = ayikla(JSON.parse(ham));
-  } catch { /* okunamıyorsa birleştirilecek bir şey yok */ }
+    return ham ? ayikla(JSON.parse(ham)) : null;
+  } catch { return null; }
+}
+
+/**
+ * @returns Bu sekmenin REKORLARI diske yazıldı mı. Eski sekmede false: rekor yazılmadıysa
+ *   oyuncuya "rekor" denmemeli.
+ */
+function birlestirVeYaz(k: Kayit): boolean {
+  const disk = diskOku();
   if (disk) {
+    // Başka bir sekme ilerlemeyi BİLEREK geri aldı (bkz. `nesil`). Birleştirmek onu geri
+    // alırdı; bu sekme eskidir, yazmaz ve ilk güvenli anda yenilenir. Ekrandaki değerler
+    // diskten tazelenir ama NESİL KOPYALANMAZ: kopyalansaydı bir sonraki yazma engeli
+    // geçer ve bu sekmenin bellekteki rekorlarını geri yazardı (test bunu yakaladı).
+    if ((disk.nesil ?? 0) > (k.nesil ?? 0)) {
+      eskiSekme = true;
+      k.level = disk.level; k.enUzak = disk.enUzak; k.bests = { ...disk.bests };
+      k.tabloSurum = disk.tabloSurum;
+      return false;
+    }
     k.enUzak = Math.max(k.enUzak, disk.enUzak);
     if (disk.tabloSurum !== undefined && k.tabloSurum !== undefined && disk.tabloSurum !== k.tabloSurum) {
       eskiSekme = true;
       yaz({ ...disk, level: k.level, enUzak: k.enUzak });
-      return;
+      return false;
     }
     for (const [n, b] of Object.entries(disk.bests)) {
       const i = Number(n);
@@ -145,7 +173,13 @@ function birlestirVeYaz(k: Kayit): void {
     if (k.tabloSurum === undefined) k.tabloSurum = disk.tabloSurum;
   }
   yaz(k);
+  return true;
 }
+
+/** Bilinçli geri alma: nesil, diskteki ve bellekteki neslin büyüğünden bir fazla olur. */
+const nesliArtir = (k: Kayit): void => {
+  k.nesil = Math.max(diskOku()?.nesil ?? 0, k.nesil ?? 0) + 1;
+};
 
 export function levelKaydet(k: Kayit, level: number): void {
   k.level = level;
@@ -233,6 +267,7 @@ export function kaydiDegistir(k: Kayit, yeni: Kayit): void {
   k.enUzak = yeni.enUzak;
   k.bests = yeni.bests;
   k.tabloSurum = yeni.tabloSurum;
+  nesliArtir(k);
   yaz(k);
 }
 
@@ -272,6 +307,24 @@ export function tabloSurumuUygula(
   return silinen;
 }
 
+let kaliciIstendi = false;
+/**
+ * Tarayıcıdan kaydın silinmemesini ister (`navigator.storage.persist`). Bir kez.
+ *
+ * Neden: tarayıcı sekmesinde (ana ekrana eklenmeden) oynayan oyuncunun kaydı, depolama
+ * baskısında ya da Safari'de 7 gün kullanılmayınca tarayıcı tarafından silinebilir.
+ * İlk bölüm bitince çağrılır: kaybedilecek bir şey olduğu an. Chrome çoğu zaman sessizce
+ * karar verir; izin penceresi açılmaz. Desteklenmiyorsa ya da reddedilirse hiçbir şey olmaz.
+ */
+export function kaliciKayitIste(): void {
+  if (kaliciIstendi) return;
+  kaliciIstendi = true;
+  try {
+    const d = typeof navigator !== "undefined" ? navigator.storage : undefined;
+    if (d && typeof d.persist === "function") void d.persist().catch(() => { /* olmadan da oynanır */ });
+  } catch { /* olmadan da oynanır */ }
+}
+
 /** Bölüm seçiminde oynanabilir mi? Ulaşılan en uzak bölüme kadar her şey açıktır. */
 export const acikMi = (k: Kayit, n: number): boolean => n >= 1 && n <= k.enUzak;
 
@@ -279,8 +332,7 @@ export const acikMi = (k: Kayit, n: number): boolean => n >= 1 && n <= k.enUzak;
 export function rekorKaydet(k: Kayit, level: number, yeni: Best): boolean {
   if (!isBetter(yeni, k.bests[level])) return false;
   k.bests[level] = yeni;
-  birlestirVeYaz(k);
-  return true;
+  return birlestirVeYaz(k);
 }
 
 /**
@@ -293,6 +345,7 @@ export function rekorKaydet(k: Kayit, level: number, yeni: Best): boolean {
 export function bastanBasla(k: Kayit): void {
   k.level = 1;
   k.enUzak = 1;
+  nesliArtir(k);
   yaz(k);
 }
 

@@ -21,7 +21,7 @@ class SahteDepo {
 const depo = new SahteDepo();
 Object.defineProperty(globalThis, "localStorage", { value: depo, configurable: true });
 
-const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, acikMi, tabloSurumuUygula, disaAktar, iceAktar, kayitEskidiMi } =
+const { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, acikMi, tabloSurumuUygula, disaAktar, iceAktar, kayitEskidiMi, kaydiDegistir, kaliciKayitIste } =
   await import("./storage.ts");
 const { LEVEL_COUNT } = await import("../core/index.ts");
 
@@ -379,4 +379,49 @@ test("damgadan önceki kayıt özetle de cezalandırılmaz", () => {
   const k = oku();
   assert.equal(tabloSurumuUygula(k, "t1", n => "ozet" + n), 0);
   assert.equal(oku().bests[1].h, "ozet1");
+});
+
+test("nesil: A'da Baştan başla, B'de kazanma — sıfırlama kalıcı, B eski sayılır", () => {
+  yaz({ level: 412, enUzak: 412, tabloSurum: "t", bests: { 5: { s: 2, t: 4 } } });
+  const a = oku(), b = oku();
+  bastanBasla(a);
+  levelKaydet(b, 413);
+  const yeni = rekorKaydet(b, 412, { s: 3, t: 3 });
+  const disk = oku();
+  assert.equal(disk.enUzak, 1, "sıfırlama başka sekme tarafından geri alınmamalı");
+  assert.equal(disk.bests[412], undefined, "eski sekmenin rekoru yazılmamalı");
+  assert.equal(yeni, false, "yazılmayan rekor 'rekor' sayılmamalı");
+  assert.equal(kayitEskidiMi(), true);
+  assert.equal(b.enUzak, 1, "eski sekmenin belleği diskle tazelenmeli");
+});
+
+test("nesil: A'da yedek yükleme, B'de rekor — diskte yedeğin rekorları kalır", () => {
+  yaz({ level: 20, enUzak: 20, tabloSurum: "t", bests: { 1: { s: 3, t: 2 } } });
+  const a = oku(), b = oku();
+  kaydiDegistir(a, { level: 3, enUzak: 3, tabloSurum: "t", bests: { 1: { s: 1, t: 9 } } });
+  rekorKaydet(b, 1, { s: 3, t: 1 });
+  const disk = oku();
+  assert.deepEqual(disk.bests, { 1: { s: 1, t: 9 } });
+  assert.equal(disk.enUzak, 3);
+});
+
+test("nesil: alanı olmayan kayıt 0 sayılır; art arda iki sıfırlama nesli iki artırır", () => {
+  yaz({ level: 5, enUzak: 5, bests: {} });
+  const k = oku();
+  assert.equal(k.nesil, undefined);
+  bastanBasla(k); bastanBasla(k);
+  assert.equal(oku().nesil, 2);
+  // Nesil eşitken bugünkü birleştirme aynen çalışır.
+  const x = oku(), y = oku();
+  levelKaydet(x, 7); levelKaydet(y, 3);
+  assert.equal(oku().enUzak, 7);
+});
+
+test("kalıcı kayıt bir kez istenir; destek yoksa sessiz geçer", () => {
+  let cagri = 0;
+  Object.defineProperty(globalThis.navigator, "storage", {
+    value: { persist: async () => { cagri++; return true; } }, configurable: true
+  });
+  kaliciKayitIste(); kaliciKayitIste(); kaliciKayitIste();
+  assert.equal(cagri, 1);
 });

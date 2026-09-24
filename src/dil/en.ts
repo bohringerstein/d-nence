@@ -58,6 +58,7 @@ export const EN: Metinler = {
   yedekYukle: "Restore",
   yedekYukleOnay: "Are you sure? Your current progress will be erased",
   yedekGecersiz: "Could not read the code",
+  yedekBos: "This backup is empty; your progress was not replaced",
   yedekYuklendi: bolum => `Progress restored: ${cogul(bolum, "level", "levels")}`,
   gizlilik: "Privacy policy",
 

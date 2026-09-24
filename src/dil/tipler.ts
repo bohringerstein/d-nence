@@ -92,6 +92,8 @@ export interface Metinler {
   /** İkinci basışta çıkan onay: yükleme var olan ilerlemenin üstüne yazar. */
   yedekYukleOnay: string;
   yedekGecersiz: string;
+  /** Kod okundu ama içinde ilerleme yok; mevcut ilerlemenin üstüne yazılmaz. */
+  yedekBos: string;
   yedekYuklendi: (bolum: number) => string;
 
   /** Ayarlardaki gizlilik politikası bağlantısı (public/gizlilik.html). */

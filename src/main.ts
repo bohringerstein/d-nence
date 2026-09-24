@@ -16,7 +16,7 @@ import { tuvalKur, ciz } from "./game/render.ts";
 import { renkleriOku, renklerHazir, hareketAzalt, tercihleriIzle, temayiUygula } from "./game/theme.ts";
 import { ogreticiTablosu, patronIlkGorunus, ipucu, yildizYazisi, yildizParcalari, sureYazisi, kayipYazisi, kalanYazisi } from "./game/hints.ts";
 import { oku, levelKaydet, rekorKaydet, bastanBasla, toplamYildiz, bitirilenLevel, tabloSurumuUygula, disaAktar, iceAktar, kaydiDegistir,
-  devamNoktasiYaz, devamNoktasiOku } from "./game/storage.ts";
+  devamNoktasiYaz, devamNoktasiOku, kaliciKayitIste } from "./game/storage.ts";
 import { izgaraHtml, sayfaSayisi, sayfasi, aralik } from "./ui/secim.ts";
 import { acilisBolumu, resetOnayHedefi, kazanincaSonraki, bitisCikisi } from "./game/akis.ts";
 import { ayarlariOku, ayarlariYaz, halkaOpakligi, titret, titresimVarMi } from "./game/ayarlar.ts";
@@ -331,6 +331,7 @@ function dokunusIsle(gercekZaman: number): void {
       const oncekiVardi = kayit.bests[durum.level.n] !== undefined;
       titret(ayarlar, "acildi"); cal(ayarlar, "acildi");
       const rekor = rekorKaydet(kayit, durum.level.n, yeni);
+      kaliciKayitIste();
       yazKoru(M.sonucSatiri(M.yildizEtiketi[sonuc.yildiz], yildizYazisi(sonuc.yildiz), sureYazisi(sonuc.sure, M)) +
           kalanYazisi(sonuc.q, tablo.q3, tablo.q2, M) +
           (rekor && oncekiVardi ? M.rekorEki : ""));
@@ -348,8 +349,11 @@ const oyun = dongu({
     const s = step(durum, dt);
     if (s.tip === "sureDoldu") { titret(ayarlar, "kayip"); cal(ayarlar, "kayip"); yazKoru(M.sureDoldu(durum.rings.filter(r => !r.locked).length)); return true; }
     if (s.tip === "bitti") {
-      if (durum.asama === "crash") levelYukle(durum.level.n, true);
-      else {
+      if (durum.asama === "crash") {
+        // Kayıptan sonra bölüm zaten baştan başlıyor: yenileme oyuncudan bir şey götürmez.
+        guncellemeyiIste(durum.level.n);
+        levelYukle(durum.level.n, true);
+      } else {
         const sonraki = kazanincaSonraki(durum.level.n);
         if (sonraki.tip === "bitis") { bitisGoster(); return false; }
         // Bölüm sınırı, yenilemenin oyuncudan hiçbir şey götürmediği tek an.
@@ -457,9 +461,9 @@ function duraklatmaAc(): void {
 }
 
 function duraklatmaKapat(): void {
-  // İkinci güvenli an: oyuncu zaten durmuş. Sonuca bakmadan devam ediyoruz —
-  // yenileme gelmezse örtü açık kalır ve "Devam et" ölürdü.
-  guncellemeyiIste(durum.level.n);
+  // Duraklatmadan dönüş güvenli an DEĞİL: yenileme bölümü baştan başlatıyordu, oysa
+  // duraklatma ekranı "halkalar tam durduğun yerde bekliyor" diye söz veriyor. Güncelleme
+  // yalnız bölüm sınırında (kazanç ya da kayıp) uygulanır.
   ortuKapat(ui.duraklat, ui.canvas, ui.arka);
   mod = "oyun";
   geriSayimBaslat();
@@ -808,7 +812,9 @@ ui.yedekYukle.addEventListener("click", () => {
   const doluKayit = kayit.enUzak > 1 || Object.keys(kayit.bests).length > 0;
   if (!yeni || (bosYedek && doluKayit)) {
     yedekOnayiSifirla();
-    ui.yedekNot.textContent = M.yedekGecersiz;
+    // İki ayrı durum, iki ayrı mesaj: okunamayan kod ile okunan ama BOŞ olan yedek.
+    // Tek mesajla oyuncu, geçerli bir yedeğin "okunamadığını" görüp özelliği bozuk sanıyordu.
+    ui.yedekNot.textContent = yeni ? M.yedekBos : M.yedekGecersiz;
     return;
   }
   if (!yedekOnayBekliyor) {
@@ -849,6 +855,10 @@ ui.dilKutu.addEventListener("change", () => {
   if (!gecerliDilMi(secilen) || secilen === dilKodu) return;
   ayarlar.dil = secilen;
   ayarlariYaz(ayarlar);
+  // Yenilemeden sonra oyuncu TAM bıraktığı bölüme dönmeli (bkz. guncellemeyiIste). Bu
+  // satır yokken bölüm seçiminden 5'e dönmüş 412'lik oyuncu dil değiştirince 412'ye
+  // fırlatılıyordu: soğuk açılışın çıpası `enUzak`.
+  devamNoktasiYaz(durum.level.n);
   location.reload();
 });
 // Ses açılınca hemen bir örnek: ayarın ne yaptığı duyulsun.

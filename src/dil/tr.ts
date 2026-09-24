@@ -47,6 +47,7 @@ export const TR: Metinler = {
   yedekYukle: "Geri yükle",
   yedekYukleOnay: "Emin misin? Şu anki ilerlemen silinir",
   yedekGecersiz: "Kod okunamadı",
+  yedekBos: "Bu yedek boş; ilerlemenin üstüne yazılmadı",
   yedekYuklendi: bolum => `İlerleme yüklendi: ${bolum} bölüm`,
   gizlilik: "Gizlilik politikası",
 
