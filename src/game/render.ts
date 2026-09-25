@@ -272,14 +272,33 @@ export function ciz(t: Tuval, s: LevelState, renk: Renkler, { hareketAzalt, halk
         ctx.stroke();
       } else {
         // Kayıpta dolgu geri gelir: "işte sığmadığın yer" tek bakışta okunmalı.
+        //
+        // AMA YALNIZ YANILAN HALKAYA KADAR. Dilim dışa doğru genişlediği için bütün çıkış
+        // yolunu boyamak, dış halkalar hizasında geniş bir alan gösteriyor ve oyuncuya
+        // "top buradan geçerdi, oyun haksızlık etti" dedirtiyordu (proje sahibinin
+        // gözlemi). Kırmızı merkezden kaybettiren kilidin halkasına kadar dolar ve orada
+        // biter; kesik kontur da aynı sınırı çizer. Süre dolmasında (HEPSI) daralan bir
+        // halka yoktur, eski çizim kalır.
+        const kayipR = s.asama === "crash" && s.crashRing >= 0 ? g.radius(s.crashRing) : null;
         if (s.asama === "crash") {
-          dilim();
+          if (kayipR !== null) {
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, kayipR, bolge.from, bolge.to);
+            ctx.closePath();
+          } else dilim();
           ctx.fillStyle = renk.fail;
           ctx.globalAlpha = KAMA.kayipDolgu;
           ctx.fill();
         }
-        // Renk körlüğü için ikinci işaret: kesik kontur. Geçer kamayla aynı yol.
-        kenar();
+        // Renk körlüğü için ikinci işaret: kesik kontur. Oyun sürerken geçer kamayla aynı
+        // yol (halkaların dışı); kayıpta kırmızı alanın kendisi (merkezden yanılan halkaya).
+        if (kayipR !== null) {
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.arc(0, 0, kayipR, bolge.from, bolge.to);
+          ctx.closePath();
+        } else kenar();
         ctx.globalAlpha = KAMA.gecmezKontur;
         ctx.strokeStyle = renk.fail;
         ctx.lineWidth = KAMA.kalinlik;

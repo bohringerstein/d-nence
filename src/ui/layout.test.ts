@@ -3,7 +3,7 @@
 import test from "node:test";
 import { KAMA_TASMA } from "../game/render.ts";
 import assert from "node:assert";
-import { layout, RATIO, LINE_WIDTH_MIN, LINE_WIDTH_MAX } from "../core/index.ts";
+import { layout, RATIO, LINE_WIDTH_MIN, LINE_WIDTH_MAX, TOP_CIZIM, NEED_PASS } from "../core/index.ts";
 
 /** Üst çubuk + süre çubuğu + alt çubuğun oyun alanından aldığı yaklaşık yükseklik. */
 const KROM = 110;
@@ -66,8 +66,19 @@ test("oranlar şartnamedeki değerlerle aynı", () => {
   const g = layout(1000, 1000, 5);
   assert.equal(g.outer, 440);
   assert.equal(g.inner, 170);
-  assert.equal(g.ballR, 22);
+  // Çizilen top kural boyutunda (TOP_CIZIM), kuralın kendisi RATIO.ball ile kalır.
+  assert.ok(Math.abs(g.ballR - 1000 * TOP_CIZIM) < 1e-9);
   assert.equal(g.step, (440 - 170) / 4);
+});
+
+test("çizilen top eşikte en iç halkadaki açıklığa tam oturur, eşiğin altında sığmaz", () => {
+  // Proje sahibinin gözlemi: kıl payı kayıpta top gözle sığıyordu (kural 3° pay istiyor).
+  const g = layout(360, 360, 6);
+  const aciklik = (derece: number): number => 2 * g.inner * Math.sin(derece * Math.PI / 360);
+  assert.ok(Math.abs(aciklik(NEED_PASS * 180 / Math.PI) - 2 * g.ballR) < 1e-9, "eşikte tam oturmalı");
+  assert.ok(aciklik(NEED_PASS * 180 / Math.PI - 0.5) < 2 * g.ballR, "kıl payı kayıpta top açıklıktan geniş görünmeli");
+  // Zorluk değişmedi: kural hâlâ topun gerçek boyutuna 3° pay ekliyor.
+  assert.equal(RATIO.ball, 0.022);
 });
 
 test("tek halkalı durumda bölme hatası olmuyor", () => {

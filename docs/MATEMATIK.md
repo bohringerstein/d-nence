@@ -56,6 +56,15 @@ Yani oyun "geçti" derken göz "değdi" görüyordu. Yay artık her iki uçtan `
 kadar kısaltılır (`src/game/render.ts`, `halkaCiz`), böylece yuvarlak uç tam boşluk
 sınırında biter ve görünen açıklık mantıksal açıklığa eşit olur.
 
+### 1.2 Top kural boyutunda çizilir
+
+3°'lik emniyet payı görüntüde yoktu: top `r_b = 0,022 S` ile çizilirken kural
+`NEED_PASS = 18,0°` istiyordu. Kıl payı bir kayıpta (17,5°) en iç halkadaki açıklık
+`2 · 0,17 · sin(8,75°) = 0,0517 S`, topun çapı `0,044 S`: top açıklığa %17 payla SIĞIYORDU.
+Oyuncu haklı olarak "geçerdi" diyordu. Top artık `TOP_CIZIM = 0,17 · sin(9°) = 0,0266 S`
+yarıçapla çizilir; eşikte açıklık ile çap eşit, altında top geniş. Kural (`NEED`) ve tablo
+değişmedi.
+
 ---
 
 ## 2. Boşluk genişliği: hata payından türetme

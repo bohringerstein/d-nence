@@ -31,6 +31,20 @@ export const NEED_BINS = Math.ceil(NEED / BIN);
 export const NEED_PASS = NEED_BINS * BIN;
 export const canPass = (w: number): boolean => w >= NEED_PASS;
 
+/**
+ * Topun ÇİZİLDİĞİ yarıçap (kısa kenara oran). Kuralın kendisi değil, kuraldan türetilir.
+ *
+ * Kural topun geçmesi için gerçek boyutuna (`RATIO.ball`, 14,9°) 3° emniyet payı ekleyip
+ * 18° istiyor. Top gerçek boyutunda çizildiğinde kıl payı bir kayıpta (17,5°) en iç halkadaki
+ * açıklık 360 px ekranda ~18,6 px, topun çapı 15,8 px'ti: oyun "sığmadı" derken göz "sığdı"
+ * görüyordu ve oyuncu haksız yere kaybettiğini düşünüyordu (proje sahibinin gözlemi).
+ *
+ * Top artık kuralın gerçekten beklediği boyutta çizilir: en iç halkada tam `NEED_PASS`
+ * genişliğine oturan top. Eşikte açıklığa tam sığar, eşiğin altında sığmadığı görülür.
+ * Zorluk DEĞİŞMEZ: `NEED` ve tablo aynı kalır, yalnız görüntü kuralla örtüşür.
+ */
+export const TOP_CIZIM = RATIO.inner * Math.sin(NEED_PASS / 2);
+
 /** Referans çözücünün kendine bıraktığı pay: insan oyuncunun sapması için yer açar. */
 export const SOLVER_MARGIN = 2 * BIN;
 
@@ -55,7 +69,7 @@ export function layout(width: number, height: number, ringCount: number): Layout
   const step = ringCount > 1 ? (outer - inner) / (ringCount - 1) : 0;
   return {
     S, outer, inner, step,
-    ballR: S * RATIO.ball,
+    ballR: S * TOP_CIZIM,
     lineWidth: Math.max(LINE_WIDTH_MIN, Math.min(LINE_WIDTH_MAX, S * RATIO.lineWidth)),
     radius: (i: number) => outer - i * step
   };

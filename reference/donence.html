@@ -102,6 +102,7 @@ var DonenceCore = (() => {
     SOLVER_HEDEF: () => SOLVER_HEDEF,
     SOLVER_MARGIN: () => SOLVER_MARGIN,
     TAU: () => TAU,
+    TOP_CIZIM: () => TOP_CIZIM,
     applyMask: () => applyMask,
     bolumOzeti: () => bolumOzeti,
     bossMu: () => bossMu,
@@ -150,6 +151,7 @@ var DonenceCore = (() => {
   var NEED_BINS = Math.ceil(NEED / BIN);
   var NEED_PASS = NEED_BINS * BIN;
   var canPass = (w) => w >= NEED_PASS;
+  var TOP_CIZIM = RATIO.inner * Math.sin(NEED_PASS / 2);
   var SOLVER_MARGIN = 2 * BIN;
   var REACT = 0.3;
   var norm = (a) => {
@@ -167,7 +169,7 @@ var DonenceCore = (() => {
       outer,
       inner,
       step,
-      ballR: S * RATIO.ball,
+      ballR: S * TOP_CIZIM,
       lineWidth: Math.max(LINE_WIDTH_MIN, Math.min(LINE_WIDTH_MAX, S * RATIO.lineWidth)),
       radius: (i) => outer - i * step
     };
@@ -467,7 +469,7 @@ var DonenceCore = (() => {
   }
   return __toCommonJS(index_exports);
 })();
-const { ADIM, BIN, BINS, BOSS_ARALIGI, BOSS_LEVELS, DEG, GAP_MAX_DEG, LEVEL_COUNT, LINE_WIDTH_MAX, LINE_WIDTH_MIN, NEED, NEED_BINS, NEED_PASS, OPEN_ALL, PATRON_ANAHTARLARI, RATIO, REACT, SOLVER_HEDEF, SOLVER_MARGIN, TAU, applyMask, bolumOzeti, bossMu, canPass, ciziliYaylar, firstSeen, gapCenters, initialOpen, isBetter, isaretAcisi, largestOpen, layout, liveRings, lockOpen, maskLargest, maskRuns, newMask, norm, peekOpen, solve, starCount, starRatio, stepRings, validateTable, wrap } = DonenceCore;
+const { ADIM, BIN, BINS, BOSS_ARALIGI, BOSS_LEVELS, DEG, GAP_MAX_DEG, LEVEL_COUNT, LINE_WIDTH_MAX, LINE_WIDTH_MIN, NEED, NEED_BINS, NEED_PASS, OPEN_ALL, PATRON_ANAHTARLARI, RATIO, REACT, SOLVER_HEDEF, SOLVER_MARGIN, TAU, TOP_CIZIM, applyMask, bolumOzeti, bossMu, canPass, ciziliYaylar, firstSeen, gapCenters, initialOpen, isBetter, isaretAcisi, largestOpen, layout, liveRings, lockOpen, maskLargest, maskRuns, newMask, norm, peekOpen, solve, starCount, starRatio, stepRings, validateTable, wrap } = DonenceCore;
 // <<< core.js
 </script>
 <script>

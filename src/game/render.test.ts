@@ -10,7 +10,7 @@ import { createLevel } from "./state.ts";
 import { ciz, KAMA } from "./render.ts";
 import type { Tuval } from "./render.ts";
 
-interface Dolgu { renk: string; alfa: number }
+interface Dolgu { renk: string; alfa: number; enUzak: number }
 interface Kontur {
   renk: string; alfa: number; kesikli: boolean; kalinlik: number;
   /** Yolun merkeze en yakın noktası (moveTo/lineTo/arc'tan). */
@@ -36,7 +36,7 @@ function sahteTuval(): { tuval: Tuval; dolgular: Dolgu[]; konturlar: Kontur[]; y
     measureText: (t: string) => ({ width: t.length * 20 }),
     createRadialGradient: () => ({ addColorStop() {} }),
     setLineDash(d: number[]) { kesikli = d.length > 0; },
-    fill() { dolgular.push({ renk: String(ctx.fillStyle), alfa: ctx.globalAlpha }); },
+    fill() { dolgular.push({ renk: String(ctx.fillStyle), alfa: ctx.globalAlpha, enUzak: Math.max(0, ...yol) }); },
     stroke() {
       konturlar.push({ renk: String(ctx.strokeStyle), alfa: ctx.globalAlpha, kesikli,
         kalinlik: ctx.lineWidth, enYakin: Math.min(...yol) });
@@ -198,4 +198,26 @@ test("geri sayım sırasında arka plandaki bölüm numarası çizilmez", () => 
   const b = sahteTuval();
   ciz(b.tuval, createLevel(level(), 1), RENK, { ...SECENEK, numaraGizle: true });
   assert.ok(!b.yazilar.includes("5"), "geri sayımda numara sayımın rakamıyla üst üste binmemeli");
+});
+
+test("kayıpta kırmızı yalnız yanılan halkaya kadar dolar, bütün çıkış yolunu boyamaz", () => {
+  // Proje sahibinin gözlemi: dışa doğru genişleyen dilim, dış halkalar hizasında geniş
+  // görünüp "top buradan geçerdi" dedirtiyordu.
+  const yer = layout(400, 700, 2);
+  for (const halka of [0, 1]) {
+    const g = sahteTuval();
+    const s = createLevel(level(), 1);
+    kanalKur(s, 20);
+    s.asama = "crash";
+    s.crashRing = halka;
+    ciz(g.tuval, s, RENK, SECENEK);
+    const kirmizi = g.dolgular.filter(d => d.renk === RENK.fail && d.alfa > 0.2 && d.alfa < 1);
+    assert.ok(kirmizi.length > 0, "kayıpta kırmızı dolgu olmalı");
+    for (const d of kirmizi) {
+      assert.ok(d.enUzak <= yer.radius(halka) + 1e-6,
+        `halka ${halka}: kırmızı ${d.enUzak.toFixed(1)} px'e uzanıyor, yanılan halka ${yer.radius(halka).toFixed(1)} px`);
+    }
+    const kesik = g.konturlar.filter(k => k.renk === RENK.fail && k.kesikli);
+    assert.ok(kesik.length > 0, "renk körlüğü için kesik kontur kayıpta da kalmalı");
+  }
 });
